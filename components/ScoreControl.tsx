@@ -1,11 +1,13 @@
 export function ScoreControl({
   label,
-  description,
+  lowAnchor,
+  highAnchor,
   value,
   onChange,
 }: {
   label: string;
-  description: string;
+  lowAnchor: string;
+  highAnchor: string;
   value: number;
   onChange: (value: number) => void;
 }) {
@@ -14,7 +16,6 @@ export function ScoreControl({
       <div className="score-label">
         <div>
           <legend>{label}</legend>
-          <p>{description}</p>
         </div>
         <strong>{value || "—"}</strong>
       </div>
@@ -33,10 +34,9 @@ export function ScoreControl({
         ))}
       </div>
       <div className="score-scale">
-        <span>Needs work</span>
-        <span>Exceptional</span>
+        <span>{lowAnchor}</span>
+        <span>{highAnchor}</span>
       </div>
     </fieldset>
   );
 }
-

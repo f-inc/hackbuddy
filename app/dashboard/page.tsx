@@ -107,6 +107,12 @@ export default function DashboardPage() {
     (total, bucket) => total + bucket.count,
     0,
   );
+  const remainingReviews = Math.max(
+    0,
+    data.stats.total - data.stats.completed,
+  );
+  const queueComplete = data.stats.total > 0 && remainingReviews === 0;
+  const judgeHasWork = data.stats.available > 0;
 
   return (
     <AppShell name={name} role={role}>
@@ -116,22 +122,29 @@ export default function DashboardPage() {
         </div>
       )}
       <main className="workspace-main dashboard-main">
-        <section className="page-heading">
+        <section
+          className={`page-heading${role === "judge" ? " judge-page-heading" : ""}`}
+        >
           <div>
-            <span className="eyebrow">Live overview</span>
-            <h1>Dashboard</h1>
+            <h1>{role === "admin" ? "Dashboard" : "Judging overview"}</h1>
             <p>
-              Welcome back, {name}. Here’s what’s happening in the judging room.
+              {role === "admin"
+                ? `Welcome back, ${name}. Here’s what’s happening in the judging room.`
+                : `Welcome back, ${name}. Here’s what still needs your attention.`}
             </p>
           </div>
-          <a className="primary-button link-button" href="/judging">
-            Start judging <span>→</span>
-          </a>
+          {role === "admin" && (
+            <a className="primary-button link-button" href="/judging">
+              Start judging <span>→</span>
+            </a>
+          )}
         </section>
 
         {error && <div className="error-banner page-error">{error}</div>}
 
-        <section className="score-overview card">
+        {role === "admin" ? (
+          <>
+          <section className="score-overview card">
           <div className="score-overview-copy">
             <span className="eyebrow">Score distribution</span>
             <div className="score-average">
@@ -183,9 +196,9 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-        </section>
+          </section>
 
-        <section className="metric-grid metric-grid-secondary">
+          <section className="metric-grid metric-grid-secondary">
           <article className="metric-card card">
             <span>Completed reviews</span>
             <div>
@@ -212,18 +225,6 @@ export default function DashboardPage() {
             </div>
             <p>{data.stats.available} projects waiting in the queue</p>
           </article>
-          {role === "judge" ? (
-            <article className="metric-card card">
-              <span>Your reviews</span>
-              <div>
-                <strong>{data.yourCompleted}</strong>
-                {data.yourAverageScore > 0 && (
-                  <small>{data.yourAverageScore} avg.</small>
-                )}
-              </div>
-              <p>Completed under your judge name</p>
-            </article>
-          ) : (
             <article className="metric-card card">
               <span>Administrator tools</span>
               <div>
@@ -231,10 +232,9 @@ export default function DashboardPage() {
               </div>
               <p>Active sessions available to inspect or release</p>
             </article>
-          )}
-        </section>
+          </section>
 
-        <section className="dashboard-panels">
+          <section className="dashboard-panels">
           <article className="card panel-card">
             <div className="section-header">
               <div>
@@ -263,14 +263,12 @@ export default function DashboardPage() {
                       <span>{timeAgo(session.claimedAt)}</span>
                     </div>
                     <span className="table-status in-progress">In progress</span>
-                    {role === "admin" && (
-                      <a
-                        className="inspect-session"
-                        href={`/judging?submission=${encodeURIComponent(session.id)}`}
-                      >
-                        Inspect
-                      </a>
-                    )}
+                    <a
+                      className="inspect-session"
+                      href={`/judging?submission=${encodeURIComponent(session.id)}`}
+                    >
+                      Inspect
+                    </a>
                   </div>
                 ))}
               </div>
@@ -315,7 +313,86 @@ export default function DashboardPage() {
               </div>
             )}
           </article>
-        </section>
+          </section>
+          </>
+        ) : (
+          <section className="judge-dashboard-focus card">
+            <header>
+              <span
+                className={`judge-work-status ${
+                  queueComplete
+                    ? "complete"
+                    : judgeHasWork
+                      ? "ready"
+                      : "waiting"
+                }`}
+              >
+                <span />
+                {queueComplete
+                  ? "Judging complete"
+                  : judgeHasWork
+                    ? "Projects need judging"
+                    : "Nothing available right now"}
+              </span>
+              <strong>{completion}% complete</strong>
+            </header>
+
+            <div className="judge-focus-copy">
+              <span>Collective queue progress</span>
+              <h2>
+                {queueComplete
+                  ? "The queue is complete."
+                  : judgeHasWork
+                    ? `${data.stats.available} ${
+                        data.stats.available === 1 ? "project is" : "projects are"
+                      } ready for review.`
+                    : data.stats.inProgress
+                      ? "You’re caught up for now."
+                      : "Waiting for submissions."}
+              </h2>
+              <p>
+                {queueComplete
+                  ? "Every submitted project has received a score."
+                  : judgeHasWork
+                    ? "Pick up the next submission and keep the judging queue moving."
+                    : data.stats.inProgress
+                      ? `${data.stats.inProgress} ${
+                          data.stats.inProgress === 1
+                            ? "project is"
+                            : "projects are"
+                        } currently being reviewed by other judges.`
+                      : "New projects will appear here as soon as they enter the queue."}
+              </p>
+            </div>
+
+            <div
+              aria-label={`${completion}% of judging complete`}
+              className="judge-progress-track"
+              role="progressbar"
+              aria-valuemax={100}
+              aria-valuemin={0}
+              aria-valuenow={completion}
+            >
+              <span style={{ width: `${completion}%` }} />
+            </div>
+
+            <footer>
+              <span>
+                <strong>{data.stats.completed}</strong> of{" "}
+                <strong>{data.stats.total}</strong> submissions reviewed
+              </span>
+              {judgeHasWork ? (
+                <a className="primary-button link-button" href="/judging">
+                  Judge next project <span>→</span>
+                </a>
+              ) : queueComplete ? (
+                <a className="secondary-button link-button" href="/results">
+                  View results <span>→</span>
+                </a>
+              ) : null}
+            </footer>
+          </section>
+        )}
       </main>
     </AppShell>
   );

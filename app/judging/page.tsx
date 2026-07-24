@@ -266,11 +266,9 @@ export default function JudgingPage() {
       <main className="workspace-main judging-main">
         <section className="workspace-toolbar compact-toolbar">
           <div>
-            <span className="eyebrow">
-              {inspectionMode
-                ? "Administrator session view"
-                : "Newest submission first"}
-            </span>
+            {inspectionMode && (
+              <span className="eyebrow">Administrator session view</span>
+            )}
             <h1>{inspectionMode ? "Inspect judging session" : "Judging"}</h1>
           </div>
           <div className="queue-progress">
@@ -314,19 +312,27 @@ export default function JudgingPage() {
               >
               <header className="project-header">
                 <div>
-                  <div className="project-badges">
-                    <span className="status-badge">
-                      <span />
-                      In progress
-                    </span>
-                    <span className="track-badge">{submission.track}</span>
+                  <div className="project-title-row">
+                    <h2>{submission.projectName}</h2>
+                    {submission.repositoryUrl && repository && (
+                      <a
+                        aria-label={`Open ${repository.label} on GitHub`}
+                        className="repository-mini-card"
+                        href={submission.repositoryUrl}
+                        rel="noreferrer"
+                        target="_blank"
+                        title={repository.label}
+                      >
+                        <span
+                          aria-hidden
+                          className="repository-mini-icon github-icon"
+                        />
+                        <span>GitHub</span>
+                        <span aria-hidden>↗</span>
+                      </a>
+                    )}
                   </div>
-                  <h2>{submission.projectName}</h2>
                   <p className="project-byline">by {submission.teamName}</p>
-                </div>
-                <div className="project-record">
-                  <span>Latest submission</span>
-                  <strong>#{submission.id.slice(-6)}</strong>
                 </div>
               </header>
 
@@ -372,7 +378,6 @@ export default function JudgingPage() {
 
               <section className="submission-story">
                 <div className="story-block one-liner-block">
-                  <span>One-liner</span>
                   <p>
                     {submission.oneLiner ||
                       "No one-line description was provided."}
@@ -387,33 +392,6 @@ export default function JudgingPage() {
                     </div>
                   )}
               </section>
-
-              {submission.repositoryUrl && repository && (
-                <a
-                  className="repository-preview"
-                  href={submission.repositoryUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <span
-                    aria-label="GitHub"
-                    className="repository-icon github-icon"
-                    role="img"
-                  />
-                  <span className="repository-copy">
-                    <small>Source repository</small>
-                    <strong>
-                      {repository.label}
-                    </strong>
-                    <span>
-                      {repository.host}
-                    </span>
-                  </span>
-                  <span className="repository-arrow" aria-hidden>
-                    ↗
-                  </span>
-                </a>
-              )}
 
               <section className="submission-details">
                 <div className="detail-item builders">
@@ -529,20 +507,23 @@ export default function JudgingPage() {
                 </header>
 
                 <ScoreControl
-                  description="Meaningful progress completed tonight"
+                  highAnchor="Exceptional progress tonight"
                   label="One-night progress"
+                  lowAnchor="Little meaningful progress"
                   onChange={setProgress}
                   value={progress}
                 />
                 <ScoreControl
-                  description="Useful, feasible, and relevant"
+                  highAnchor="Solves an actual problem"
                   label="Practicality"
+                  lowAnchor="No real-world use case"
                   onChange={setPracticality}
                   value={practicality}
                 />
                 <ScoreControl
-                  description="Technical difficulty and execution"
+                  highAnchor="Complex and well executed"
                   label="Technical complexity"
+                  lowAnchor="Technically straightforward"
                   onChange={setComplexity}
                   value={complexity}
                 />

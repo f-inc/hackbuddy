@@ -10,6 +10,16 @@ export async function GET() {
 
   try {
     const dashboard = await getDashboard(session.name);
+    if (session.role === "judge") {
+      return NextResponse.json({
+        ...dashboard,
+        leaderboard: [],
+        activeSessions: [],
+        scoreDistribution: [],
+        averageScore: 0,
+        demoMode: isDemoMode(),
+      });
+    }
     return NextResponse.json({ ...dashboard, demoMode: isDemoMode() });
   } catch (error) {
     console.error(error);
