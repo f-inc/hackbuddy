@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: "HackBuddy — Hackathon judging",
   description:
     "A focused Airtable-backed queue and scoring workspace for hackathon judges.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -16,4 +19,3 @@ export default function RootLayout({
     </html>
   );
 }
-

@@ -30,8 +30,10 @@ export function AppShell({
     <div className="product-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand-mark small">H</span>
-          <span>HackBuddy</span>
+          <span aria-hidden className="brand-mark small" />
+          <span className="brand-wordmark">
+            Hack<span>Buddy</span>
+          </span>
         </div>
 
         <nav className="sidebar-nav" aria-label="Main navigation">
@@ -65,8 +67,10 @@ export function AppShell({
       <div className="product-content">
         <header className="mobile-header">
           <div className="sidebar-brand">
-            <span className="brand-mark small">H</span>
-            <span>HackBuddy</span>
+            <span aria-hidden className="brand-mark small" />
+            <span className="brand-wordmark">
+              Hack<span>Buddy</span>
+            </span>
           </div>
           <nav>
             {navigation.map((item) => (

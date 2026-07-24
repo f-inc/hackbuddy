@@ -44,13 +44,13 @@ export default function LoginPage() {
     <main className="login-page">
       <section className="login-panel">
         <div className="brand">
-          <span className="brand-mark">H</span>
+          <span aria-hidden className="brand-mark" />
           <span>HackBuddy</span>
         </div>
 
         <div className="login-copy">
           <span className="eyebrow">Hackathon judging</span>
-          <h1>A better way to run the judging room.</h1>
+          <h1>Hackathon judging, simplified.</h1>
           <p>
             Pick up the newest submission, score it consistently, and keep the
             entire event moving from one shared workspace.

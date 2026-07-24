@@ -60,6 +60,11 @@ export default function JudgingPage() {
   >("idle");
   const [releasing, setReleasing] = useState(false);
 
+  useEffect(() => {
+    document.body.classList.add("judging-scroll-lock");
+    return () => document.body.classList.remove("judging-scroll-lock");
+  }, []);
+
   const claim = useCallback(async (showFullPageLoader = false) => {
     if (showFullPageLoader) setLoading(true);
     setError("");
@@ -297,7 +302,12 @@ export default function JudgingPage() {
             </section>
           ) : (
             <div className="judging-layout">
-            <article className="project-workspace card">
+              <div className="submission-scroll-frame">
+              <article
+                aria-label="Submission details"
+                className="project-workspace card"
+                tabIndex={0}
+              >
               <header className="project-header">
                 <div>
                   <div className="project-badges">
@@ -451,9 +461,10 @@ export default function JudgingPage() {
                   </div>
                 </div>
               </section>
-            </article>
+              </article>
+              </div>
 
-            {inspectionMode ? (
+              {inspectionMode ? (
               <aside className="compact-score-card admin-inspection-card card">
                 <header className="compact-score-header">
                   <div>
@@ -559,8 +570,8 @@ export default function JudgingPage() {
                   </button>
                 </footer>
               </aside>
-            )}
-          </div>
+              )}
+            </div>
           )}
         </div>
       </main>
