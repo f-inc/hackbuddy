@@ -56,7 +56,7 @@ export default function JudgingPage() {
   const [showTeamPhoto, setShowTeamPhoto] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [transitionState, setTransitionState] = useState<
-    "idle" | "saving" | "success"
+    "idle" | "saving" | "success" | "exiting"
   >("idle");
   const [releasing, setReleasing] = useState(false);
 
@@ -199,12 +199,16 @@ export default function JudgingPage() {
       setPracticality(0);
       setComplexity(0);
       setNotes("");
-      window.requestAnimationFrame(() => {
+      await new Promise<void>((resolve) => {
         window.requestAnimationFrame(() => {
-          setTransitionState("idle");
-          setTransitioning(false);
+          window.requestAnimationFrame(() => resolve());
         });
       });
+      setTransitioning(false);
+      await new Promise((resolve) => window.setTimeout(resolve, 240));
+      setTransitionState("exiting");
+      await new Promise((resolve) => window.setTimeout(resolve, 320));
+      setTransitionState("idle");
     } catch (caught) {
       setTransitionState("idle");
       setTransitioning(false);
@@ -302,7 +306,7 @@ export default function JudgingPage() {
             </section>
           ) : (
             <div className="judging-layout">
-              <div className="submission-scroll-frame">
+              <div className="submission-scroll-frame" key={submission.id}>
               <article
                 aria-label="Submission details"
                 className="project-workspace card"
@@ -596,12 +600,12 @@ export default function JudgingPage() {
           </svg>
           <div>
             <strong>
-              {transitionState === "success"
+              {transitionState === "success" || transitionState === "exiting"
                 ? "Score submitted"
                 : "Submitting score"}
             </strong>
             <span>
-              {transitionState === "success"
+              {transitionState === "success" || transitionState === "exiting"
                 ? "Loading the next project…"
                 : "Saving your review…"}
             </span>

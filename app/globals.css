@@ -2008,15 +2008,13 @@ td:first-child span {
   opacity: 1;
   transform: translateY(0);
   transition:
-    opacity 180ms ease,
-    transform 180ms ease,
-    filter 180ms ease;
+    opacity 220ms ease,
+    transform 220ms ease;
 }
 
 .project-transition-shell.switching {
   pointer-events: none;
   opacity: 0;
-  filter: blur(2px);
   transform: translateY(4px);
 }
 
@@ -2028,13 +2026,12 @@ td:first-child span {
   visibility: hidden;
   place-items: center;
   color: var(--text);
-  background: rgba(248, 249, 251, 0.97);
+  background: #f8f9fb;
   opacity: 0;
   pointer-events: none;
-  backdrop-filter: blur(7px);
   transition:
-    opacity 200ms ease,
-    visibility 0s linear 200ms;
+    opacity 240ms ease,
+    visibility 0s linear 240ms;
 }
 
 .submission-confirmation.saving,
@@ -2042,8 +2039,16 @@ td:first-child span {
   visibility: visible;
   opacity: 1;
   transition:
-    opacity 200ms ease,
+    opacity 240ms ease,
     visibility 0s;
+}
+
+.submission-confirmation.exiting {
+  visibility: visible;
+  opacity: 0;
+  transition:
+    opacity 320ms ease,
+    visibility 0s linear 320ms;
 }
 
 .submission-confirmation-content {
@@ -2059,7 +2064,8 @@ td:first-child span {
 }
 
 .submission-confirmation.saving .submission-confirmation-content,
-.submission-confirmation.success .submission-confirmation-content {
+.submission-confirmation.success .submission-confirmation-content,
+.submission-confirmation.exiting .submission-confirmation-content {
   transform: translateY(0) scale(1);
 }
 
@@ -2106,7 +2112,8 @@ td:first-child span {
   opacity: 0;
 }
 
-.submission-confirmation.success .submission-check {
+.submission-confirmation.success .submission-check,
+.submission-confirmation.exiting .submission-check {
   opacity: 1;
 }
 
@@ -2139,6 +2146,11 @@ td:first-child span {
 .submission-confirmation.success .submission-check-mark {
   animation: submission-check-draw 330ms 260ms
     cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.submission-confirmation.exiting .submission-check-circle,
+.submission-confirmation.exiting .submission-check-mark {
+  stroke-dashoffset: 0;
 }
 
 @keyframes submission-spin {
