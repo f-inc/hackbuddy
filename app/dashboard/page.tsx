@@ -18,6 +18,8 @@ type DashboardData = {
   averageScore: number;
   yourCompleted: number;
   yourAverageScore: number;
+  eligibleAvailable: number;
+  hasActiveReview: boolean;
   demoMode: boolean;
   error?: string;
 };
@@ -30,6 +32,8 @@ const emptyData: DashboardData = {
   averageScore: 0,
   yourCompleted: 0,
   yourAverageScore: 0,
+  eligibleAvailable: 0,
+  hasActiveReview: false,
   demoMode: false,
 };
 
@@ -112,7 +116,7 @@ export default function DashboardPage() {
     data.stats.total - data.stats.completed,
   );
   const queueComplete = data.stats.total > 0 && remainingReviews === 0;
-  const judgeHasWork = data.stats.available > 0;
+  const judgeHasWork = data.hasActiveReview || data.eligibleAvailable > 0;
 
   return (
     <AppShell name={name} role={role}>
@@ -126,11 +130,11 @@ export default function DashboardPage() {
           className={`page-heading${role === "judge" ? " judge-page-heading" : ""}`}
         >
           <div>
-            <h1>{role === "admin" ? "Dashboard" : "Judging overview"}</h1>
+            <h1>{role === "admin" ? "Dashboard" : "Judging queue"}</h1>
             <p>
               {role === "admin"
                 ? `Welcome back, ${name}. Here’s what’s happening in the judging room.`
-                : `Welcome back, ${name}. Here’s what still needs your attention.`}
+                : "See what still needs your attention."}
             </p>
           </div>
           {role === "admin" && (
@@ -300,7 +304,7 @@ export default function DashboardPage() {
                     </div>
                     <b>
                       {entry.score}
-                      <small>/30</small>
+                      <small>/60</small>
                     </b>
                   </li>
                 ))}
@@ -338,14 +342,15 @@ export default function DashboardPage() {
             </header>
 
             <div className="judge-focus-copy">
-              <span>Collective queue progress</span>
               <h2>
                 {queueComplete
                   ? "The queue is complete."
                   : judgeHasWork
-                    ? `${data.stats.available} ${
-                        data.stats.available === 1 ? "project is" : "projects are"
-                      } ready for review.`
+                    ? data.hasActiveReview
+                      ? "Your current review is waiting."
+                      : `${data.eligibleAvailable} ${
+                          data.eligibleAvailable === 1 ? "project" : "projects"
+                        } ready to judge.`
                     : data.stats.inProgress
                       ? "You’re caught up for now."
                       : "Waiting for submissions."}
@@ -354,7 +359,9 @@ export default function DashboardPage() {
                 {queueComplete
                   ? "Every submitted project has received a score."
                   : judgeHasWork
-                    ? "Pick up the next submission and keep the judging queue moving."
+                    ? data.hasActiveReview
+                      ? "Continue where you left off and submit your score."
+                      : "Pick up the next submission and keep the queue moving."
                     : data.stats.inProgress
                       ? `${data.stats.inProgress} ${
                           data.stats.inProgress === 1
@@ -383,7 +390,8 @@ export default function DashboardPage() {
               </span>
               {judgeHasWork ? (
                 <a className="primary-button link-button" href="/judging">
-                  Judge next project <span>→</span>
+                  {data.hasActiveReview ? "Continue judging" : "Judge next project"}{" "}
+                  <span>→</span>
                 </a>
               ) : queueComplete ? (
                 <a className="secondary-button link-button" href="/results">

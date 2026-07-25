@@ -7,6 +7,7 @@ import type {
   ResultEntry,
   ScoreDistributionBucket,
   Submission,
+  SubmissionReview,
 } from "./types";
 
 type AirtableRecord = {
@@ -48,6 +49,7 @@ const field = {
   total: process.env.AIRTABLE_SCORE_FIELD || "Score",
   notes: process.env.AIRTABLE_NOTES_FIELD || "Judge Notes",
   completedAt: process.env.AIRTABLE_COMPLETED_AT_FIELD || "Completed At",
+  reviews: process.env.AIRTABLE_REVIEWS_FIELD || "Reviews",
 };
 
 const statusValue: Record<QueueStatus, string> = {
@@ -123,11 +125,81 @@ function normalizeStatus(value: unknown): QueueStatus {
   return "available";
 }
 
+function reviewHistory(
+  value: unknown,
+  fields: Record<string, unknown>,
+): SubmissionReview[] {
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (Array.isArray(parsed)) {
+        const reviews = parsed.filter(
+          (review): review is SubmissionReview =>
+            typeof review === "object" &&
+            review !== null &&
+            typeof (review as SubmissionReview).judgeName === "string" &&
+            Number.isInteger((review as SubmissionReview).progressScore) &&
+            Number.isInteger((review as SubmissionReview).practicalityScore) &&
+            Number.isInteger((review as SubmissionReview).complexityScore) &&
+            Number.isInteger((review as SubmissionReview).totalScore) &&
+            typeof (review as SubmissionReview).completedAt === "string",
+        );
+        if (reviews.length) {
+          return reviews.map((review) => ({
+            ...review,
+            judgeName: review.judgeName.trim().toLowerCase(),
+            notes: typeof review.notes === "string" ? review.notes : "",
+          }));
+        }
+      }
+    } catch {
+      // Fall through to the legacy single-score migration below.
+    }
+  }
+
+  const progressScore = number(fields[field.progress]);
+  const practicalityScore = number(fields[field.practicality]);
+  const complexityScore = number(fields[field.complexity]);
+  if (
+    progressScore === null ||
+    practicalityScore === null ||
+    complexityScore === null
+  ) {
+    return [];
+  }
+
+  return [
+    {
+      judgeName:
+        text(fields[field.claimedBy]).trim().toLowerCase() || "legacy judge",
+      progressScore,
+      practicalityScore,
+      complexityScore,
+      totalScore:
+        number(fields[field.total]) ??
+        progressScore + practicalityScore + complexityScore,
+      notes: text(fields[field.notes]),
+      completedAt: text(fields[field.completedAt]),
+    },
+  ];
+}
+
 function toSubmission(record: AirtableRecord): Submission {
   const f = record.fields;
   const progressPreview = attachment(f[field.preview]);
   const teamPhoto = attachment(f[field.teamPhoto]);
   const demo = attachment(f[field.demoUrl]);
+  const reviews = reviewHistory(f[field.reviews], f);
+  const rawStatus = normalizeStatus(f[field.status]);
+  const aggregate = reviews.reduce(
+    (total, review) => ({
+      progress: total.progress + review.progressScore,
+      practicality: total.practicality + review.practicalityScore,
+      complexity: total.complexity + review.complexityScore,
+      score: total.score + review.totalScore,
+    }),
+    { progress: 0, practicality: 0, complexity: 0, score: 0 },
+  );
   return {
     id: record.id,
     teamName: text(f[field.teamName]) || "Unnamed team",
@@ -144,16 +216,30 @@ function toSubmission(record: AirtableRecord): Submission {
     demoFilename: demo.filename,
     repositoryUrl: text(f[field.repositoryUrl]),
     track: text(f[field.track]) || "General",
-    status: normalizeStatus(f[field.status]),
+    status:
+      rawStatus === "in progress"
+        ? "in progress"
+        : reviews.length >= 2
+          ? "completed"
+          : "available",
     createdAt: text(f[field.submittedAt]) || record.createdTime,
     claimedBy: text(f[field.claimedBy]),
     claimedAt: text(f[field.claimedAt]),
-    completedAt: text(f[field.completedAt]),
-    progressScore: number(f[field.progress]),
-    practicalityScore: number(f[field.practicality]),
-    complexityScore: number(f[field.complexity]),
-    totalScore: number(f[field.total]),
-    notes: text(f[field.notes]),
+    completedAt:
+      reviews.length >= 2
+        ? text(f[field.completedAt]) ||
+          reviews[reviews.length - 1]?.completedAt ||
+          ""
+        : "",
+    progressScore: reviews.length ? aggregate.progress : null,
+    practicalityScore: reviews.length ? aggregate.practicality : null,
+    complexityScore: reviews.length ? aggregate.complexity : null,
+    totalScore: reviews.length ? aggregate.score : null,
+    notes: reviews
+      .map((review) => review.notes)
+      .filter(Boolean)
+      .join("\n\n"),
+    reviews,
   };
 }
 
@@ -212,9 +298,17 @@ function currentDemoSubmissions() {
           ...submission,
           status: "in progress" as const,
           claimedBy: activeJudge,
-          claimedAt: submission.claimedAt || new Date().toISOString(),
+          claimedAt: new Date().toISOString(),
         }
-      : submission;
+      : {
+          ...submission,
+          status:
+            submission.reviews.length >= 2
+              ? ("completed" as const)
+              : ("available" as const),
+          claimedBy: "",
+          claimedAt: "",
+        };
   });
 }
 
@@ -238,15 +332,19 @@ export async function claimNextSubmission(
   judgeName: string,
 ): Promise<Submission | null> {
   if (!configured()) {
-    const existing = demoState.submissions.find(
-      (submission) => demoState.claims.get(submission.id) === judgeName,
+    const current = currentDemoSubmissions();
+    const existing = current.find(
+      (submission) =>
+        demoState.claims.get(submission.id) === judgeName &&
+        !submission.reviews.some((review) => review.judgeName === judgeName),
     );
-    if (existing) return { ...existing, status: "in progress" };
-    const next = [...demoState.submissions]
+    if (existing) return existing;
+    const next = [...current]
       .filter(
         (submission) =>
           submission.status === "available" &&
-          !demoState.claims.has(submission.id),
+          !demoState.claims.has(submission.id) &&
+          !submission.reviews.some((review) => review.judgeName === judgeName),
       )
       .sort(
         (a, b) =>
@@ -259,24 +357,43 @@ export async function claimNextSubmission(
 
   const existingFormula = `AND(${formula(field.status, statusValue["in progress"])},${formula(field.claimedBy, judgeName)})`;
   const existing = await listRecords(existingFormula);
-  if (existing[0]) return toSubmission(existing[0]);
+  if (existing[0]) {
+    const submission = toSubmission(existing[0]);
+    if (
+      !submission.reviews.some((review) => review.judgeName === judgeName)
+    ) {
+      return submission;
+    }
+  }
 
-  const available = (
-    await listRecords(formula(field.status, statusValue.available))
-  ).sort(
+  const available = (await listRecords()).filter((record) => {
+    const submission = toSubmission(record);
+    return (
+      submission.status === "available" &&
+      !submission.reviews.some((review) => review.judgeName === judgeName)
+    );
+  }).sort(
     (a, b) =>
       new Date(text(b.fields[field.submittedAt]) || b.createdTime).getTime() -
       new Date(text(a.fields[field.submittedAt]) || a.createdTime).getTime(),
   );
 
-  for (const candidate of available.slice(0, 5)) {
+  for (const candidate of available.slice(0, 10)) {
     const claimToken = crypto.randomUUID();
-    await updateRecord(candidate.id, {
+    const candidateSubmission = toSubmission(candidate);
+    const claimFields: Record<string, string | number | null> = {
       [field.status]: statusValue["in progress"],
       [field.claimedBy]: judgeName,
       [field.claimedAt]: new Date().toISOString(),
       [field.claimToken]: claimToken,
-    });
+    };
+    if (
+      !text(candidate.fields[field.reviews]) &&
+      candidateSubmission.reviews.length
+    ) {
+      claimFields[field.reviews] = JSON.stringify(candidateSubmission.reviews);
+    }
+    await updateRecord(candidate.id, claimFields);
 
     const verified = await request<AirtableRecord>(`/${candidate.id}`);
     if (verified.fields[field.claimToken] === claimToken) {
@@ -305,15 +422,48 @@ export async function completeSubmission(
     }
     const submission = demoState.submissions.find((item) => item.id === id);
     if (!submission) throw new Error("Submission not found.");
+    if (submission.reviews.some((review) => review.judgeName === judgeName)) {
+      throw new Error("You have already reviewed this submission.");
+    }
+    const completedAt = new Date().toISOString();
+    const reviews = [
+      ...submission.reviews,
+      {
+        judgeName,
+        progressScore: scores.progress,
+        practicalityScore: scores.practicality,
+        complexityScore: scores.complexity,
+        totalScore: total,
+        notes: scores.notes,
+        completedAt,
+      },
+    ];
+    const aggregate = reviews.reduce(
+      (sum, review) => ({
+        progress: sum.progress + review.progressScore,
+        practicality: sum.practicality + review.practicalityScore,
+        complexity: sum.complexity + review.complexityScore,
+        total: sum.total + review.totalScore,
+      }),
+      { progress: 0, practicality: 0, complexity: 0, total: 0 },
+    );
     Object.assign(submission, {
-      status: "completed" as const,
-      progressScore: scores.progress,
-      practicalityScore: scores.practicality,
-      complexityScore: scores.complexity,
-      totalScore: total,
-      notes: scores.notes,
-      claimedBy: judgeName,
-      completedAt: new Date().toISOString(),
+      status:
+        reviews.length >= 2
+          ? ("completed" as const)
+          : ("available" as const),
+      progressScore: aggregate.progress,
+      practicalityScore: aggregate.practicality,
+      complexityScore: aggregate.complexity,
+      totalScore: aggregate.total,
+      notes: reviews
+        .map((review) => review.notes)
+        .filter(Boolean)
+        .join("\n\n"),
+      claimedBy: "",
+      claimedAt: "",
+      completedAt: reviews.length >= 2 ? completedAt : "",
+      reviews,
     });
     demoState.claims.delete(id);
     return;
@@ -327,14 +477,54 @@ export async function completeSubmission(
     throw new Error("This submission is not assigned to you.");
   }
 
+  const submission = toSubmission(current);
+  if (submission.reviews.some((review) => review.judgeName === judgeName)) {
+    throw new Error("You have already reviewed this submission.");
+  }
+
+  const completedAt = new Date().toISOString();
+  const reviews: SubmissionReview[] = [
+    ...submission.reviews,
+    {
+      judgeName,
+      progressScore: scores.progress,
+      practicalityScore: scores.practicality,
+      complexityScore: scores.complexity,
+      totalScore: total,
+      notes: scores.notes,
+      completedAt,
+    },
+  ];
+  const aggregate = reviews.reduce(
+    (sum, review) => ({
+      progress: sum.progress + review.progressScore,
+      practicality: sum.practicality + review.practicalityScore,
+      complexity: sum.complexity + review.complexityScore,
+      total: sum.total + review.totalScore,
+    }),
+    { progress: 0, practicality: 0, complexity: 0, total: 0 },
+  );
+  const fullyReviewed = reviews.length >= 2;
+
   await updateRecord(id, {
-    [field.progress]: scores.progress,
-    [field.practicality]: scores.practicality,
-    [field.complexity]: scores.complexity,
-    [field.total]: total,
-    [field.notes]: scores.notes,
-    [field.status]: statusValue.completed,
-    [field.completedAt]: new Date().toISOString(),
+    [field.progress]: aggregate.progress,
+    [field.practicality]: aggregate.practicality,
+    [field.complexity]: aggregate.complexity,
+    [field.total]: aggregate.total,
+    [field.notes]: reviews
+      .map((review) =>
+        review.notes ? `${review.judgeName}: ${review.notes}` : "",
+      )
+      .filter(Boolean)
+      .join("\n\n"),
+    [field.reviews]: JSON.stringify(reviews),
+    [field.status]: fullyReviewed
+      ? statusValue.completed
+      : statusValue.available,
+    [field.completedAt]: fullyReviewed ? completedAt : null,
+    [field.claimedBy]: null,
+    [field.claimedAt]: null,
+    [field.claimToken]: null,
   });
 }
 
@@ -381,19 +571,29 @@ export async function getDashboard(judgeName: string) {
       judgeName: submission.claimedBy,
       claimedAt: submission.claimedAt,
     }));
-  const yourCompleted = completed.filter(
-    (submission) => submission.claimedBy === judgeName,
-  );
+  const yourReviews = submissions
+    .flatMap((submission) => submission.reviews)
+    .filter((review) => review.judgeName === judgeName);
   const allScoreTotal = completed.reduce(
     (sum, submission) => sum + (submission.totalScore ?? 0),
     0,
   );
-  const yourScoreTotal = yourCompleted.reduce(
-    (sum, submission) => sum + (submission.totalScore ?? 0),
+  const yourScoreTotal = yourReviews.reduce(
+    (sum, review) => sum + review.totalScore,
     0,
   );
   const scoredSubmissions = completed.filter(
     (submission) => submission.totalScore !== null,
+  );
+  const eligibleAvailable = submissions.filter(
+    (submission) =>
+      submission.status === "available" &&
+      !submission.reviews.some((review) => review.judgeName === judgeName),
+  ).length;
+  const hasActiveReview = submissions.some(
+    (submission) =>
+      submission.status === "in progress" &&
+      submission.claimedBy === judgeName,
   );
   const scoreDistribution: ScoreDistributionBucket[] = Array.from(
     { length: 14 },
@@ -404,7 +604,10 @@ export async function getDashboard(judgeName: string) {
     },
   );
   for (const submission of scoredSubmissions) {
-    const score = Math.max(3, Math.min(30, submission.totalScore ?? 3));
+    const score = Math.max(
+      3,
+      Math.min(30, (submission.totalScore ?? 6) / 2),
+    );
     const bucketIndex = Math.min(
       scoreDistribution.length - 1,
       Math.max(0, Math.floor((score - 3) / 2)),
@@ -417,12 +620,14 @@ export async function getDashboard(judgeName: string) {
     leaderboard,
     activeSessions,
     scoreDistribution,
+    eligibleAvailable,
+    hasActiveReview,
     averageScore: scoredSubmissions.length
-      ? Math.round((allScoreTotal / scoredSubmissions.length) * 10) / 10
+      ? Math.round((allScoreTotal / scoredSubmissions.length / 2) * 10) / 10
       : 0,
-    yourCompleted: yourCompleted.length,
-    yourAverageScore: yourCompleted.length
-      ? Math.round((yourScoreTotal / yourCompleted.length) * 10) / 10
+    yourCompleted: yourReviews.length,
+    yourAverageScore: yourReviews.length
+      ? Math.round((yourScoreTotal / yourReviews.length) * 10) / 10
       : 0,
   };
 }
@@ -437,6 +642,7 @@ export async function getCompletedResults(): Promise<ResultEntry[]> {
       );
 
   return submissions
+    .filter((submission) => submission.status === "completed")
     .filter(
       (
         submission,
@@ -465,7 +671,7 @@ export async function getCompletedResults(): Promise<ResultEntry[]> {
       submitterNames: submission.submitterNames,
       teamPhotoUrl: submission.teamPhotoUrl,
       track: submission.track,
-      judgeName: submission.claimedBy,
+      reviews: submission.reviews,
       progressScore: submission.progressScore,
       practicalityScore: submission.practicalityScore,
       complexityScore: submission.complexityScore,

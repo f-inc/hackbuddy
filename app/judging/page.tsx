@@ -469,6 +469,10 @@ export default function JudgingPage() {
                     <span>Claimed</span>
                     <strong>{formatSubmitted(submission.claimedAt)}</strong>
                   </div>
+                  <div>
+                    <span>Completed reviews</span>
+                    <strong>{submission.reviews.length} of 2</strong>
+                  </div>
                 </div>
 
                 <div className="release-explanation">
@@ -497,7 +501,9 @@ export default function JudgingPage() {
               <aside className="compact-score-card card">
                 <header className="compact-score-header">
                   <div>
-                    <span className="eyebrow">Scoring rubric</span>
+                    <span className="eyebrow">
+                      Review {Math.min(submission.reviews.length + 1, 2)} of 2
+                    </span>
                     <h2>Score this project</h2>
                   </div>
                   <div className="compact-total">

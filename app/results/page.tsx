@@ -87,7 +87,11 @@ export default function ResultsPage() {
 
   const summary = useMemo(() => {
     const total = results.reduce((sum, result) => sum + result.totalScore, 0);
-    const judges = new Set(results.map((result) => result.judgeName).filter(Boolean));
+    const judges = new Set(
+      results.flatMap((result) =>
+        result.reviews.map((review) => review.judgeName),
+      ),
+    );
     return {
       average: results.length ? Math.round((total / results.length) * 10) / 10 : 0,
       judges: judges.size,
@@ -127,11 +131,11 @@ export default function ResultsPage() {
           </article>
           <article className="card">
             <span>Average score</span>
-            <strong>{summary.average || "—"}<small>/30</small></strong>
+            <strong>{summary.average || "—"}<small>/60</small></strong>
           </article>
           <article className="card">
             <span>Highest score</span>
-            <strong>{summary.highest || "—"}<small>/30</small></strong>
+            <strong>{summary.highest || "—"}<small>/60</small></strong>
           </article>
           <article className="card">
             <span>Judges represented</span>
@@ -202,17 +206,26 @@ export default function ResultsPage() {
                         </button>
                       </td>
                       <td>
-                        <span className="judge-chip">
-                          {result.judgeName.slice(0, 1).toUpperCase()}
-                        </span>
-                        <strong className="judge-name">
-                          {result.judgeName || "Unknown"}
-                        </strong>
+                        <div className="result-judges">
+                          {result.reviews.map((review) => (
+                            <div key={`${result.id}-${review.judgeName}`}>
+                              <span className="judge-chip">
+                                {review.judgeName.slice(0, 1).toUpperCase()}
+                              </span>
+                              <span>
+                                <strong className="judge-name">
+                                  {review.judgeName || "Unknown"}
+                                </strong>
+                                <small>{review.totalScore}/30</small>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </td>
-                      <td><span className="rubric-score">{result.progressScore}<small>/10</small></span></td>
-                      <td><span className="rubric-score">{result.practicalityScore}<small>/10</small></span></td>
-                      <td><span className="rubric-score">{result.complexityScore}<small>/10</small></span></td>
-                      <td><span className="result-total">{result.totalScore}<small>/30</small></span></td>
+                      <td><span className="rubric-score">{result.progressScore}<small>/20</small></span></td>
+                      <td><span className="rubric-score">{result.practicalityScore}<small>/20</small></span></td>
+                      <td><span className="rubric-score">{result.complexityScore}<small>/20</small></span></td>
+                      <td><span className="result-total">{result.totalScore}<small>/60</small></span></td>
                       <td><span className="completed-time">{formatCompleted(result.completedAt)}</span></td>
                     </tr>
                   ))}

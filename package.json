@@ -9,7 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ignore-pattern .next"
+    "lint": "eslint . --ignore-pattern .next",
+    "migrate:two-review": "node scripts/migrate-two-review-ledger.mjs"
   },
   "dependencies": {
     "next": "16.2.6",

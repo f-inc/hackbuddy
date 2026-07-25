@@ -2067,19 +2067,63 @@ td:first-child span {
   }
 
   .judge-page-heading {
-    align-items: center;
-    padding: 0 8px;
-    text-align: center;
+    align-items: flex-start;
+    padding: 0 4px;
+    text-align: left;
   }
 
   .judge-page-heading h1 {
-    font-size: 32px;
+    font-size: 28px;
   }
 
   .judge-page-heading p {
-    max-width: 320px;
-    margin-right: auto;
-    margin-left: auto;
+    display: none;
+  }
+
+  .dashboard-main .judge-page-heading {
+    margin-bottom: 18px;
+  }
+
+  .dashboard-main {
+    padding-top: 22px;
+  }
+
+  .judge-dashboard-focus {
+    min-height: 0;
+    padding: 20px;
+    text-align: left;
+  }
+
+  .judge-dashboard-focus > header {
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .judge-dashboard-focus > header > strong {
+    white-space: nowrap;
+  }
+
+  .judge-work-status {
+    min-height: 28px;
+    padding: 0 9px;
+    font-size: 9px;
+  }
+
+  .judge-focus-copy {
+    margin: 30px 0 24px;
+  }
+
+  .judge-focus-copy h2 {
+    max-width: 300px;
+    font-size: 32px;
+    line-height: 1.05;
+  }
+
+  .judge-focus-copy p {
+    max-width: 300px;
+    margin: 12px 0 0;
     font-size: 12px;
     line-height: 1.55;
   }
@@ -2089,35 +2133,12 @@ td:first-child span {
     gap: 9px;
   }
 
-  .judge-dashboard-focus {
-    padding: 24px 20px;
-    text-align: center;
-  }
-
-  .judge-dashboard-focus > header {
-    flex-direction: column;
-    justify-content: center;
-    gap: 11px;
-  }
-
-  .judge-focus-copy {
-    margin: 42px auto 34px;
-  }
-
-  .judge-focus-copy h2 {
-    font-size: 32px;
-  }
-
-  .judge-focus-copy p {
-    margin-right: auto;
-    margin-left: auto;
-    font-size: 12px;
-  }
-
   .judge-dashboard-focus > footer {
     align-items: stretch;
     flex-direction: column;
-    text-align: center;
+    gap: 14px;
+    margin-top: 14px;
+    text-align: left;
   }
 
   .judge-dashboard-focus > footer .primary-button,
@@ -3111,6 +3132,27 @@ td:first-child span {
   font-size: 10px;
   font-weight: 650;
   vertical-align: middle;
+}
+
+.result-judges {
+  display: grid;
+  gap: 7px;
+}
+
+.result-judges > div {
+  display: flex;
+  align-items: center;
+}
+
+.result-judges > div > span:last-child {
+  display: grid;
+  gap: 1px;
+}
+
+.result-judges small {
+  color: var(--muted-light);
+  font-size: 8px;
+  font-weight: 600;
 }
 
 .rubric-score,

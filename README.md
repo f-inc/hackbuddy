@@ -8,6 +8,8 @@ share a live view of queue progress, active sessions, and current scores.
 
 - Separate judge and administrator passwords with lowercase names and signed sessions
 - One active submission per judge
+- Two distinct judges required before a submission is completed
+- Judges cannot review the same submission twice
 - Newest submissions are claimed first
 - Queue states: `available`, `in progress`, and `completed`
 - Three required 1–10 rubric scores
@@ -44,6 +46,12 @@ Create a `Submissions` table with these fields:
 | Score | Number |
 | Judge Notes | Long text |
 | Completed At | Date with time |
+| Reviews | Long text containing the JSON review ledger |
+
+After the first review, the submission returns to `available`. After the second
+distinct judge submits a review, it becomes `completed`. The three category
+columns contain summed `/20` values and `Score` contains the summed `/60`
+total; `Reviews` preserves each judge's individual `/30` score and notes.
 
 Set every Tally-created record's `Status` to `available`. This can be a default
 value in Airtable or a simple Airtable automation.

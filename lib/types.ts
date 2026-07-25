@@ -1,5 +1,15 @@
 export type QueueStatus = "available" | "in progress" | "completed";
 
+export type SubmissionReview = {
+  judgeName: string;
+  progressScore: number;
+  practicalityScore: number;
+  complexityScore: number;
+  totalScore: number;
+  notes: string;
+  completedAt: string;
+};
+
 export type Submission = {
   id: string;
   teamName: string;
@@ -26,6 +36,7 @@ export type Submission = {
   complexityScore: number | null;
   totalScore: number | null;
   notes: string;
+  reviews: SubmissionReview[];
 };
 
 export type QueueStats = {
@@ -66,7 +77,7 @@ export type ResultEntry = {
   submitterNames: string;
   teamPhotoUrl: string;
   track: string;
-  judgeName: string;
+  reviews: SubmissionReview[];
   progressScore: number;
   practicalityScore: number;
   complexityScore: number;

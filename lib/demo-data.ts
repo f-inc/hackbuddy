@@ -28,6 +28,7 @@ export const demoSubmissions: Submission[] = [
     complexityScore: null,
     totalScore: null,
     notes: "",
+    reviews: [],
   },
   {
     id: "demo-2",
@@ -56,6 +57,7 @@ export const demoSubmissions: Submission[] = [
     complexityScore: null,
     totalScore: null,
     notes: "",
+    reviews: [],
   },
   {
     id: "demo-3",
@@ -74,7 +76,7 @@ export const demoSubmissions: Submission[] = [
     demoFilename: "Receipt Relay demo",
     repositoryUrl: "https://github.com/example/receipt-relay",
     track: "AI",
-    status: "completed",
+    status: "available",
     createdAt: "2026-07-23T20:48:00.000Z",
     claimedBy: "alex",
     claimedAt: "2026-07-23T21:02:00.000Z",
@@ -84,5 +86,16 @@ export const demoSubmissions: Submission[] = [
     complexityScore: 7,
     totalScore: 24,
     notes: "Very polished flow.",
+    reviews: [
+      {
+        judgeName: "alex",
+        progressScore: 8,
+        practicalityScore: 9,
+        complexityScore: 7,
+        totalScore: 24,
+        notes: "Very polished flow.",
+        completedAt: "2026-07-23T21:10:00.000Z",
+      },
+    ],
   },
 ];
