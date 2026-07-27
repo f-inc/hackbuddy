@@ -6,6 +6,7 @@ const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: "▦" },
   { href: "/judging", label: "Judging", icon: "✓" },
   { href: "/results", label: "Results", icon: "≡" },
+  { href: "/leaderboard", label: "Top 10", icon: "★" },
 ];
 
 export function AppShell({

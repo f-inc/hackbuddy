@@ -3,7 +3,13 @@
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { ScoreControl } from "@/components/ScoreControl";
-import type { QueueStats, Submission } from "@/lib/types";
+import { SubmissionDetails } from "@/components/SubmissionDetails";
+import type {
+  FinalsState,
+  QueueStats,
+  Submission,
+  SubmissionReview,
+} from "@/lib/types";
 import { useCallback, useEffect, useState } from "react";
 
 type ClaimResponse = {
@@ -11,6 +17,11 @@ type ClaimResponse = {
   stats: QueueStats;
   demoMode: boolean;
   error?: string;
+};
+
+type FinalSubmissionResponse = ClaimResponse & {
+  existingReview: SubmissionReview | null;
+  finals: FinalsState;
 };
 
 function formatSubmitted(value: string) {
@@ -23,25 +34,16 @@ function formatSubmitted(value: string) {
   }).format(new Date(value));
 }
 
-function repositoryDetails(value: string) {
-  try {
-    const url = new URL(value);
-    const path = decodeURIComponent(url.pathname)
-      .replace(/^\/|\/$/g, "")
-      .replace(/\.git$/i, "");
-    return {
-      host: url.hostname.replace(/^www\./, ""),
-      label: path || url.hostname,
-    };
-  } catch {
-    return { host: "Source code", label: value };
-  }
-}
-
 export default function JudgingPage() {
   const [name, setName] = useState("");
   const [role, setRole] = useState<"judge" | "admin">("judge");
   const [inspectionMode, setInspectionMode] = useState(false);
+  const [finalMode, setFinalMode] = useState(false);
+  const [editingFinalReview, setEditingFinalReview] = useState(false);
+  const [finalsState, setFinalsState] = useState<FinalsState | null>(null);
+  const [editingReviewIndex, setEditingReviewIndex] = useState<number | null>(
+    null,
+  );
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [stats, setStats] = useState<QueueStats | null>(null);
   const [progress, setProgress] = useState(0);
@@ -53,7 +55,6 @@ export default function JudgingPage() {
   const [error, setError] = useState("");
   const [demoMode, setDemoMode] = useState(false);
   const [completedNow, setCompletedNow] = useState(0);
-  const [showTeamPhoto, setShowTeamPhoto] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [transitionState, setTransitionState] = useState<
     "idle" | "saving" | "success" | "exiting"
@@ -106,14 +107,51 @@ export default function JudgingPage() {
       setName(session.name);
       setRole(session.role);
 
-      const submissionId = new URLSearchParams(window.location.search).get(
-        "submission",
-      );
+      const searchParams = new URLSearchParams(window.location.search);
+      const submissionId = searchParams.get("submission");
+      const isFinalMode = searchParams.get("final") === "1";
+      const reviewParam = searchParams.get("review");
+      const selectedReviewIndex =
+        reviewParam !== null && /^\d+$/.test(reviewParam)
+          ? Number(reviewParam)
+          : null;
+      if (isFinalMode && submissionId) {
+        setFinalMode(true);
+        setLoading(true);
+        const finalResponse = await fetch(
+          `/api/finals?id=${encodeURIComponent(submissionId)}`,
+        );
+        const result =
+          (await finalResponse.json()) as FinalSubmissionResponse;
+        if (!finalResponse.ok) {
+          setError(result.error || "Could not load this finalist.");
+          setLoading(false);
+          return;
+        }
+        setSubmission(result.submission);
+        setStats(result.stats);
+        setFinalsState(result.finals);
+        setDemoMode(result.demoMode);
+        if (result.existingReview) {
+          setEditingFinalReview(true);
+          setProgress(result.existingReview.progressScore);
+          setPracticality(result.existingReview.practicalityScore);
+          setComplexity(result.existingReview.complexityScore);
+          setNotes(result.existingReview.notes);
+        }
+        setLoading(false);
+        return;
+      }
       if (session.role === "admin" && submissionId) {
         setInspectionMode(true);
+        setEditingReviewIndex(selectedReviewIndex);
         setLoading(true);
         const inspectionResponse = await fetch(
-          `/api/admin/submission?id=${encodeURIComponent(submissionId)}`,
+          `/api/admin/submission?id=${encodeURIComponent(submissionId)}${
+            selectedReviewIndex !== null
+              ? `&review=${selectedReviewIndex}`
+              : ""
+          }`,
         );
         const result = (await inspectionResponse.json()) as ClaimResponse;
         if (!inspectionResponse.ok) {
@@ -124,6 +162,17 @@ export default function JudgingPage() {
         setSubmission(result.submission);
         setStats(result.stats);
         setDemoMode(result.demoMode);
+        if (
+          selectedReviewIndex !== null &&
+          result.submission?.reviews[selectedReviewIndex]
+        ) {
+          const selectedReview =
+            result.submission.reviews[selectedReviewIndex];
+          setProgress(selectedReview.progressScore);
+          setPracticality(selectedReview.practicalityScore);
+          setComplexity(selectedReview.complexityScore);
+          setNotes(selectedReview.notes);
+        }
         setLoading(false);
         return;
       }
@@ -134,20 +183,7 @@ export default function JudgingPage() {
   }, [claim]);
 
   useEffect(() => {
-    if (!showTeamPhoto) return;
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setShowTeamPhoto(false);
-    }
-    document.addEventListener("keydown", closeOnEscape);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", closeOnEscape);
-      document.body.style.overflow = "";
-    };
-  }, [showTeamPhoto]);
-
-  useEffect(() => {
-    if (!name) return;
+    if (!name || finalMode) return;
 
     async function refreshCollectiveProgress() {
       const response = await fetch("/api/dashboard");
@@ -161,7 +197,7 @@ export default function JudgingPage() {
       30_000,
     );
     return () => window.clearInterval(interval);
-  }, [name]);
+  }, [finalMode, name]);
 
   async function submitScore() {
     if (!submission || !progress || !practicality || !complexity) {
@@ -243,18 +279,92 @@ export default function JudgingPage() {
     }
   }
 
+  async function updateSelectedReview() {
+    if (!submission || !progress || !practicality || !complexity) {
+      setError("Choose a score for all three rubric categories.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/submission", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: submission.id,
+          reviewIndex: editingReviewIndex,
+          progress,
+          practicality,
+          complexity,
+          notes,
+        }),
+      });
+      const result = (await response.json()) as ClaimResponse & {
+        ok?: boolean;
+      };
+      if (!response.ok) throw new Error(result.error);
+      window.location.href = "/results";
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not update the review.",
+      );
+      setSubmitting(false);
+    }
+  }
+
+  async function submitFinalScore() {
+    if (!submission || !progress || !practicality || !complexity) {
+      setError("Choose a score for all three rubric categories.");
+      return;
+    }
+
+    setSubmitting(true);
+    setTransitioning(true);
+    setTransitionState("saving");
+    setError("");
+    try {
+      const response = await fetch("/api/finals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: submission.id,
+          progress,
+          practicality,
+          complexity,
+          notes,
+        }),
+      });
+      const result = (await response.json()) as {
+        finals?: FinalsState;
+        error?: string;
+      };
+      if (!response.ok) throw new Error(result.error);
+      setTransitionState("success");
+      await new Promise((resolve) => window.setTimeout(resolve, 900));
+      window.location.href = "/leaderboard";
+    } catch (caught) {
+      setTransitionState("idle");
+      setTransitioning(false);
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not save the final score.",
+      );
+      setSubmitting(false);
+    }
+  }
+
   if (!name || loading) return <LoadingScreen />;
 
-  const reviewed = stats?.completed ?? 0;
-  const total = stats?.total ?? 0;
+  const reviewed = finalMode
+    ? finalsState?.finalists.filter((finalist) => finalist.reviewedByYou)
+        .length ?? 0
+    : stats?.completed ?? 0;
+  const total = finalMode ? finalsState?.finalists.length ?? 10 : stats?.total ?? 0;
   const totalScore = progress + practicality + complexity;
-  const repository = submission?.repositoryUrl
-    ? repositoryDetails(submission.repositoryUrl)
-    : null;
-  const isVideo =
-    submission?.demoType.startsWith("video/") ||
-    Boolean(submission?.demoUrl.match(/\.(mp4|webm|mov)(?:\?|$)/i));
-
   return (
     <AppShell name={name} role={role}>
       {demoMode && (
@@ -266,14 +376,30 @@ export default function JudgingPage() {
       <main className="workspace-main judging-main">
         <section className="workspace-toolbar compact-toolbar">
           <div>
-            {inspectionMode && (
-              <span className="eyebrow">Administrator session view</span>
+            {(inspectionMode || finalMode) && (
+              <span className="eyebrow">
+                {finalMode
+                  ? "Final-round presentation"
+                  : editingReviewIndex !== null
+                  ? "Administrator score editor"
+                  : "Administrator session view"}
+              </span>
             )}
-            <h1>{inspectionMode ? "Inspect judging session" : "Judging"}</h1>
+            <h1>
+              {finalMode
+                ? "Judge finalist"
+                : editingReviewIndex !== null
+                ? "Inspect submitted score"
+                : inspectionMode
+                  ? "Inspect judging session"
+                  : "Judging"}
+            </h1>
           </div>
           <div className="queue-progress">
             <div className="progress-copy">
-              <span>Collective queue progress</span>
+              <span>
+                {finalMode ? "Your finalist progress" : "Collective queue progress"}
+              </span>
               <strong>
                 {reviewed} / {total}
               </strong>
@@ -301,152 +427,17 @@ export default function JudgingPage() {
                 {completedNow} {completedNow === 1 ? "review" : "reviews"} in
                 this session.
               </p>
+              <a className="empty-state-results-link" href="/results">
+                See results <span aria-hidden>→</span>
+              </a>
             </section>
           ) : (
             <div className="judging-layout">
               <div className="submission-scroll-frame" key={submission.id}>
-              <article
-                aria-label="Submission details"
-                className="project-workspace card"
-                tabIndex={0}
-              >
-              <header className="project-header">
-                <div>
-                  <div className="project-title-row">
-                    <h2>{submission.projectName}</h2>
-                    {submission.repositoryUrl && repository && (
-                      <a
-                        aria-label={`Open ${repository.label} on GitHub`}
-                        className="repository-mini-card"
-                        href={submission.repositoryUrl}
-                        rel="noreferrer"
-                        target="_blank"
-                        title={repository.label}
-                      >
-                        <span
-                          aria-hidden
-                          className="repository-mini-icon github-icon"
-                        />
-                        <span>GitHub</span>
-                        <span aria-hidden>↗</span>
-                      </a>
-                    )}
-                  </div>
-                  <p className="project-byline">by {submission.teamName}</p>
-                </div>
-              </header>
-
-              <section className="media-stage">
-                {isVideo && submission.demoUrl ? (
-                  <video
-                    autoPlay
-                    controls
-                    loop
-                    muted
-                    playsInline
-                    poster={submission.previewImageUrl || undefined}
-                    preload="metadata"
-                    src={submission.demoUrl}
-                  >
-                    Your browser does not support embedded video.
-                  </video>
-                ) : submission.previewImageUrl ? (
-                  <div
-                    className="media-image"
-                    style={{
-                      backgroundImage: `url("${submission.previewImageUrl}")`,
-                    }}
-                  />
-                ) : (
-                  <div className="media-placeholder">
-                    <span>No media preview submitted</span>
-                  </div>
-                )}
-
-                <div className="media-actions">
-                  {submission.previewImageUrl && (
-                    <a
-                      href={submission.previewImageUrl}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      Progress image ↗
-                    </a>
-                  )}
-                </div>
-              </section>
-
-              <section className="submission-story">
-                <div className="story-block one-liner-block">
-                  <p>
-                    {submission.oneLiner ||
-                      "No one-line description was provided."}
-                  </p>
-                </div>
-                {submission.description &&
-                  submission.description.trim() !==
-                    submission.oneLiner.trim() && (
-                    <div className="story-block">
-                      <span>Project description</span>
-                      <p>{submission.description}</p>
-                    </div>
-                  )}
-              </section>
-
-              <section className="submission-details">
-                <div className="detail-item builders">
-                  {submission.teamPhotoUrl ? (
-                    <button
-                      aria-label={`Enlarge photo of ${submission.submitterNames || submission.teamName}`}
-                      className="team-photo"
-                      onClick={() => setShowTeamPhoto(true)}
-                      style={{
-                        backgroundImage: `url("${submission.teamPhotoUrl}")`,
-                      }}
-                      type="button"
-                    />
-                  ) : (
-                    <span className="detail-icon">◎</span>
-                  )}
-                  <div>
-                    <span>Builders</span>
-                    <strong>
-                      {submission.submitterNames || submission.teamName}
-                    </strong>
-                  </div>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-icon">⌂</span>
-                  <div>
-                    <span>Demo attendance</span>
-                    <strong>{submission.attendance || "Not provided"}</strong>
-                  </div>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-icon">◷</span>
-                  <div>
-                    <span>Submitted</span>
-                    <strong>{formatSubmitted(submission.createdAt)}</strong>
-                  </div>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-icon">@</span>
-                  <div>
-                    <span>Contact</span>
-                    {submission.contactEmail ? (
-                      <a href={`mailto:${submission.contactEmail}`}>
-                        {submission.contactEmail}
-                      </a>
-                    ) : (
-                      <strong>Not provided</strong>
-                    )}
-                  </div>
-                </div>
-              </section>
-              </article>
+                <SubmissionDetails submission={submission} />
               </div>
 
-              {inspectionMode ? (
+              {inspectionMode && editingReviewIndex === null ? (
               <aside className="compact-score-card admin-inspection-card card">
                 <header className="compact-score-header">
                   <div>
@@ -502,9 +493,29 @@ export default function JudgingPage() {
                 <header className="compact-score-header">
                   <div>
                     <span className="eyebrow">
-                      Review {Math.min(submission.reviews.length + 1, 2)} of 2
+                      {finalMode
+                        ? editingFinalReview
+                          ? `Editing your final review`
+                          : "Final-round review"
+                        : editingReviewIndex !== null
+                        ? `Review by ${
+                            submission.reviews[editingReviewIndex]?.judgeName ||
+                            "unknown judge"
+                          }`
+                        : `Review ${Math.min(
+                            submission.reviews.length + 1,
+                            2,
+                          )} of 2`}
                     </span>
-                    <h2>Score this project</h2>
+                    <h2>
+                      {finalMode
+                        ? editingFinalReview
+                          ? "Edit presentation score"
+                          : "Score this presentation"
+                        : editingReviewIndex !== null
+                        ? "Edit submitted score"
+                        : "Score this project"}
+                    </h2>
                   </div>
                   <div className="compact-total">
                     <strong>{totalScore || "—"}</strong>
@@ -548,18 +559,56 @@ export default function JudgingPage() {
 
                 <footer className="compact-submit">
                   <p>
-                    This project is reserved for <strong>{name}</strong>.
+                    {finalMode ? (
+                      <>
+                        Score the team’s live presentation. You can return and
+                        edit this review from the Top 10 tab.
+                      </>
+                    ) : editingReviewIndex !== null ? (
+                      <>
+                        Updating this judge’s review will recalculate the
+                        project’s total score.
+                      </>
+                    ) : (
+                      <>
+                        This project is reserved for <strong>{name}</strong>.
+                      </>
+                    )}
                   </p>
                   <button
                     className="primary-button"
                     disabled={submitting}
-                    onClick={submitScore}
+                    onClick={
+                      finalMode
+                        ? submitFinalScore
+                        : editingReviewIndex !== null
+                        ? updateSelectedReview
+                        : submitScore
+                    }
                     type="button"
                   >
-                    {submitting ? "Saving…" : "Submit score"}
+                    {submitting
+                      ? "Saving…"
+                      : finalMode
+                        ? editingFinalReview
+                          ? "Update final score"
+                          : "Submit final score"
+                        : editingReviewIndex !== null
+                        ? "Update score"
+                        : "Submit score"}
                     {!submitting && <span>→</span>}
                   </button>
                 </footer>
+                {finalMode && (
+                  <a className="back-to-dashboard" href="/leaderboard">
+                    ← Back to Top 10
+                  </a>
+                )}
+                {!finalMode && editingReviewIndex !== null && (
+                  <a className="back-to-dashboard" href="/results">
+                    ← Back to results
+                  </a>
+                )}
               </aside>
               )}
             </div>
@@ -588,55 +637,22 @@ export default function JudgingPage() {
           <div>
             <strong>
               {transitionState === "success" || transitionState === "exiting"
-                ? "Score submitted"
+                ? finalMode
+                  ? "Final score submitted"
+                  : "Score submitted"
                 : "Submitting score"}
             </strong>
             <span>
               {transitionState === "success" || transitionState === "exiting"
-                ? "Loading the next project…"
+                ? finalMode
+                  ? "Returning to the finalists…"
+                  : "Loading the next project…"
                 : "Saving your review…"}
             </span>
           </div>
         </div>
       </div>
 
-      {showTeamPhoto && submission?.teamPhotoUrl && (
-        <div
-          aria-label="Builder photo preview"
-          aria-modal="true"
-          className="photo-modal"
-          onClick={() => setShowTeamPhoto(false)}
-          role="dialog"
-        >
-          <div
-            className="photo-modal-content"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              aria-label="Close photo"
-              className="photo-modal-close"
-              onClick={() => setShowTeamPhoto(false)}
-              type="button"
-            >
-              ×
-            </button>
-            <div
-              aria-label={`Builders: ${submission.submitterNames || submission.teamName}`}
-              className="photo-modal-image"
-              role="img"
-              style={{
-                backgroundImage: `url("${submission.teamPhotoUrl}")`,
-              }}
-            />
-            <div className="photo-modal-caption">
-              <span>Builders</span>
-              <strong>
-                {submission.submitterNames || submission.teamName}
-              </strong>
-            </div>
-          </div>
-        </div>
-      )}
     </AppShell>
   );
 }

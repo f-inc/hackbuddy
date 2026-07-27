@@ -29,6 +29,7 @@ export const demoSubmissions: Submission[] = [
     totalScore: null,
     notes: "",
     reviews: [],
+    finalJudging: null,
   },
   {
     id: "demo-2",
@@ -58,6 +59,7 @@ export const demoSubmissions: Submission[] = [
     totalScore: null,
     notes: "",
     reviews: [],
+    finalJudging: null,
   },
   {
     id: "demo-3",
@@ -97,5 +99,6 @@ export const demoSubmissions: Submission[] = [
         completedAt: "2026-07-23T21:10:00.000Z",
       },
     ],
+    finalJudging: null,
   },
 ];

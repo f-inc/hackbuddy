@@ -10,6 +10,12 @@ export type SubmissionReview = {
   completedAt: string;
 };
 
+export type FinalJudgingState = {
+  startedAt: string;
+  judges: string[];
+  reviews: SubmissionReview[];
+};
+
 export type Submission = {
   id: string;
   teamName: string;
@@ -37,6 +43,7 @@ export type Submission = {
   totalScore: number | null;
   notes: string;
   reviews: SubmissionReview[];
+  finalJudging: FinalJudgingState | null;
 };
 
 export type QueueStats = {
@@ -83,4 +90,23 @@ export type ResultEntry = {
   complexityScore: number;
   totalScore: number;
   completedAt: string;
+};
+
+export type FinalistEntry = ResultEntry & {
+  finalReviews: SubmissionReview[];
+  reviewedByYou: boolean;
+  fullyReviewed: boolean;
+};
+
+export type FinalsState = {
+  started: boolean;
+  canStart: boolean;
+  startedAt: string;
+  judges: string[];
+  eligibleJudge: boolean;
+  finalists: FinalistEntry[];
+  completedReviews: number;
+  requiredReviews: number;
+  allComplete: boolean;
+  topThree: FinalistEntry[];
 };
