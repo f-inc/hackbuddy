@@ -3,23 +3,26 @@ import {
   getFinalsState,
   getQueueStats,
   isDemoMode,
+  resetFinalRound,
   startFinalRound,
   submitFinalReview,
+  syncFinalRoundWithResults,
 } from "@/lib/airtable";
-import { getSession } from "@/lib/auth";
+import {
+  requireAdmin,
+  requireHackathonSession,
+} from "@/server/auth/policies";
+import { errorResponse } from "@/server/http/errors";
+import {
+  parseFinalsActionRequest,
+  parseReviewRequest,
+  readJson,
+} from "@/server/http/validation";
 import { NextResponse } from "next/server";
 
-function validScore(value: unknown): value is number {
-  return Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 10;
-}
-
 export async function GET(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
+    const session = await requireHackathonSession();
     const id = new URL(request.url).searchParams.get("id");
     if (id) {
       const submission = await getFinalistSubmission(id, session.name);
@@ -34,94 +37,46 @@ export async function GET(request: Request) {
         demoMode: isDemoMode(),
       });
     }
-
     return NextResponse.json({
       finals: await getFinalsState(session.name),
       demoMode: isDemoMode(),
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "The final round could not be loaded.",
-      },
-      { status: 409 },
-    );
+    return errorResponse(error, "The final round could not be loaded.");
   }
 }
 
-export async function POST() {
-  const session = await getSession();
-  if (!session || session.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function POST(request: Request) {
   try {
+    const session = await requireAdmin();
+    const body = parseFinalsActionRequest(await readJson(request));
+    const finals =
+      body.action === "reset"
+        ? await resetFinalRound(session.name)
+        : body.action === "sync"
+          ? await syncFinalRoundWithResults(session.name)
+          : await startFinalRound(session.name, body.judges);
     return NextResponse.json({
       ok: true,
-      finals: await startFinalRound(session.name),
+      finals,
       demoMode: isDemoMode(),
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "The final round could not be started.",
-      },
-      { status: 409 },
-    );
+    return errorResponse(error, "The final round could not be changed.");
   }
 }
 
 export async function PATCH(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const body = (await request.json()) as {
-    id?: string;
-    progress?: number;
-    practicality?: number;
-    complexity?: number;
-    notes?: string;
-  };
-  if (
-    !body.id ||
-    !validScore(body.progress) ||
-    !validScore(body.practicality) ||
-    !validScore(body.complexity)
-  ) {
-    return NextResponse.json(
-      { error: "Every rubric score must be between 1 and 10." },
-      { status: 400 },
-    );
-  }
-
   try {
-    await submitFinalReview(body.id, session.name, {
-      progress: body.progress,
-      practicality: body.practicality,
-      complexity: body.complexity,
-      notes: body.notes?.trim() || "",
-    });
+    const session = await requireHackathonSession();
+    const { id, scores } = parseReviewRequest(await readJson(request));
+    await submitFinalReview(id, session.name, scores);
     return NextResponse.json({
       ok: true,
       finals: await getFinalsState(session.name),
       demoMode: isDemoMode(),
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "The final score could not be saved.",
-      },
-      { status: 409 },
-    );
+    return errorResponse(error, "The final score could not be saved.");
   }
 }

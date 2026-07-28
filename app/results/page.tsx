@@ -3,6 +3,12 @@
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SubmissionDetails } from "@/components/SubmissionDetails";
+import {
+  JUDGING_POLICY,
+  PRELIMINARY_SCORE_MAX,
+  RUBRIC,
+  RUBRIC_SCORE_MAX,
+} from "@/domain/judging-policy";
 import type { ResultEntry, Submission } from "@/lib/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -22,7 +28,17 @@ function formatCompleted(value: string) {
   }).format(new Date(value));
 }
 
-export default function ResultsPage() {
+export function ResultsView({
+  hackathon,
+  hackathonName,
+  hackathonImageUrl,
+}: {
+  hackathon?: string;
+  hackathonName?: string;
+  hackathonImageUrl?: string;
+}) {
+  const apiBase = hackathon ? `/api/hackathons/${hackathon}` : "/api";
+  const pageBase = hackathon ? `/${hackathon}` : "";
   const [name, setName] = useState("");
   const [role, setRole] = useState<"judge" | "admin">("judge");
   const [results, setResults] = useState<ResultEntry[]>([]);
@@ -40,9 +56,9 @@ export default function ResultsPage() {
   const refresh = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     try {
-      const response = await fetch("/api/results");
+      const response = await fetch(`${apiBase}/results`);
       if (response.status === 401) {
-        window.location.href = "/";
+        window.location.href = hackathon ? `/${hackathon}` : "/";
         return;
       }
       const data = (await response.json()) as ResultsResponse;
@@ -57,19 +73,34 @@ export default function ResultsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [apiBase, hackathon]);
 
   useEffect(() => {
     async function initialize() {
       const response = await fetch("/api/auth/session");
       if (!response.ok) {
-        window.location.href = "/";
+        window.location.href = hackathon ? `/${hackathon}` : "/";
         return;
       }
       const session = (await response.json()) as {
         name: string;
         role: "judge" | "admin";
+        hackathon?: string;
       };
+      if (!hackathon && session.role === "judge") {
+        window.location.href = session.hackathon
+          ? `/${session.hackathon}/results`
+          : "/";
+        return;
+      }
+      if (
+        hackathon &&
+        session.role !== "admin" &&
+        session.hackathon !== hackathon
+      ) {
+        window.location.href = `/${hackathon}`;
+        return;
+      }
       setName(session.name);
       setRole(session.role);
       await refresh();
@@ -77,7 +108,7 @@ export default function ResultsPage() {
     void initialize();
     const interval = window.setInterval(() => void refresh(true), 30_000);
     return () => window.clearInterval(interval);
-  }, [refresh]);
+  }, [hackathon, refresh]);
 
   useEffect(() => {
     if (!selectedTeam && !reviewPickerProject && !inspectingId) return;
@@ -104,7 +135,7 @@ export default function ResultsPage() {
     setInspectionError("");
     try {
       const response = await fetch(
-        `/api/submission?id=${encodeURIComponent(id)}`,
+        `${apiBase}/submission?id=${encodeURIComponent(id)}`,
       );
       const data = (await response.json()) as {
         submission?: Submission;
@@ -146,7 +177,13 @@ export default function ResultsPage() {
   if (!name || loading) return <LoadingScreen />;
 
   return (
-    <AppShell name={name} role={role}>
+    <AppShell
+      hackathon={hackathon}
+      hackathonImageUrl={hackathonImageUrl}
+      hackathonName={hackathonName}
+      name={name}
+      role={role}
+    >
       {demoMode && (
         <div className="demo-banner">
           Preview mode — add Airtable credentials to use live submissions.
@@ -175,11 +212,11 @@ export default function ResultsPage() {
           </article>
           <article className="card">
             <span>Average score</span>
-            <strong>{summary.average || "—"}<small>/60</small></strong>
+            <strong>{summary.average || "—"}<small>/{PRELIMINARY_SCORE_MAX}</small></strong>
           </article>
           <article className="card">
             <span>Highest score</span>
-            <strong>{summary.highest || "—"}<small>/60</small></strong>
+            <strong>{summary.highest || "—"}<small>/{PRELIMINARY_SCORE_MAX}</small></strong>
           </article>
           <article className="card">
             <span>Judges represented</span>
@@ -205,9 +242,9 @@ export default function ResultsPage() {
                     <th>Project &amp; team</th>
                     <th>Builders</th>
                     <th>Judge</th>
-                    <th>Progress</th>
-                    <th>Practicality</th>
-                    <th>Complexity</th>
+                    <th>{RUBRIC.progress.label}</th>
+                    <th>{RUBRIC.practicality.label}</th>
+                    <th>{RUBRIC.complexity.label}</th>
                     <th>Total</th>
                     <th>Completed</th>
                     {role === "admin" && <th>Admin</th>}
@@ -276,16 +313,16 @@ export default function ResultsPage() {
                                 <strong className="judge-name">
                                   {review.judgeName || "Unknown"}
                                 </strong>
-                                <small>{review.totalScore}/30</small>
+                                <small>{review.totalScore}/{RUBRIC_SCORE_MAX}</small>
                               </span>
                             </div>
                           ))}
                         </div>
                       </td>
-                      <td><span className="rubric-score">{result.progressScore}<small>/20</small></span></td>
-                      <td><span className="rubric-score">{result.practicalityScore}<small>/20</small></span></td>
-                      <td><span className="rubric-score">{result.complexityScore}<small>/20</small></span></td>
-                      <td><span className="result-total">{result.totalScore}<small>/60</small></span></td>
+                      <td><span className="rubric-score">{result.progressScore}<small>/{JUDGING_POLICY.score.max * JUDGING_POLICY.preliminary.requiredReviews}</small></span></td>
+                      <td><span className="rubric-score">{result.practicalityScore}<small>/{JUDGING_POLICY.score.max * JUDGING_POLICY.preliminary.requiredReviews}</small></span></td>
+                      <td><span className="rubric-score">{result.complexityScore}<small>/{JUDGING_POLICY.score.max * JUDGING_POLICY.preliminary.requiredReviews}</small></span></td>
+                      <td><span className="result-total">{result.totalScore}<small>/{PRELIMINARY_SCORE_MAX}</small></span></td>
                       <td><span className="completed-time">{formatCompleted(result.completedAt)}</span></td>
                       {role === "admin" && (
                         <td>
@@ -398,7 +435,7 @@ export default function ResultsPage() {
               {reviewPickerProject.reviews.map((review, index) => (
                 <a
                   className="review-picker-option"
-                  href={`/judging?submission=${encodeURIComponent(
+                  href={`${pageBase}/judging?submission=${encodeURIComponent(
                     reviewPickerProject.id,
                   )}&review=${index}`}
                   key={`${reviewPickerProject.id}-${review.judgeName}-${index}`}
@@ -412,18 +449,21 @@ export default function ResultsPage() {
                   </span>
                   <span className="review-picker-breakdown">
                     <span>
-                      Progress <strong>{review.progressScore}</strong>
+                      {RUBRIC.progress.label}{" "}
+                      <strong>{review.progressScore}</strong>
                     </span>
                     <span>
-                      Practicality <strong>{review.practicalityScore}</strong>
+                      {RUBRIC.practicality.label}{" "}
+                      <strong>{review.practicalityScore}</strong>
                     </span>
                     <span>
-                      Complexity <strong>{review.complexityScore}</strong>
+                      {RUBRIC.complexity.label}{" "}
+                      <strong>{review.complexityScore}</strong>
                     </span>
                   </span>
                   <span className="review-picker-total">
                     <strong>{review.totalScore}</strong>
-                    <small>/30</small>
+                    <small>/{RUBRIC_SCORE_MAX}</small>
                   </span>
                   <span className="review-picker-arrow" aria-hidden>
                     →
@@ -469,4 +509,8 @@ export default function ResultsPage() {
       )}
     </AppShell>
   );
+}
+
+export default function ResultsPage() {
+  return <ResultsView />;
 }

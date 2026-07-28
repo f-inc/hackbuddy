@@ -10,8 +10,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ignore-pattern .next",
+    "test": "tsc --outDir /tmp/hackbuddy-domain-tests --noEmit false --incremental false --module commonjs --moduleResolution node --target ES2022 --esModuleInterop true --skipLibCheck domain/*.ts tests/*.test.ts && node --test /tmp/hackbuddy-domain-tests/tests/*.test.js",
     "migrate:two-review": "node scripts/migrate-two-review-ledger.mjs",
-    "setup:finals": "node scripts/setup-finals-field.mjs"
+    "setup:finals": "node scripts/setup-finals-field.mjs",
+    "setup:hackathons": "node scripts/setup-hackathons-table.mjs",
+    "setup:reviews": "node scripts/setup-reviews-table.mjs"
   },
   "dependencies": {
     "next": "16.2.6",

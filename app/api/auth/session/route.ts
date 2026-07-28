@@ -10,5 +10,6 @@ export async function GET() {
     authenticated: true,
     name: session.name,
     role: session.role,
+    hackathon: session.hackathon,
   });
 }

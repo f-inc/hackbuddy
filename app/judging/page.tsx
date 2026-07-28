@@ -4,6 +4,11 @@ import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { ScoreControl } from "@/components/ScoreControl";
 import { SubmissionDetails } from "@/components/SubmissionDetails";
+import {
+  JUDGING_POLICY,
+  RUBRIC,
+  RUBRIC_SCORE_MAX,
+} from "@/domain/judging-policy";
 import type {
   FinalsState,
   QueueStats,
@@ -34,7 +39,17 @@ function formatSubmitted(value: string) {
   }).format(new Date(value));
 }
 
-export default function JudgingPage() {
+export function JudgingView({
+  hackathon,
+  hackathonName,
+  hackathonImageUrl,
+}: {
+  hackathon?: string;
+  hackathonName?: string;
+  hackathonImageUrl?: string;
+}) {
+  const apiBase = hackathon ? `/api/hackathons/${hackathon}` : "/api";
+  const pageBase = hackathon ? `/${hackathon}` : "";
   const [name, setName] = useState("");
   const [role, setRole] = useState<"judge" | "admin">("judge");
   const [inspectionMode, setInspectionMode] = useState(false);
@@ -70,9 +85,9 @@ export default function JudgingPage() {
     if (showFullPageLoader) setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/queue/claim", { method: "POST" });
+      const response = await fetch(`${apiBase}/queue/claim`, { method: "POST" });
       if (response.status === 401) {
-        window.location.href = "/";
+        window.location.href = hackathon ? `/${hackathon}` : "/";
         return;
       }
       const result = (await response.json()) as ClaimResponse;
@@ -91,19 +106,34 @@ export default function JudgingPage() {
     } finally {
       if (showFullPageLoader) setLoading(false);
     }
-  }, []);
+  }, [apiBase, hackathon]);
 
   useEffect(() => {
     async function initialize() {
       const response = await fetch("/api/auth/session");
       if (!response.ok) {
-        window.location.href = "/";
+        window.location.href = hackathon ? `/${hackathon}` : "/";
         return;
       }
       const session = (await response.json()) as {
         name: string;
         role: "judge" | "admin";
+        hackathon?: string;
       };
+      if (!hackathon && session.role === "judge") {
+        window.location.href = session.hackathon
+          ? `/${session.hackathon}/judging`
+          : "/";
+        return;
+      }
+      if (
+        hackathon &&
+        session.role !== "admin" &&
+        session.hackathon !== hackathon
+      ) {
+        window.location.href = `/${hackathon}`;
+        return;
+      }
       setName(session.name);
       setRole(session.role);
 
@@ -119,7 +149,7 @@ export default function JudgingPage() {
         setFinalMode(true);
         setLoading(true);
         const finalResponse = await fetch(
-          `/api/finals?id=${encodeURIComponent(submissionId)}`,
+          `${apiBase}/finals?id=${encodeURIComponent(submissionId)}`,
         );
         const result =
           (await finalResponse.json()) as FinalSubmissionResponse;
@@ -147,7 +177,7 @@ export default function JudgingPage() {
         setEditingReviewIndex(selectedReviewIndex);
         setLoading(true);
         const inspectionResponse = await fetch(
-          `/api/admin/submission?id=${encodeURIComponent(submissionId)}${
+          `${apiBase}/admin/submission?id=${encodeURIComponent(submissionId)}${
             selectedReviewIndex !== null
               ? `&review=${selectedReviewIndex}`
               : ""
@@ -180,13 +210,13 @@ export default function JudgingPage() {
       await claim(true);
     }
     void initialize();
-  }, [claim]);
+  }, [apiBase, claim, hackathon]);
 
   useEffect(() => {
     if (!name || finalMode) return;
 
     async function refreshCollectiveProgress() {
-      const response = await fetch("/api/dashboard");
+      const response = await fetch(`${apiBase}/dashboard`);
       if (!response.ok) return;
       const result = (await response.json()) as { stats: QueueStats };
       setStats(result.stats);
@@ -197,7 +227,7 @@ export default function JudgingPage() {
       30_000,
     );
     return () => window.clearInterval(interval);
-  }, [finalMode, name]);
+  }, [apiBase, finalMode, name]);
 
   async function submitScore() {
     if (!submission || !progress || !practicality || !complexity) {
@@ -210,7 +240,7 @@ export default function JudgingPage() {
     setTransitionState("saving");
     setError("");
     try {
-      const response = await fetch("/api/queue/complete", {
+      const response = await fetch(`${apiBase}/queue/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -261,14 +291,14 @@ export default function JudgingPage() {
     setReleasing(true);
     setError("");
     try {
-      const response = await fetch("/api/admin/release", {
+      const response = await fetch(`${apiBase}/admin/release`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: submission.id }),
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error);
-      window.location.href = "/dashboard";
+      window.location.href = `${pageBase}/dashboard`;
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -288,7 +318,7 @@ export default function JudgingPage() {
     setSubmitting(true);
     setError("");
     try {
-      const response = await fetch("/api/admin/submission", {
+      const response = await fetch(`${apiBase}/admin/submission`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -304,7 +334,7 @@ export default function JudgingPage() {
         ok?: boolean;
       };
       if (!response.ok) throw new Error(result.error);
-      window.location.href = "/results";
+      window.location.href = `${pageBase}/results`;
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -326,7 +356,7 @@ export default function JudgingPage() {
     setTransitionState("saving");
     setError("");
     try {
-      const response = await fetch("/api/finals", {
+      const response = await fetch(`${apiBase}/finals`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -344,7 +374,7 @@ export default function JudgingPage() {
       if (!response.ok) throw new Error(result.error);
       setTransitionState("success");
       await new Promise((resolve) => window.setTimeout(resolve, 900));
-      window.location.href = "/leaderboard";
+      window.location.href = `${pageBase}/leaderboard`;
     } catch (caught) {
       setTransitionState("idle");
       setTransitioning(false);
@@ -363,10 +393,19 @@ export default function JudgingPage() {
     ? finalsState?.finalists.filter((finalist) => finalist.reviewedByYou)
         .length ?? 0
     : stats?.completed ?? 0;
-  const total = finalMode ? finalsState?.finalists.length ?? 10 : stats?.total ?? 0;
+  const total = finalMode
+    ? finalsState?.finalists.length ??
+      JUDGING_POLICY.finals.finalistCount
+    : stats?.total ?? 0;
   const totalScore = progress + practicality + complexity;
   return (
-    <AppShell name={name} role={role}>
+    <AppShell
+      hackathon={hackathon}
+      hackathonImageUrl={hackathonImageUrl}
+      hackathonName={hackathonName}
+      name={name}
+      role={role}
+    >
       {demoMode && (
         <div className="demo-banner">
           Preview mode — add Airtable credentials to use live submissions.
@@ -427,7 +466,7 @@ export default function JudgingPage() {
                 {completedNow} {completedNow === 1 ? "review" : "reviews"} in
                 this session.
               </p>
-              <a className="empty-state-results-link" href="/results">
+              <a className="empty-state-results-link" href={`${pageBase}/results`}>
                 See results <span aria-hidden>→</span>
               </a>
             </section>
@@ -462,7 +501,10 @@ export default function JudgingPage() {
                   </div>
                   <div>
                     <span>Completed reviews</span>
-                    <strong>{submission.reviews.length} of 2</strong>
+                    <strong>
+                      {submission.reviews.length} of{" "}
+                      {JUDGING_POLICY.preliminary.requiredReviews}
+                    </strong>
                   </div>
                 </div>
 
@@ -484,7 +526,7 @@ export default function JudgingPage() {
                   {!releasing && <span>↗</span>}
                 </button>
 
-                <a className="back-to-dashboard" href="/dashboard">
+                <a className="back-to-dashboard" href={`${pageBase}/dashboard`}>
                   ← Back to dashboard
                 </a>
               </aside>
@@ -503,9 +545,9 @@ export default function JudgingPage() {
                             "unknown judge"
                           }`
                         : `Review ${Math.min(
-                            submission.reviews.length + 1,
-                            2,
-                          )} of 2`}
+                          submission.reviews.length + 1,
+                          JUDGING_POLICY.preliminary.requiredReviews,
+                        )} of {JUDGING_POLICY.preliminary.requiredReviews}`}
                     </span>
                     <h2>
                       {finalMode
@@ -519,27 +561,27 @@ export default function JudgingPage() {
                   </div>
                   <div className="compact-total">
                     <strong>{totalScore || "—"}</strong>
-                    <span>/30</span>
+                    <span>/{RUBRIC_SCORE_MAX}</span>
                   </div>
                 </header>
 
                 <ScoreControl
                   highAnchor="Exceptional progress tonight"
-                  label="One-night progress"
+                  label={RUBRIC.progress.label}
                   lowAnchor="Little meaningful progress"
                   onChange={setProgress}
                   value={progress}
                 />
                 <ScoreControl
                   highAnchor="Solves an actual problem"
-                  label="Practicality"
+                  label={RUBRIC.practicality.label}
                   lowAnchor="No real-world use case"
                   onChange={setPracticality}
                   value={practicality}
                 />
                 <ScoreControl
                   highAnchor="Complex and well executed"
-                  label="Technical complexity"
+                  label={RUBRIC.complexity.label}
                   lowAnchor="Technically straightforward"
                   onChange={setComplexity}
                   value={complexity}
@@ -562,7 +604,8 @@ export default function JudgingPage() {
                     {finalMode ? (
                       <>
                         Score the team’s live presentation. You can return and
-                        edit this review from the Top 10 tab.
+                        edit this review from the Top{" "}
+                        {JUDGING_POLICY.finals.finalistCount} tab.
                       </>
                     ) : editingReviewIndex !== null ? (
                       <>
@@ -600,12 +643,12 @@ export default function JudgingPage() {
                   </button>
                 </footer>
                 {finalMode && (
-                  <a className="back-to-dashboard" href="/leaderboard">
-                    ← Back to Top 10
+                  <a className="back-to-dashboard" href={`${pageBase}/leaderboard`}>
+                    ← Back to Top {JUDGING_POLICY.finals.finalistCount}
                   </a>
                 )}
                 {!finalMode && editingReviewIndex !== null && (
-                  <a className="back-to-dashboard" href="/results">
+                  <a className="back-to-dashboard" href={`${pageBase}/results`}>
                     ← Back to results
                   </a>
                 )}
@@ -655,4 +698,8 @@ export default function JudgingPage() {
 
     </AppShell>
   );
+}
+
+export default function JudgingPage() {
+  return <JudgingView />;
 }

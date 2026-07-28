@@ -1,14 +1,11 @@
 import { getDashboard, isDemoMode } from "@/lib/airtable";
-import { getSession } from "@/lib/auth";
+import { requireHackathonSession } from "@/server/auth/policies";
+import { errorResponse } from "@/server/http/errors";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
+    const session = await requireHackathonSession();
     const dashboard = await getDashboard(session.name);
     if (session.role === "judge") {
       return NextResponse.json({
@@ -22,10 +19,6 @@ export async function GET() {
     }
     return NextResponse.json({ ...dashboard, demoMode: isDemoMode() });
   } catch (error) {
-    console.error(error);
-    return NextResponse.json(
-      { error: "Airtable could not be reached. Check the server configuration." },
-      { status: 500 },
-    );
+    return errorResponse(error, "The dashboard could not be loaded.");
   }
 }

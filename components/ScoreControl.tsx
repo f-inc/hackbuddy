@@ -1,3 +1,5 @@
+import { JUDGING_POLICY } from "@/domain/judging-policy";
+
 export function ScoreControl({
   label,
   lowAnchor,
@@ -20,9 +22,15 @@ export function ScoreControl({
         <strong>{value || "—"}</strong>
       </div>
       <div className="score-options">
-        {Array.from({ length: 10 }, (_, index) => index + 1).map((score) => (
+        {Array.from(
+          {
+            length:
+              JUDGING_POLICY.score.max - JUDGING_POLICY.score.min + 1,
+          },
+          (_, index) => index + JUDGING_POLICY.score.min,
+        ).map((score) => (
           <button
-            aria-label={`${label}: ${score} out of 10`}
+            aria-label={`${label}: ${score} out of ${JUDGING_POLICY.score.max}`}
             aria-pressed={value === score}
             className={value === score ? "selected" : ""}
             key={score}

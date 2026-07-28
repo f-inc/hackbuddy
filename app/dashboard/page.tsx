@@ -2,6 +2,10 @@
 
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import {
+  PRELIMINARY_SCORE_MAX,
+  RUBRIC_SCORE_MAX,
+} from "@/domain/judging-policy";
 import type {
   ActiveSession,
   LeaderboardEntry,
@@ -48,7 +52,17 @@ function timeAgo(value: string) {
   return `${Math.floor(minutes / 60)}h ago`;
 }
 
-export default function DashboardPage() {
+export function DashboardView({
+  hackathon,
+  hackathonName,
+  hackathonImageUrl,
+}: {
+  hackathon?: string;
+  hackathonName?: string;
+  hackathonImageUrl?: string;
+}) {
+  const apiBase = hackathon ? `/api/hackathons/${hackathon}` : "/api";
+  const pageBase = hackathon ? `/${hackathon}` : "";
   const [name, setName] = useState("");
   const [role, setRole] = useState<"judge" | "admin">("judge");
   const [data, setData] = useState(emptyData);
@@ -58,9 +72,9 @@ export default function DashboardPage() {
   const refresh = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     try {
-      const response = await fetch("/api/dashboard");
+      const response = await fetch(`${apiBase}/dashboard`);
       if (response.status === 401) {
-        window.location.href = "/";
+        window.location.href = hackathon ? `/${hackathon}` : "/";
         return;
       }
       const result = (await response.json()) as DashboardData;
@@ -76,19 +90,34 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [apiBase, hackathon]);
 
   useEffect(() => {
     async function initialize() {
       const response = await fetch("/api/auth/session");
       if (!response.ok) {
-        window.location.href = "/";
+        window.location.href = hackathon ? `/${hackathon}` : "/";
         return;
       }
       const session = (await response.json()) as {
         name: string;
         role: "judge" | "admin";
+        hackathon?: string;
       };
+      if (!hackathon && session.role === "judge") {
+        window.location.href = session.hackathon
+          ? `/${session.hackathon}/dashboard`
+          : "/";
+        return;
+      }
+      if (
+        hackathon &&
+        session.role !== "admin" &&
+        session.hackathon !== hackathon
+      ) {
+        window.location.href = `/${hackathon}`;
+        return;
+      }
       setName(session.name);
       setRole(session.role);
       await refresh();
@@ -96,7 +125,7 @@ export default function DashboardPage() {
     void initialize();
     const interval = window.setInterval(() => void refresh(true), 30_000);
     return () => window.clearInterval(interval);
-  }, [refresh]);
+  }, [hackathon, refresh]);
 
   if (!name || loading) return <LoadingScreen />;
 
@@ -119,7 +148,13 @@ export default function DashboardPage() {
   const judgeHasWork = data.hasActiveReview || data.eligibleAvailable > 0;
 
   return (
-    <AppShell name={name} role={role}>
+    <AppShell
+      hackathon={hackathon}
+      hackathonImageUrl={hackathonImageUrl}
+      hackathonName={hackathonName}
+      name={name}
+      role={role}
+    >
       {data.demoMode && (
         <div className="demo-banner">
           Preview mode — add Airtable credentials to use live submissions.
@@ -129,16 +164,29 @@ export default function DashboardPage() {
         <section
           className={`page-heading${role === "judge" ? " judge-page-heading" : ""}`}
         >
-          <div>
-            <h1>{role === "admin" ? "Dashboard" : "Judging queue"}</h1>
-            <p>
-              {role === "admin"
-                ? `Welcome back, ${name}. Here’s what’s happening in the judging room.`
-                : "See what still needs your attention."}
-            </p>
+          <div className="dashboard-event-heading">
+            {hackathonImageUrl && (
+              <span
+                aria-label={`${hackathonName || "Hackathon"} artwork`}
+                className="dashboard-event-image"
+                role="img"
+                style={{
+                  backgroundImage: `url("${hackathonImageUrl}")`,
+                }}
+              />
+            )}
+            <div>
+              {hackathonName && <span className="eyebrow">{hackathonName}</span>}
+              <h1>{role === "admin" ? "Dashboard" : "Judging queue"}</h1>
+              <p>
+                {role === "admin"
+                  ? `Welcome back, ${name}. Here’s what’s happening in the judging room.`
+                  : "See what still needs your attention."}
+              </p>
+            </div>
           </div>
           {role === "admin" && (
-            <a className="primary-button link-button" href="/judging">
+            <a className="primary-button link-button" href={`${pageBase}/judging`}>
               Start judging <span>→</span>
             </a>
           )}
@@ -154,7 +202,7 @@ export default function DashboardPage() {
             <div className="score-average">
               <strong>{data.averageScore || "—"}</strong>
               <span>
-                <small>/ 30</small>
+                <small>/ {RUBRIC_SCORE_MAX}</small>
                 Current average
               </span>
             </div>
@@ -269,7 +317,7 @@ export default function DashboardPage() {
                     <span className="table-status in-progress">In progress</span>
                     <a
                       className="inspect-session"
-                      href={`/judging?submission=${encodeURIComponent(session.id)}`}
+                      href={`${pageBase}/judging?submission=${encodeURIComponent(session.id)}`}
                     >
                       Inspect
                     </a>
@@ -304,7 +352,7 @@ export default function DashboardPage() {
                     </div>
                     <b>
                       {entry.score}
-                      <small>/60</small>
+                      <small>/{PRELIMINARY_SCORE_MAX}</small>
                     </b>
                   </li>
                 ))}
@@ -389,12 +437,12 @@ export default function DashboardPage() {
                 <strong>{data.stats.total}</strong> submissions reviewed
               </span>
               {judgeHasWork ? (
-                <a className="primary-button link-button" href="/judging">
+                <a className="primary-button link-button" href={`${pageBase}/judging`}>
                   {data.hasActiveReview ? "Continue judging" : "Judge next project"}{" "}
                   <span>→</span>
                 </a>
               ) : queueComplete ? (
-                <a className="secondary-button link-button" href="/results">
+                <a className="secondary-button link-button" href={`${pageBase}/results`}>
                   View results <span>→</span>
                 </a>
               ) : null}
@@ -404,4 +452,8 @@ export default function DashboardPage() {
       </main>
     </AppShell>
   );
+}
+
+export default function DashboardPage() {
+  return <DashboardView />;
 }

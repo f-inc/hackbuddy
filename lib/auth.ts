@@ -1,9 +1,11 @@
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { authSecret } from "@/server/config/env";
 
 export type Session = {
   role: "judge" | "admin";
   name: string;
+  hackathon?: string;
   expiresAt: number;
 };
 
@@ -11,7 +13,7 @@ const COOKIE_NAME = "hackbuddy_session";
 const SESSION_DURATION_MS = 12 * 60 * 60 * 1000;
 
 function secret() {
-  return process.env.AUTH_SECRET || "development-only-change-me";
+  return authSecret();
 }
 
 function sign(payload: string) {
@@ -38,13 +40,33 @@ function decodeSession(value: string): Session | null {
   }
 
   try {
-    const parsed = JSON.parse(
+    const parsed: unknown = JSON.parse(
       Buffer.from(payload, "base64url").toString(),
-    ) as Session;
+    );
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !("expiresAt" in parsed) ||
+      typeof parsed.expiresAt !== "number" ||
+      !("name" in parsed) ||
+      typeof parsed.name !== "string" ||
+      !("role" in parsed) ||
+      (parsed.role !== "admin" && parsed.role !== "judge") ||
+      ("hackathon" in parsed &&
+        parsed.hackathon !== undefined &&
+        typeof parsed.hackathon !== "string")
+    ) {
+      return null;
+    }
     if (parsed.expiresAt < Date.now()) return null;
     return {
-      ...parsed,
-      role: parsed.role === "admin" ? "admin" : "judge",
+      role: parsed.role,
+      name: parsed.name,
+      hackathon:
+        "hackathon" in parsed && typeof parsed.hackathon === "string"
+          ? parsed.hackathon
+          : undefined,
+      expiresAt: parsed.expiresAt,
     };
   } catch {
     return null;
@@ -56,13 +78,17 @@ export async function getSession() {
   return value ? decodeSession(value) : null;
 }
 
-export async function setSession(name: string, role: Session["role"]) {
+export async function setSession(
+  name: string,
+  role: Session["role"],
+  hackathon?: string,
+) {
   const store = await cookies();
   const expiresAt = Date.now() + SESSION_DURATION_MS;
   const normalizedName = name.trim().toLowerCase();
   store.set(
     COOKIE_NAME,
-    encodeSession({ name: normalizedName, role, expiresAt }),
+    encodeSession({ name: normalizedName, role, hackathon, expiresAt }),
     {
       httpOnly: true,
       sameSite: "lax",

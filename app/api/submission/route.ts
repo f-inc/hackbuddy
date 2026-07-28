@@ -1,28 +1,21 @@
 import { getSubmissionById } from "@/lib/airtable";
-import { getSession } from "@/lib/auth";
+import { requireHackathonSession } from "@/server/auth/policies";
+import {
+  errorResponse,
+  NotFoundError,
+  ValidationError,
+} from "@/server/http/errors";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
-  const session = await getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    await requireHackathonSession();
+    const id = new URL(request.url).searchParams.get("id");
+    if (!id) throw new ValidationError("Submission ID is required.");
+    const submission = await getSubmissionById(id);
+    if (!submission) throw new NotFoundError("Submission not found.");
+    return NextResponse.json({ submission });
+  } catch (error) {
+    return errorResponse(error, "The submission could not be loaded.");
   }
-
-  const id = new URL(request.url).searchParams.get("id");
-  if (!id) {
-    return NextResponse.json(
-      { error: "Submission ID required." },
-      { status: 400 },
-    );
-  }
-
-  const submission = await getSubmissionById(id);
-  if (!submission) {
-    return NextResponse.json(
-      { error: "Submission not found." },
-      { status: 404 },
-    );
-  }
-
-  return NextResponse.json({ submission });
 }
