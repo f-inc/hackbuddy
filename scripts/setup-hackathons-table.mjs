@@ -200,3 +200,48 @@ if (legacyTable) {
     console.log(`Added default event "${slug}".`);
   }
 }
+
+// Immutable snapshots use an append-only journal. An auto-numbered primary
+// field provides a database-assigned order across separate server instances.
+const publicationsName =
+  process.env.AIRTABLE_PUBLICATIONS_TABLE || "HackBuddy Publications";
+const publicationFields = [
+  { name: "Sequence", type: "autoNumber" },
+  { name: "Hackathon ID", type: "singleLineText" },
+  { name: "Snapshot", type: "multilineText" },
+];
+let publications = metadata.tables.find(
+  (candidate) => candidate.name === publicationsName,
+);
+if (!publications) {
+  const response = await fetch(metaUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      name: publicationsName,
+      description:
+        "Append-only official HackBuddy results. The lowest Sequence per event is authoritative; never edit or delete published rows.",
+      fields: publicationFields,
+    }),
+  });
+  if (!response.ok)
+    throw new Error(
+      `Could not create publication journal (HTTP ${response.status}).`,
+    );
+  publications = await response.json();
+  console.log(`Created "${publicationsName}" publication journal.`);
+} else {
+  for (const definition of publicationFields) {
+    if (
+      !publications.fields.some(
+        (field) =>
+          field.name === definition.name && field.type === definition.type,
+      )
+    ) {
+      throw new Error(
+        `Publication journal field "${definition.name}" is missing or has the wrong type. Migration stopped without changing published rows.`,
+      );
+    }
+  }
+  console.log(`"${publicationsName}" publication journal already exists.`);
+}

@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 const eventNavigation = [
   { href: "/dashboard", label: "Dashboard", icon: "▦" },
   { href: "/judging", label: "Judging", icon: "✓" },
+  { href: "/judged", label: "Projects judged", icon: "▤" },
   { href: "/results", label: "Results", icon: "≡" },
   {
     href: "/leaderboard",
@@ -112,7 +113,8 @@ export function AppShell({
             <span className="nav-label">Workspace</span>
             {navigation.map((item) => (
               <a
-                className={pathname === item.href ? "active" : ""}
+                aria-current={pathname === item.href || pathname.startsWith(`${item.href}/`) ? "page" : undefined}
+                className={pathname === item.href || pathname.startsWith(`${item.href}/`) ? "active" : ""}
                 href={item.href}
                 key={item.href}
               >
@@ -148,7 +150,8 @@ export function AppShell({
           <nav>
             {navigation.map((item) => (
               <a
-                className={pathname === item.href ? "active" : ""}
+                aria-current={pathname === item.href || pathname.startsWith(`${item.href}/`) ? "page" : undefined}
+                className={pathname === item.href || pathname.startsWith(`${item.href}/`) ? "active" : ""}
                 href={item.href}
                 key={item.href}
               >

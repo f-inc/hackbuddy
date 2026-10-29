@@ -84,17 +84,32 @@ test("persistent publication is read without consulting the live review ledger; 
     },
   };
   let writes = 0;
+  const journal = [];
   global.fetch = async (url, options = {}) => {
     assert.equal(
       options.headers.Authorization,
       "Bearer integration-test-token",
     );
     if (String(url).endsWith("/Hackathons/event")) {
-      if (options.method === "PATCH") {
-        writes++;
-        Object.assign(record.fields, JSON.parse(options.body).fields);
-      }
+      assert.notEqual(
+        options.method,
+        "PATCH",
+        "published registry fields must never be overwritten",
+      );
       return Response.json(record);
+    }
+    if (String(url).includes("/HackBuddy%20Publications")) {
+      if (options.method === "POST") {
+        writes++;
+        journal.push({
+          id: `publication-${writes}`,
+          fields: {
+            ...JSON.parse(options.body).records[0].fields,
+            Sequence: writes,
+          },
+        });
+      }
+      return Response.json({ records: journal.slice(0, 1) });
     }
     if (String(url).includes("/Hackathons?"))
       return Response.json({ records: [record] });
@@ -113,7 +128,7 @@ test("persistent publication is read without consulting the live review ledger; 
         const saved = snapshot();
         await eventScoringRepository.publish(saved);
         assert.equal(writes, 1);
-        assert.ok(record.fields["Published Results"].startsWith("gzip-v1:"));
+        assert.ok(journal[0].fields.Snapshot.startsWith("gzip-v1:"));
         // Registry policy edits cannot replace a published event's pinned version.
         record.fields["Scoring Policy"] = "raw-v1";
         assert.equal(
@@ -147,7 +162,7 @@ test("persistent publication is read without consulting the live review ledger; 
         ])
           await assert.rejects(operation, /published and locked/);
         assert.equal(writes, 1);
-        record.fields["Published Results"] = "corrupted snapshot";
+        journal[0].fields.Snapshot = "corrupted snapshot";
         await assert.rejects(
           () => api.getResultsReport(),
           /Refusing to recalculate/,
@@ -185,6 +200,8 @@ test("legacy metadata stays raw and event edits cannot change the policy or repl
     if (String(url).includes("/Hackathons?"))
       return Response.json({ records: [record] });
     if (String(url).endsWith("/Hackathons/event")) return Response.json(record);
+    if (String(url).includes("/HackBuddy%20Publications"))
+      return Response.json({ records: [] });
     throw new Error("Unexpected network call");
   };
   try {
@@ -352,4 +369,188 @@ test("dashboard, results, and finalist preview honor the same event policy; publ
   assert.equal(dashboard.leaderboard[0].score, 1.5);
   assert.equal(dashboard.publishedAt, saved.publishedAt);
   assert.equal(dashboard.averageScore, 24);
+});
+
+test("personal judge history follows official policy and keeps published scorecards private and frozen", async () => {
+  const {
+    JudgedProjectsQuery,
+  } = require("../application/judged-projects-query.ts");
+  const { preliminaryRanking } = require("../domain/ranking.ts");
+  const saved = snapshot();
+  const live = {
+    ...saved.results[0],
+    status: "completed",
+    finalJudging: {
+      startedAt: saved.finals.startedAt,
+      judges: ["judge"],
+      reviews: [
+        {
+          ...saved.finals.finalists[0].finalReviews[0],
+          totalScore: 3,
+          progressScore: 1,
+          practicalityScore: 1,
+          complexityScore: 1,
+        },
+      ],
+    },
+    totalScore: 3,
+    reviews: [
+      {
+        ...saved.results[0].reviews[0],
+        progressScore: 1,
+        totalScore: 3,
+        notes: "Edited after publication",
+      },
+    ],
+  };
+  const query = new JudgedProjectsQuery(() => ({ list: async () => [live] }));
+  const result = await query.execute(
+    "judge",
+    "project",
+    saved.scoringPolicy,
+    saved,
+  );
+  assert.equal(result.project.result.score, 24);
+  assert.equal(result.project.result.rank, 1);
+  assert.equal(result.project.publishedAt, saved.publishedAt);
+  assert.equal(result.submission.reviews[0].notes, "Saved note");
+  assert.equal(result.project.finalResult.score, 24);
+  assert.equal(
+    await query.execute("other judge", "project", saved.scoringPolicy, saved),
+    null,
+  );
+  for (const policy of ["raw-v1", "normalized-v1"]) {
+    const expected = preliminaryRanking([live], policy).results[0];
+    const history = await query.execute("judge", undefined, policy);
+    assert.equal(history.projects[0].result.rank, 1);
+    assert.equal(
+      history.projects[0].result.normalizedScore,
+      policy === "normalized-v1" ? expected.normalizedScore : null,
+    );
+  }
+});
+
+test("concurrent event reads do not mix scoring policies or published snapshots", async () => {
+  const originalFetch = global.fetch,
+    originalEnv = { ...process.env };
+  process.env.AIRTABLE_API_KEY = "integration-test-token";
+  process.env.AIRTABLE_BASE_ID = "appTest";
+  const saved = snapshot();
+  global.fetch = async (url) => {
+    if (String(url).includes("/HackBuddy%20Publications"))
+      return Response.json({ records: [] });
+    const id = String(url).split("/").at(-1);
+    await new Promise((resolve) =>
+      setTimeout(resolve, id === "event-a" ? 10 : 1),
+    );
+    return Response.json({
+      id,
+      fields:
+        id === "event-a"
+          ? {}
+          : {
+              "Scoring Policy": "normalized-v1",
+              "Published Results": encodePublication(saved),
+            },
+    });
+  };
+  try {
+    const reads = await Promise.all(
+      ["event-a", "event-b"].map((hackathonId) =>
+        withAirtableConfig(
+          {
+            hackathonId,
+            baseId: "appTest",
+            tableName: "Submissions",
+            reviewsTableName: "Reviews",
+          },
+          () => eventScoringRepository.read(),
+        ),
+      ),
+    );
+    assert.equal(reads[0].scoringPolicy, "raw-v1");
+    assert.equal(reads[0].publication, null);
+    assert.equal(reads[1].scoringPolicy, "normalized-v1");
+    assert.equal(reads[1].publication.publishedAt, saved.publishedAt);
+  } finally {
+    global.fetch = originalFetch;
+    process.env = originalEnv;
+  }
+});
+
+test("concurrent publishers across requests cannot overwrite the first official snapshot", async () => {
+  const originalFetch = global.fetch,
+    originalEnv = { ...process.env };
+  process.env.AIRTABLE_API_KEY = "integration-test-token";
+  process.env.AIRTABLE_BASE_ID = "appTest";
+  const journal = [];
+  let initialReads = 0;
+  global.fetch = async (url, options = {}) => {
+    if (String(url).endsWith("/Hackathons/event")) {
+      assert.notEqual(options.method, "PATCH");
+      return Response.json({
+        id: "event",
+        fields: { "Scoring Policy": "normalized-v1" },
+      });
+    }
+    assert.ok(String(url).includes("/HackBuddy%20Publications"));
+    if (options.method === "POST") {
+      const sequence = journal.length + 1;
+      journal.push({
+        id: `publication-${sequence}`,
+        fields: {
+          ...JSON.parse(options.body).records[0].fields,
+          Sequence: sequence,
+        },
+      });
+      if (sequence === 1)
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      return Response.json({ records: [journal[sequence - 1]] });
+    }
+    // Both server requests see an empty journal before either inserts.
+    if (++initialReads <= 4) return Response.json({ records: [] });
+    return Response.json({ records: journal.slice(0, 1) });
+  };
+  try {
+    await withAirtableConfig(
+      {
+        hackathonId: "event",
+        baseId: "appTest",
+        tableName: "Submissions",
+        reviewsTableName: "Reviews",
+      },
+      async () => {
+        const first = { ...snapshot(), publishedBy: "first-admin" };
+        const second = {
+          ...snapshot(),
+          publishedBy: "second-admin",
+          publishedAt: "2026-01-03T00:00:00Z",
+        };
+        const results = await Promise.all([
+          eventScoringRepository.publish(first),
+          eventScoringRepository.publish(second),
+        ]);
+        assert.equal(
+          journal.length,
+          2,
+          "the fixture must exercise two competing inserts",
+        );
+        assert.deepEqual(results[0], results[1]);
+        assert.equal(results[0].publishedBy, "first-admin");
+        await eventScoringRepository.publish(second);
+        assert.equal(
+          journal.length,
+          2,
+          "subsequent publication must not append or replace",
+        );
+        assert.equal(
+          (await eventScoringRepository.read()).publication.publishedBy,
+          "first-admin",
+        );
+      },
+    );
+  } finally {
+    global.fetch = originalFetch;
+    process.env = originalEnv;
+  }
 });

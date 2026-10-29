@@ -15,6 +15,8 @@ share a live view of queue progress, active sessions, and current scores.
 - Three required 1–10 rubric scores
 - Airtable remains the source of truth
 - Shared dashboard with queue progress, current scores, and active sessions
+- Personal Projects judged tab with searchable preliminary/final review history,
+  saved scores and notes, project results, and a read-only grading workspace
 - Live results scorecard with each rubric score, judge, team, builders, and
   clickable team photos
 - Administrators can inspect any active judge session and release its submission
@@ -176,20 +178,38 @@ Run the domain policy tests with:
 npm test
 ```
 
-## Deploy on Railway
+## Deploy on Vercel
 
-1. Push this directory to a GitHub repository.
-2. In Railway, create a project from that repository.
-3. Add the required variables from `.env.example`.
-4. Railway will detect Next.js. The build command is `npm run build` and the
-   start command is `npm start`.
-5. Generate `AUTH_SECRET` with a password manager or:
+1. Link this checkout with `npx vercel link` and choose the work team.
+2. Add `AIRTABLE_API_KEY`, `AIRTABLE_BASE_ID`, `AIRTABLE_TABLE_NAME`,
+   `ADMIN_PASSWORD`, `JUDGE_PASSWORD`, and `AUTH_SECRET` to the production
+   environment with `npx vercel env add NAME --environment production`.
+   Pipe secret values through stdin rather than passing them as command arguments.
+   Add any optional overrides from `.env.example` that your deployment uses.
+3. For a new installation, generate `AUTH_SECRET` with a password manager or:
 
    ```bash
    openssl rand -base64 32
    ```
 
+   When migrating an existing installation, preserve its signing secret and
+   passwords instead.
+4. Deploy with `npx vercel --prod`. Vercel detects Next.js and builds with
+   `npm run build`; API routes run as functions in San Francisco (`sfo1`).
+5. Add the production domain with
+   `npx vercel domains add hackbuddy.f.inc hackbuddy --scope f-inc`
+   and update its DNS to the target reported by Vercel. Complete the TXT
+   ownership challenge if Vercel requests one. Set
+   `NEXT_PUBLIC_SITE_URL=https://hackbuddy.f.inc` for canonical and social links,
+   then redeploy after changing any variables.
+6. Connect `f-inc/hackbuddy` using `npx vercel git connect` and use `master`
+   as the production branch for automatic deployments.
+
 No database or volume is required because Airtable stores the queue and scores.
+Do not run the Airtable setup or migration scripts as a deployment step.
+Railway-generated `RAILWAY_*` variables are not needed on Vercel.
+The old `railway.json` is retained for rollback; stop the Railway deployment
+only after the custom domain and authenticated Airtable reads work on Vercel.
 
 ## Queue locking note
 
@@ -275,7 +295,9 @@ live Airtable automatically):
 | Field | Airtable type | Meaning |
 | --- | --- | --- |
 | Scoring Policy | Single line text | `raw-v1` or `normalized-v1`; blank means legacy raw scoring |
-| Published Results | Long text | Compressed, versioned snapshot of official results |
+| Published Results | Long text | Read-only compatibility field for existing snapshots |
+
+The setup script also creates a `HackBuddy Publications` journal with an auto-numbered `Sequence`, `Hackathon ID`, and compressed `Snapshot`. Official publication appends a row and reads the lowest sequence for that event; concurrent publishes cannot overwrite the first snapshot. Existing registry snapshots remain readable and authoritative.
 
 The setup script leaves historical policy fields blank, preserving raw scoring;
 it does not publish snapshots or alter scores. Missing fields fail writes
@@ -286,7 +308,7 @@ can choose **Publish and lock results** on the leaderboard. Until then,
 rankings are provisional. Publication reads the event ledger once and saves
 its preliminary ranking, raw and normalized score values, final rankings,
 individual scorecards, judge roster, scoring version, publisher and timestamp.
-The snapshot is compressed to fit the registry long-text field; an oversized
+The snapshot is compressed to fit the journal long-text field; an oversized
 snapshot is rejected before writing. Publication is idempotent and the app
 never intentionally replaces an existing snapshot.
 

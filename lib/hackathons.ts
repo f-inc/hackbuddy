@@ -25,7 +25,6 @@ export type HackathonConfig = {
   active: boolean;
   legacy?: boolean;
   scoringPolicy: ScoringPolicy;
-  resultsPublished: boolean;
 };
 
 type AirtableRecord = {
@@ -65,14 +64,18 @@ function configured() {
   return Boolean(apiKey && baseId);
 }
 
-function registryUrl(path = "") {
-  return `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodeURIComponent(registryTable)}${path}`;
+function registryUrl(path = "", table = registryTable) {
+  return `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodeURIComponent(table)}${path}`;
 }
 
-async function registryRequest<T>(path = "", init?: RequestInit): Promise<T> {
+async function registryRequest<T>(
+  path = "",
+  init?: RequestInit,
+  table = registryTable,
+): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(registryUrl(path), {
+    response = await fetch(registryUrl(path, table), {
       ...init,
       headers: {
         Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}`,
@@ -185,7 +188,6 @@ function toConfig(record: AirtableRecord): HackathonConfig {
     scoringPolicy: readScoringPolicy(
       record.fields[registryField.scoringPolicy],
     ),
-    resultsPublished: Boolean(record.fields[registryField.publishedResults]),
   };
 }
 
@@ -211,7 +213,6 @@ function legacyHackathon(): HackathonConfig | null {
     active: true,
     legacy: true,
     scoringPolicy: "raw-v1",
-    resultsPublished: false,
   };
 }
 
@@ -440,8 +441,39 @@ export async function readEventScoringRecord(id: string) {
     scoringPolicy: readScoringPolicy(
       record.fields[registryField.scoringPolicy],
     ),
-    encodedPublication: text(record.fields[registryField.publishedResults]),
+    encodedPublication:
+      text(record.fields[registryField.publishedResults]) ||
+      (await firstJournalPublication(id)),
   };
+}
+
+const publicationTable =
+  process.env.AIRTABLE_PUBLICATIONS_TABLE || "HackBuddy Publications";
+
+async function firstJournalPublication(id: string) {
+  const escapedId = id.replace(/'/g, "\\'");
+  const params = new URLSearchParams({
+    maxRecords: "1",
+    filterByFormula: `{Hackathon ID}='${escapedId}'`,
+    "sort[0][field]": "Sequence",
+    "sort[0][direction]": "asc",
+  });
+  const page = await registryRequest<AirtableListResponse>(
+    `?${params}`,
+    undefined,
+    publicationTable,
+  );
+  if (!Array.isArray(page.records))
+    throw new UpstreamError("Invalid publication journal response.");
+  const first = page.records[0];
+  if (!first) return "";
+  const encoded = text(first.fields.Snapshot);
+  if (!encoded || !Number.isFinite(first.fields.Sequence)) {
+    throw new UpstreamError(
+      "Published snapshot is invalid. Refusing to recalculate results.",
+    );
+  }
+  return encoded;
 }
 
 export async function writeEventPublication(id: string, encoded: string) {
@@ -449,10 +481,23 @@ export async function writeEventPublication(id: string, encoded: string) {
     throw new ConflictError(
       "Register this legacy event before publishing a permanent snapshot.",
     );
-  await registryRequest(`/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      fields: { [registryField.publishedResults]: encoded },
-    }),
-  });
+  const existing = await readEventScoringRecord(id);
+  if (existing.encodedPublication) return existing.encodedPublication;
+  // Never PATCH a published snapshot. Airtable assigns an increasing Sequence
+  // on insertion. Concurrent publishers may append, but only the first row is
+  // authoritative, so a later request cannot overwrite official results.
+  await registryRequest(
+    "",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        records: [{ fields: { "Hackathon ID": id, Snapshot: encoded } }],
+      }),
+    },
+    publicationTable,
+  );
+  const authoritative = await firstJournalPublication(id);
+  if (!authoritative)
+    throw new UpstreamError("Published snapshot could not be verified.");
+  return authoritative;
 }

@@ -98,11 +98,13 @@ export const eventScoringRepository: EventScoringRepository = {
     const validated = validatePublication(snapshot);
     if (!airtableIsConfigured())
       demoGlobal.hackbuddyDemoPublication = structuredClone(validated);
-    else
-      await writeEventPublication(
+    else {
+      const authoritative = await writeEventPublication(
         await eventId(),
         encodePublication(validated),
       );
+      return decodePublication(authoritative)!;
+    }
     return structuredClone(validated);
   },
 };
