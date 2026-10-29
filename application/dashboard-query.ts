@@ -1,6 +1,9 @@
+import type { ScoringPolicy } from "@/domain/event-scoring";
+import type { PublishedResults } from "@/domain/publication";
 import type { SubmissionRepositoryProvider } from "./ports/submission-repository";
 import { JUDGING_POLICY, RUBRIC_SCORE_MAX } from "@/domain/judging-policy";
 import type { Submission } from "@/domain/submission";
+import { preliminaryRanking } from "@/domain/ranking";
 import { queueStats } from "./queue-service";
 import type {
   ActiveSession,
@@ -10,13 +13,17 @@ import type {
 
 function average(values: number[]) {
   if (!values.length) return 0;
-  return Math.round((values.reduce((sum, value) => sum + value, 0) /
-    values.length) * 10) / 10;
+  return (
+    Math.round(
+      (values.reduce((sum, value) => sum + value, 0) / values.length) * 10,
+    ) / 10
+  );
 }
 
-function scoreDistribution(submissions: Submission[]) {
-  const rubricMinimum =
-    JUDGING_POLICY.rubric.length * JUDGING_POLICY.score.min;
+function scoreDistribution(
+  submissions: Pick<Submission, "totalScore" | "reviews">[],
+) {
+  const rubricMinimum = JUDGING_POLICY.rubric.length * JUDGING_POLICY.score.min;
   const buckets: ScoreDistributionBucket[] = Array.from(
     { length: Math.ceil((RUBRIC_SCORE_MAX - rubricMinimum + 1) / 2) },
     (_, index) => {
@@ -44,14 +51,28 @@ function scoreDistribution(submissions: Submission[]) {
 export class DashboardQuery {
   constructor(private readonly repository: SubmissionRepositoryProvider) {}
 
-  async execute(judgeName: string) {
+  async execute(
+    judgeName: string,
+    policy: ScoringPolicy = "raw-v1",
+    publication: PublishedResults | null = null,
+  ) {
     const submissions = await this.repository().list();
     const completed = submissions.filter(
       (submission) => submission.status === "completed",
     );
-    const leaderboard: LeaderboardEntry[] = completed
-      .filter((submission) => submission.totalScore !== null)
-      .sort((a, b) => (b.totalScore ?? 0) - (a.totalScore ?? 0))
+    const ranked =
+      publication?.results ??
+      (policy === "raw-v1"
+        ? completed
+            .filter((submission) => submission.totalScore !== null)
+            .sort((a, b) => (b.totalScore ?? 0) - (a.totalScore ?? 0))
+            .map((submission) => ({
+              ...submission,
+              totalScore: submission.totalScore ?? 0,
+              normalizedScore: 0,
+            }))
+        : preliminaryRanking(submissions, policy).results);
+    const leaderboard: LeaderboardEntry[] = ranked
       .slice(0, JUDGING_POLICY.finals.finalistCount)
       .map((submission, index) => ({
         id: submission.id,
@@ -59,14 +80,16 @@ export class DashboardQuery {
         teamName: submission.teamName,
         projectName: submission.projectName,
         track: submission.track,
-        score: submission.totalScore ?? 0,
+        score:
+          policy === "raw-v1"
+            ? submission.totalScore
+            : submission.normalizedScore,
       }));
     const activeSessions: ActiveSession[] = submissions
       .filter((submission) => submission.status === "in progress")
       .sort(
         (a, b) =>
-          new Date(b.claimedAt).getTime() -
-          new Date(a.claimedAt).getTime(),
+          new Date(b.claimedAt).getTime() - new Date(a.claimedAt).getTime(),
       )
       .map((submission) => ({
         id: submission.id,
@@ -81,16 +104,16 @@ export class DashboardQuery {
     const eligibleAvailable = submissions.filter(
       (submission) =>
         submission.status === "available" &&
-        !submission.reviews.some(
-          (review) => review.judgeName === judgeName,
-        ),
+        !submission.reviews.some((review) => review.judgeName === judgeName),
     ).length;
 
     return {
+      scoringPolicy: policy,
+      publishedAt: publication?.publishedAt ?? "",
       stats: queueStats(submissions),
       leaderboard,
       activeSessions,
-      scoreDistribution: scoreDistribution(completed),
+      scoreDistribution: scoreDistribution(publication?.results ?? completed),
       eligibleAvailable,
       hasActiveReview: submissions.some(
         (submission) =>
@@ -98,15 +121,12 @@ export class DashboardQuery {
           submission.claimedBy === judgeName,
       ),
       averageScore: average(
-        completed.flatMap((submission) =>
+        (publication?.results ?? completed).flatMap((submission) =>
           submission.reviews.map((review) => review.totalScore),
         ),
       ),
       yourCompleted: yourReviews.length,
-      yourAverageScore: average(
-        yourReviews.map((review) => review.totalScore),
-      ),
+      yourAverageScore: average(yourReviews.map((review) => review.totalScore)),
     };
   }
 }
-

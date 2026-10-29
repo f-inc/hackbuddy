@@ -1,4 +1,4 @@
-import { LeaderboardView } from "@/app/leaderboard/page";
+import { LeaderboardView } from "@/components/LeaderboardView";
 import { getHackathon } from "@/lib/hackathons";
 import { notFound } from "next/navigation";
 

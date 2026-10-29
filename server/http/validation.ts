@@ -1,3 +1,4 @@
+import { SCORING_POLICIES, type ScoringPolicy } from "@/domain/event-scoring";
 import { isValidRubricScore } from "@/domain/scoring";
 import { JUDGING_POLICY } from "@/domain/judging-policy";
 import type { ReviewScores } from "@/domain/submission";
@@ -12,11 +13,7 @@ function record(value: unknown, message: string): UnknownRecord {
   return value as UnknownRecord;
 }
 
-function requiredString(
-  value: unknown,
-  message: string,
-  maxLength = 500,
-) {
+function requiredString(value: unknown, message: string, maxLength = 500) {
   if (typeof value !== "string" || !value.trim()) {
     throw new ValidationError(message);
   }
@@ -25,11 +22,7 @@ function requiredString(
   return normalized;
 }
 
-function optionalString(
-  value: unknown,
-  message: string,
-  maxLength = 5_000,
-) {
+function optionalString(value: unknown, message: string, maxLength = 5_000) {
   if (value === undefined || value === null) return "";
   if (typeof value !== "string" || value.length > maxLength) {
     throw new ValidationError(message);
@@ -78,10 +71,7 @@ export function parseReviewRequest(value: unknown): {
 export function parseReviewEditRequest(value: unknown) {
   const body = record(value, "The review request must be an object.");
   const review = parseReviewRequest(body);
-  if (
-    !Number.isInteger(body.reviewIndex) ||
-    Number(body.reviewIndex) < 0
-  ) {
+  if (!Number.isInteger(body.reviewIndex) || Number(body.reviewIndex) < 0) {
     throw new ValidationError("A valid review index is required.");
   }
   return { ...review, reviewIndex: Number(body.reviewIndex) };
@@ -102,14 +92,17 @@ export function parseUrlRequest(value: unknown) {
 }
 
 export function parseFinalsActionRequest(value: unknown): {
-  action: "start" | "reset" | "sync";
+  action: "start" | "reset" | "sync" | "publish";
   judges?: string[];
 } {
   const body = record(value, "The final-round request must be an object.");
   const action =
     body.action === undefined
       ? "start"
-      : body.action === "reset" || body.action === "sync"
+      : body.action === "start" ||
+          body.action === "reset" ||
+          body.action === "sync" ||
+          body.action === "publish"
         ? body.action
         : null;
   if (!action) throw new ValidationError("The final-round action is invalid.");
@@ -151,12 +144,20 @@ export type HackathonInput = {
   baseId: string;
   tableName: string;
   reviewsTableName?: string;
+  scoringPolicy?: ScoringPolicy;
   imageUrl: string;
   squareImageUrl: string;
 };
 
 function parseHackathonFields(body: UnknownRecord): HackathonInput {
+  if (
+    body.scoringPolicy !== undefined &&
+    !SCORING_POLICIES.includes(body.scoringPolicy as ScoringPolicy)
+  ) {
+    throw new ValidationError("The scoring policy is invalid.");
+  }
   return {
+    scoringPolicy: body.scoringPolicy as ScoringPolicy | undefined,
     name: requiredString(body.name, "Hackathon name is required.", 120),
     slug: optionalString(body.slug, "The URL slug is invalid.", 120),
     baseId: requiredString(body.baseId, "Airtable base ID is required.", 100),

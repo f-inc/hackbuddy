@@ -1,5 +1,6 @@
 import {
   getFinalistSubmission,
+  publishResults,
   getFinalsState,
   getQueueStats,
   isDemoMode,
@@ -8,10 +9,7 @@ import {
   submitFinalReview,
   syncFinalRoundWithResults,
 } from "@/lib/airtable";
-import {
-  requireAdmin,
-  requireHackathonSession,
-} from "@/server/auth/policies";
+import { requireAdmin, requireHackathonSession } from "@/server/auth/policies";
 import { errorResponse } from "@/server/http/errors";
 import {
   parseFinalsActionRequest,
@@ -51,11 +49,13 @@ export async function POST(request: Request) {
     const session = await requireAdmin();
     const body = parseFinalsActionRequest(await readJson(request));
     const finals =
-      body.action === "reset"
-        ? await resetFinalRound(session.name)
-        : body.action === "sync"
-          ? await syncFinalRoundWithResults(session.name)
-          : await startFinalRound(session.name, body.judges);
+      body.action === "publish"
+        ? await publishResults(session.name)
+        : body.action === "reset"
+          ? await resetFinalRound(session.name)
+          : body.action === "sync"
+            ? await syncFinalRoundWithResults(session.name)
+            : await startFinalRound(session.name, body.judges);
     return NextResponse.json({
       ok: true,
       finals,

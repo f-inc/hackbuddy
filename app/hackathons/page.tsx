@@ -2,6 +2,10 @@
 
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import {
+  NEW_EVENT_SCORING_POLICY,
+  type ScoringPolicy,
+} from "@/domain/event-scoring";
 import type { HackathonConfig } from "@/lib/hackathons";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
@@ -12,6 +16,7 @@ type FormState = {
   tableName: string;
   imageUrl: string;
   squareImageUrl: string;
+  scoringPolicy: ScoringPolicy;
 };
 
 type AirtableBaseOption = {
@@ -32,6 +37,7 @@ const emptyForm: FormState = {
   tableName: "",
   imageUrl: "",
   squareImageUrl: "",
+  scoringPolicy: NEW_EVENT_SCORING_POLICY,
 };
 
 function isLumaEventUrl(value: string) {
@@ -55,7 +61,9 @@ export default function HackathonsPage() {
   const [resolvingImage, setResolvingImage] = useState(false);
   const [imageError, setImageError] = useState("");
   const [airtableBases, setAirtableBases] = useState<AirtableBaseOption[]>([]);
-  const [airtableTables, setAirtableTables] = useState<AirtableTableOption[]>([]);
+  const [airtableTables, setAirtableTables] = useState<AirtableTableOption[]>(
+    [],
+  );
   const [loadingBases, setLoadingBases] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
   const [airtableError, setAirtableError] = useState("");
@@ -161,11 +169,7 @@ export default function HackathonsPage() {
         setAirtableBases(bases);
         setForm((current) => ({
           ...current,
-          baseId:
-            current.baseId ||
-            data.defaultBaseId ||
-            bases[0]?.id ||
-            "",
+          baseId: current.baseId || data.defaultBaseId || bases[0]?.id || "",
         }));
       } catch (caught) {
         if (controller.signal.aborted) return;
@@ -282,6 +286,7 @@ export default function HackathonsPage() {
       tableName: hackathon.tableName,
       imageUrl: hackathon.imageUrl,
       squareImageUrl: hackathon.squareImageUrl,
+      scoringPolicy: hackathon.scoringPolicy,
     });
     setEditingImage(imageOnly);
     setImageError("");
@@ -374,11 +379,7 @@ export default function HackathonsPage() {
                   onClick={() => openEdit(hackathon)}
                   type="button"
                 >
-                  <svg
-                    aria-hidden
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
+                  <svg aria-hidden fill="none" viewBox="0 0 24 24">
                     <path
                       d="m15.2 5.2 3.6 3.6M4 20l4.25-.95L19.3 8a2.55 2.55 0 0 0-3.6-3.6L4.65 15.45 4 20Z"
                       stroke="currentColor"
@@ -450,7 +451,10 @@ export default function HackathonsPage() {
                   }
                 >
                   {resolvingImage ? (
-                    <span className="hackathon-image-loading" aria-live="polite">
+                    <span
+                      className="hackathon-image-loading"
+                      aria-live="polite"
+                    >
                       Finding image…
                     </span>
                   ) : !hasPreviewImage ? (
@@ -487,16 +491,15 @@ export default function HackathonsPage() {
                   <input
                     autoFocus={editingImage}
                     inputMode="url"
-                    onChange={(event) =>
-                      {
-                        setImageError("");
-                        setForm((current) => ({
-                          ...current,
-                          imageUrl: event.target.value,
-                          squareImageUrl: "",
-                        }));
-                      }
-                    }
+                    onChange={(event) => {
+                      setImageError("");
+                      setForm((current) => ({
+                        ...current,
+                        imageUrl: event.target.value,
+                        squareImageUrl: "",
+                        scoringPolicy: NEW_EVENT_SCORING_POLICY,
+                      }));
+                    }}
                     placeholder="https://luma.com/your-event"
                     type="url"
                     value={form.imageUrl}
@@ -520,6 +523,30 @@ export default function HackathonsPage() {
                     </div>
                     <div className="hackathon-workspace-fields">
                       <label className="field">
+                        <span>Scoring method</span>
+                        <select
+                          disabled={Boolean(editing)}
+                          value={form.scoringPolicy}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              scoringPolicy: event.target
+                                .value as ScoringPolicy,
+                            }))
+                          }
+                        >
+                          <option value="normalized-v1">
+                            Normalized scoring
+                          </option>
+                          <option value="raw-v1">Original raw scoring</option>
+                        </select>
+                        <small className="field-hint">
+                          {editing
+                            ? "Fixed when this event was created. Historical results keep their original method."
+                            : "Normalized scoring adjusts for judge generosity and scoring range. Choose before creating the event; the method then stays fixed."}
+                        </small>
+                      </label>
+                      <label className="field">
                         <span>URL slug</span>
                         <input
                           autoCapitalize="none"
@@ -537,7 +564,7 @@ export default function HackathonsPage() {
                       <label className="field">
                         <span>Airtable base</span>
                         <select
-                          disabled={loadingBases}
+                          disabled={Boolean(editing) || loadingBases}
                           onChange={(event) => {
                             setAirtableTables([]);
                             setForm((current) => ({
@@ -562,7 +589,9 @@ export default function HackathonsPage() {
                       <label className="field hackathon-table-field">
                         <span>Airtable table</span>
                         <select
-                          disabled={!form.baseId || loadingTables}
+                          disabled={
+                            Boolean(editing) || !form.baseId || loadingTables
+                          }
                           onChange={(event) =>
                             setForm((current) => ({
                               ...current,

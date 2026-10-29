@@ -15,14 +15,13 @@ export async function withHackathonRequest(
     const normalized = normalizeHackathonSlug(slug);
     const session = await requireSession();
     if (session.role === "judge" && session.hackathon !== normalized) {
-      throw new ForbiddenError(
-        "This session belongs to another hackathon.",
-      );
+      throw new ForbiddenError("This session belongs to another hackathon.");
     }
     const hackathon = await getHackathon(normalized);
     if (!hackathon) throw new NotFoundError("Hackathon not found.");
     return withAirtableConfig(
       {
+        hackathonId: hackathon.id,
         baseId: hackathon.baseId,
         tableName: hackathon.tableName,
         reviewsTableName: hackathon.reviewsTableName,
@@ -30,6 +29,9 @@ export async function withHackathonRequest(
       operation,
     );
   } catch (error) {
-    return errorResponse(error, "The hackathon request could not be completed.");
+    return errorResponse(
+      error,
+      "The hackathon request could not be completed.",
+    );
   }
 }
