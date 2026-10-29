@@ -4,6 +4,7 @@ import { FinalsService } from "@/application/finals-service";
 import type { SubmissionRepositoryProvider } from "@/application/ports/submission-repository";
 import { QueueService } from "@/application/queue-service";
 import { ResultsQuery } from "@/application/results-query";
+import { JudgedProjectsQuery } from "@/application/judged-projects-query";
 import type { ReviewScores } from "@/domain/submission";
 import {
   airtableIsConfigured,
@@ -19,6 +20,7 @@ const repository: SubmissionRepositoryProvider = () =>
 const queue = new QueueService(repository);
 const dashboard = new DashboardQuery(repository);
 const results = new ResultsQuery(repository);
+const judged = new JudgedProjectsQuery(repository);
 const finals = new FinalsService(repository);
 const admin = new AdminSubmissionService(repository);
 
@@ -48,6 +50,10 @@ export function getDashboard(judgeName: string) {
 
 export function getCompletedResults() {
   return results.execute();
+}
+
+export function getJudgedProjects(judgeName: string, id?: string) {
+  return judged.execute(judgeName, id);
 }
 
 export function getFinalsState(judgeName: string) {
