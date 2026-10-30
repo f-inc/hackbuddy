@@ -1,8 +1,8 @@
 "use client";
 
-import { scoringPolicyLabel } from "@/domain/event-scoring";
 import { FinalVotingPanel } from "@/components/FinalVotingPanel";
 import { formatNormalizedScore } from "@/domain/normalization";
+import Image from "next/image";
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SubmissionDetails } from "@/components/SubmissionDetails";
@@ -14,6 +14,14 @@ type FinalsResponse = {
   finals: FinalsState;
   error?: string;
 };
+
+const WINNER_SPONSORS = [
+  { name: "bolt.new", file: "bolt-new", width: 452, height: 125 },
+  { name: "AI", file: "ai", width: 515, height: 259 },
+  { name: "Mercury", file: "mercury", width: 616, height: 133 },
+  { name: "heypcb", file: "heypcb", width: 521, height: 117 },
+  { name: "Firecrawl", file: "firecrawl", width: 726, height: 172 },
+];
 
 const CONFETTI_COLORS = [
   "#f4c84a",
@@ -758,12 +766,9 @@ export function LeaderboardView({
 
       {error && <div className="error-banner page-error">{error}</div>}
 
-      <p>
-        {scoringPolicyLabel(finalState.scoringPolicy)} · Fixed for this event
-        {finalState.publishedAt
-          ? ` · Published ${new Date(finalState.publishedAt).toLocaleString()}`
-          : ""}
-      </p>
+      {finalState.publishedAt && (
+        <p>Published {new Date(finalState.publishedAt).toLocaleString()}</p>
+      )}
       <section className="final-round-status">
         <div className="final-round-status-label">
           <span
@@ -1014,6 +1019,27 @@ export function LeaderboardView({
         </section>
       )}
 
+      {showingTopThree && (
+        <section className="tv-winner-sponsors" aria-label="Event sponsors">
+          <p>Sponsored by</p>
+          <div className="tv-sponsor-logos">
+            {WINNER_SPONSORS.map((sponsor) => (
+              <span
+                className={`tv-sponsor-logo${sponsor.file === "ai" ? " tv-sponsor-logo-compact" : ""}`}
+                key={sponsor.file}
+              >
+                <Image
+                  src={`/sponsors/${sponsor.file}.svg`}
+                  alt={sponsor.name}
+                  width={sponsor.width}
+                  height={sponsor.height}
+                  unoptimized
+                />
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
       <footer className="tv-leaderboard-footer">
         <span>HackBuddy</span>
         <span>
