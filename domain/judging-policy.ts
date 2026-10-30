@@ -24,7 +24,7 @@ export const JUDGING_POLICY = {
     requiredReviews: 2,
   },
   finals: {
-    finalistCount: 10,
+    finalistCount: 7,
     winnerCount: 3,
   },
 } as const;
