@@ -235,7 +235,7 @@ submission tables already attached to another event. Register an existing event
 with raw scoring instead.
 
 For normalized events, preliminary results, the dashboard leaderboard, and
-top-ten selection use a relative score calculated from that event's review
+top-seven selection use a relative score calculated from that event's review
 ledger. Final winners use a separate calculation over the frozen finalists and
 selected final-round judges. Raw scores and notes are preserved.
 
@@ -264,7 +264,7 @@ review, contribute to calibration. Only completed, scored projects enter
 rankings. Rankings recalculate after reviews arrive or change. Finalist cohorts
 already stored in Airtable remain fixed; the existing sync action can update a
 cohort before final reviews start. Starting or syncing a round selects the
-normalized top ten. Final winners appear only once every selected judge has
+normalized top seven. Final winners appear only once every selected judge has
 reviewed every finalist.
 
 Results retain raw rubric scores and raw ranks, with a comparison control.
