@@ -89,7 +89,7 @@ export class FinalsService {
     }
 
     const judges = frozen[0].finalJudging?.judges ?? [];
-    const finalists = frozen
+    const finalists = selectFinalists(frozen)
       .map((submission) => finalistEntry(submission, judgeName, judges))
       .sort(comparePreliminaryRank);
     const completedReviews = finalists.reduce(
@@ -159,7 +159,7 @@ export class FinalsService {
     if (!existing.started) {
       throw new ConflictError("Start final judging before syncing finalists.");
     }
-    if (existing.completedReviews > 0) {
+    if (existing.completedReviews > 0 || (await repository.list()).some(submission => submission.finalJudging?.reviews.length)) {
       throw new ConflictError(
         "Finalists cannot be changed after a final-round review has been submitted.",
       );
@@ -206,7 +206,8 @@ export class FinalsService {
   async finalist(id: string, judgeName: string) {
     const submission = await this.repository().findById(id);
     if (!submission) throw new NotFoundError("Submission not found.");
-    if (!submission.finalJudging) {
+    const state = await this.state(judgeName);
+    if (!submission.finalJudging || !state.finalists.some(entry => entry.id === id)) {
       throw new ConflictError("This project is not in the final round.");
     }
     if (!submission.finalJudging.judges.includes(judgeName)) {
