@@ -1,3 +1,4 @@
+import { validPicks } from "@/domain/final-ballot";
 import { SCORING_POLICIES, type ScoringPolicy } from "@/domain/event-scoring";
 import { isValidRubricScore } from "@/domain/scoring";
 import { JUDGING_POLICY } from "@/domain/judging-policy";
@@ -94,6 +95,7 @@ export function parseUrlRequest(value: unknown) {
 export function parseFinalsActionRequest(value: unknown): {
   action: "start" | "reset" | "sync" | "publish";
   judges?: string[];
+  winnerIds?: [string, string, string];
 } {
   const body = record(value, "The final-round request must be an object.");
   const action =
@@ -107,7 +109,11 @@ export function parseFinalsActionRequest(value: unknown): {
         : null;
   if (!action) throw new ValidationError("The final-round action is invalid.");
 
-  if (body.judges === undefined) return { action };
+  const winnerIds =
+    body.winnerIds === undefined
+      ? undefined
+      : parseBallotRequest({ picks: body.winnerIds });
+  if (body.judges === undefined) return { action, winnerIds };
   if (
     !Array.isArray(body.judges) ||
     !body.judges.every(
@@ -118,8 +124,18 @@ export function parseFinalsActionRequest(value: unknown): {
   }
   return {
     action,
+    winnerIds,
     judges: body.judges.map((judge) => judge.trim()).filter(Boolean),
   };
+}
+
+export function parseBallotRequest(value: unknown): [string, string, string] {
+  const body = record(value, "The ballot must be an object.");
+  if (!validPicks(body.picks))
+    throw new ValidationError(
+      "Select three distinct finalists for first, second, and third place.",
+    );
+  return body.picks;
 }
 
 export function parseLoginRequest(value: unknown) {

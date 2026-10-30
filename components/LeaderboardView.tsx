@@ -1,6 +1,7 @@
 "use client";
 
 import { scoringPolicyLabel } from "@/domain/event-scoring";
+import { FinalVotingPanel } from "@/components/FinalVotingPanel";
 import { formatNormalizedScore } from "@/domain/normalization";
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -212,7 +213,6 @@ export function LeaderboardView({
   hackathonImageUrl?: string;
 }) {
   const apiBase = hackathon ? `/api/hackathons/${hackathon}` : "/api";
-  const pageBase = hackathon ? `/${hackathon}` : "";
   const [name, setName] = useState("");
   const [role, setRole] = useState<"judge" | "admin">("judge");
   const [finals, setFinals] = useState<FinalsState | null>(null);
@@ -313,7 +313,7 @@ export function LeaderboardView({
     }
 
     void initialize();
-    const interval = window.setInterval(() => void refresh(true), 30_000);
+    const interval = window.setInterval(() => void refresh(true), 10_000);
     return () => window.clearInterval(interval);
   }, [hackathon, refresh]);
 
@@ -367,7 +367,7 @@ export function LeaderboardView({
     if (
       !presenting ||
       role !== "admin" ||
-      !finals?.allComplete ||
+      !finals?.publishedAt ||
       showAllFinalists
     ) {
       return;
@@ -405,7 +405,7 @@ export function LeaderboardView({
     document.addEventListener("keydown", handleRevealKey);
     return () => document.removeEventListener("keydown", handleRevealKey);
   }, [
-    finals?.allComplete,
+    finals?.publishedAt,
     launchConfetti,
     presenting,
     revealStage,
@@ -473,7 +473,7 @@ export function LeaderboardView({
       return;
     }
 
-    if (role === "admin" && finals?.allComplete && !showAllFinalists) {
+    if (role === "admin" && finals?.publishedAt && !showAllFinalists) {
       if (ceremonyTimer.current) {
         window.clearTimeout(ceremonyTimer.current);
         ceremonyTimer.current = null;
@@ -626,11 +626,11 @@ export function LeaderboardView({
 
   const finalState = finals;
   const results =
-    finalState.allComplete && !showAllFinalists
+    Boolean(finalState.publishedAt) && !showAllFinalists
       ? finalState.topThree
       : finalState.finalists;
-  const showingTopThree = finalState.allComplete && !showAllFinalists;
-  const heading = finalState.allComplete
+  const showingTopThree = Boolean(finalState.publishedAt) && !showAllFinalists;
+  const heading = Boolean(finalState.publishedAt)
     ? showAllFinalists
       ? "Final judging"
       : `Top ${JUDGING_POLICY.finals.winnerCount} finalists`
@@ -645,16 +645,17 @@ export function LeaderboardView({
         <div className="tv-project">
           <strong>{result.projectName}</strong>
           <span>{result.oneLiner || result.teamName}</span>
-          {finalState.scoringPolicy === "normalized-v1" && (
-            <small className="normalized-finalist-score">
-              {formatNormalizedScore(
-                showingTopThree
-                  ? result.finalNormalizedScore
-                  : result.normalizedScore,
-              )}{" "}
-              · {showingTopThree ? "Final" : "Preliminary"} normalized
-            </small>
-          )}
+          {finalState.scoringPolicy === "normalized-v1" &&
+            !(showingTopThree && finalState.votingMode === "podium-v1") && (
+              <small className="normalized-finalist-score">
+                {formatNormalizedScore(
+                  showingTopThree
+                    ? result.finalNormalizedScore
+                    : result.normalizedScore,
+                )}{" "}
+                · {showingTopThree ? "Final" : "Preliminary"} normalized
+              </small>
+            )}
         </div>
         <div className="tv-builders">
           {result.teamPhotoUrl ? (
@@ -691,7 +692,7 @@ export function LeaderboardView({
             <strong>{result.submitterNames || result.teamName}</strong>
           </span>
         </div>
-        {finalState.started && (
+        {finalState.started && !finalState.publishedAt && (
           <span
             className={`final-review-status${
               result.reviewedByYou ? " complete" : ""
@@ -731,7 +732,7 @@ export function LeaderboardView({
             <span />
             {finalState.publishedAt
               ? "Published and locked"
-              : "Live · refreshes every 30 seconds"}
+              : "Live · refreshes every 10 seconds"}
           </span>
           <button
             className="secondary-button tv-present-button"
@@ -741,7 +742,7 @@ export function LeaderboardView({
             {presenting ? "Exit presentation" : "Present on TV"}
             <span aria-hidden>{presenting ? "↙" : "↗"}</span>
           </button>
-          {finalState.allComplete && !presenting && (
+          {Boolean(finalState.publishedAt) && !presenting && (
             <button
               className="secondary-button tv-present-button"
               onClick={() => setShowAllFinalists((current) => !current)}
@@ -772,7 +773,7 @@ export function LeaderboardView({
             {finalState.publishedAt
               ? "Results published and locked"
               : finalState.started
-                ? finalState.allComplete
+                ? Boolean(finalState.publishedAt)
                   ? "Final judging complete · awaiting publication"
                   : "Final judging is live"
                 : "Final judging has not started"}
@@ -781,27 +782,30 @@ export function LeaderboardView({
         <div className="final-round-status-meta">
           <p>
             {finalState.started
-              ? `${finalState.completedReviews} of ${finalState.requiredReviews} judge reviews completed across ${finalState.judges.length} judges.`
+              ? role === "admin"
+                ? `${finalState.completedReviews} of ${finalState.requiredReviews} ballots submitted.`
+                : "Choose your top three finalists and submit your ballot below."
               : role === "admin"
                 ? finalState.canStart
                   ? `Starting will freeze these teams and include ${finalState.judges.length} preliminary judges.`
-                  : "Final judging can start after the first project receives a completed preliminary score."
+                  : "Final judging can start after at least three projects receive completed preliminary scores."
                 : "An administrator will start the final round when presentations begin."}
           </p>
           {finalState.started &&
             role === "admin" &&
             !finalState.publishedAt && (
               <div className="final-round-admin-actions">
-                {finalState.allComplete && (
-                  <button
-                    className="normalization-compare"
-                    type="button"
-                    disabled={publishing}
-                    onClick={publishFinals}
-                  >
-                    {publishing ? "Publishing…" : "Publish and lock results"}
-                  </button>
-                )}
+                {finalState.votingMode !== "podium-v1" &&
+                  finals.allComplete && (
+                    <button
+                      className="normalization-compare"
+                      type="button"
+                      disabled={publishing}
+                      onClick={publishFinals}
+                    >
+                      {publishing ? "Publishing…" : "Publish and lock results"}
+                    </button>
+                  )}
                 {finalState.completedReviews === 0 && (
                   <button
                     className="final-sync-button"
@@ -839,7 +843,7 @@ export function LeaderboardView({
               <span className="eyebrow">Admin setup</span>
               <h2 id="final-roster-title">Final judge roster</h2>
               <p>
-                Choose who can open and score every Top{" "}
+                Choose who can vote on the Top{" "}
                 {JUDGING_POLICY.finals.finalistCount} team. This roster locks
                 when final judging starts.
               </p>
@@ -908,8 +912,8 @@ export function LeaderboardView({
           <div className="final-roster-actions">
             <p>
               {finalState.canStart
-                ? `${selectedJudges.length} judges will each review all ${finalState.finalists.length} finalists.`
-                : "Final judging can start after the first project receives a completed preliminary score."}
+                ? `${selectedJudges.length} judges will each choose a podium from ${finalState.finalists.length} finalists.`
+                : "Final judging can start after at least three projects receive completed preliminary scores."}
             </p>
             <button
               className="primary-button tv-start-button"
@@ -926,7 +930,19 @@ export function LeaderboardView({
         </section>
       )}
 
-      {results.length ? (
+      {finalState.started && !finalState.publishedAt && !presenting && (
+        <FinalVotingPanel
+          key={`${finalState.startedAt}:${finalState.ownBallot?.submittedAt ?? "draft"}`}
+          finals={finalState}
+          admin={role === "admin"}
+          apiBase={apiBase}
+          onInspect={(id) => void inspectSubmission(id)}
+          onUpdate={setFinals}
+        />
+      )}
+      {finalState.started &&
+      !finalState.publishedAt &&
+      !presenting ? null : results.length ? (
         <ol
           className={`tv-ranking${showingTopThree ? " top-three-ranking" : ""}`}
         >
@@ -1001,8 +1017,8 @@ export function LeaderboardView({
       <footer className="tv-leaderboard-footer">
         <span>HackBuddy</span>
         <span>
-          {finalState.allComplete && !showAllFinalists
-            ? `${JUDGING_POLICY.finals.winnerCount} finalists selected by the full judging panel`
+          {Boolean(finalState.publishedAt) && !showAllFinalists
+            ? `${JUDGING_POLICY.finals.winnerCount} winners confirmed by the organizer`
             : `${results.length} finalist teams shown`}
         </span>
       </footer>
@@ -1038,23 +1054,6 @@ export function LeaderboardView({
                 </strong>
               </div>
               <div className="submission-inspection-header-actions">
-                {finalState.started &&
-                  finalState.eligibleJudge &&
-                  !finalState.publishedAt && (
-                    <a
-                      className="submission-inspection-judge-link"
-                      href={`${pageBase}/judging?submission=${encodeURIComponent(
-                        inspectingId,
-                      )}&final=1`}
-                    >
-                      {inspectedSubmission?.finalJudging?.reviews.some(
-                        (review) => review.judgeName === name,
-                      )
-                        ? "Edit final score"
-                        : "Judge this team"}
-                      <span aria-hidden>→</span>
-                    </a>
-                  )}
                 <button
                   aria-label="Close submission preview"
                   onClick={closeInspection}

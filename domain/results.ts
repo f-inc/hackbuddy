@@ -1,3 +1,4 @@
+import type { FinalBallot } from "./final-ballot";
 import type { SubmissionReview } from "./submission";
 import type { ScoringPolicy } from "./event-scoring";
 
@@ -20,6 +21,10 @@ export type ResultEntry = {
 };
 
 export type FinalistEntry = ResultEntry & {
+  votePoints?: number;
+  firstVotes?: number;
+  secondVotes?: number;
+  thirdVotes?: number;
   finalReviews: SubmissionReview[];
   finalNormalizedScore: number;
   reviewedByYou: boolean;
@@ -27,6 +32,11 @@ export type FinalistEntry = ResultEntry & {
 };
 
 export type FinalsState = {
+  votingMode?: "podium-v1";
+  ownBallot?: FinalBallot | null;
+  submittedJudges?: string[];
+  standings?: FinalistEntry[];
+  organizerOverride?: boolean;
   scoringPolicy: ScoringPolicy;
   publishedAt: string;
   started: boolean;

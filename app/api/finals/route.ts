@@ -6,16 +6,20 @@ import {
   isDemoMode,
   resetFinalRound,
   startFinalRound,
-  submitFinalReview,
+  submitFinalBallot,
   syncFinalRoundWithResults,
 } from "@/lib/airtable";
 import { requireAdmin, requireHackathonSession } from "@/server/auth/policies";
 import { errorResponse } from "@/server/http/errors";
 import {
   parseFinalsActionRequest,
-  parseReviewRequest,
+  parseBallotRequest,
   readJson,
 } from "@/server/http/validation";
+import {
+  finalsForViewer,
+  submissionForViewer,
+} from "@/domain/finals-visibility";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -25,18 +29,21 @@ export async function GET(request: Request) {
     if (id) {
       const submission = await getFinalistSubmission(id, session.name);
       return NextResponse.json({
-        submission,
-        existingReview:
-          submission.finalJudging?.reviews.find(
-            (review) => review.judgeName === session.name,
-          ) ?? null,
-        finals: await getFinalsState(session.name),
+        submission: submissionForViewer(submission, session.role === "admin"),
+        existingReview: null,
+        finals: finalsForViewer(
+          await getFinalsState(session.name),
+          session.role === "admin",
+        ),
         stats: await getQueueStats(),
         demoMode: isDemoMode(),
       });
     }
     return NextResponse.json({
-      finals: await getFinalsState(session.name),
+      finals: finalsForViewer(
+        await getFinalsState(session.name),
+        session.role === "admin",
+      ),
       demoMode: isDemoMode(),
     });
   } catch (error) {
@@ -50,7 +57,7 @@ export async function POST(request: Request) {
     const body = parseFinalsActionRequest(await readJson(request));
     const finals =
       body.action === "publish"
-        ? await publishResults(session.name)
+        ? await publishResults(session.name, body.winnerIds)
         : body.action === "reset"
           ? await resetFinalRound(session.name)
           : body.action === "sync"
@@ -69,11 +76,14 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const session = await requireHackathonSession();
-    const { id, scores } = parseReviewRequest(await readJson(request));
-    await submitFinalReview(id, session.name, scores);
+    const picks = parseBallotRequest(await readJson(request));
+    await submitFinalBallot(session.name, picks);
     return NextResponse.json({
       ok: true,
-      finals: await getFinalsState(session.name),
+      finals: finalsForViewer(
+        await getFinalsState(session.name),
+        session.role === "admin",
+      ),
       demoMode: isDemoMode(),
     });
   } catch (error) {

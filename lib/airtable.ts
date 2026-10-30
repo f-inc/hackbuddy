@@ -111,7 +111,7 @@ export async function getFinalistSubmission(id: string, judgeName: string) {
     if (!submission) throw new NotFoundError("Submission not found.");
     return submission;
   }
-  return finals.finalist(id, judgeName);
+  return finals.finalist(id, judgeName, state.scoringPolicy);
 }
 
 export async function submitFinalReview(
@@ -121,6 +121,11 @@ export async function submitFinalReview(
 ) {
   await mutableScoring();
   return finals.submitReview(id, judgeName, scores);
+}
+
+export async function submitFinalBallot(judgeName: string, picks: unknown) {
+  const state = await mutableScoring();
+  return finals.submitBallot(judgeName, picks, state.scoringPolicy);
 }
 
 export async function getSubmissionById(id: string) {
@@ -154,7 +159,7 @@ async function mutableScoring() {
   return state;
 }
 
-export async function publishResults(adminName: string) {
+export async function publishResults(adminName: string, winnerIds?: unknown) {
   const state = await eventScoringRepository.read();
   if (state.publication) return getFinalsState(adminName);
   // Both views use one ledger read, so the published preliminary and final
@@ -167,7 +172,37 @@ export async function publishResults(adminName: string) {
     null,
     submissions,
   );
-  if (!finalState.allComplete)
+  if (finalState.votingMode === "podium-v1") {
+    const { validPicks } = await import("@/domain/final-ballot");
+    if (!finalState.completedReviews)
+      throw new ConflictError(
+        "At least one submitted ballot is required before publication.",
+      );
+    if (winnerIds !== undefined) {
+      if (
+        !validPicks(winnerIds, new Set(finalState.finalists.map((s) => s.id)))
+      )
+        throw new ConflictError(
+          "Choose three distinct finalists for the final podium.",
+        );
+      finalState.topThree = winnerIds.map(
+        (id) => finalState.standings!.find((s) => s.id === id)!,
+      );
+      finalState.organizerOverride = true;
+    } else {
+      const ranked = finalState.standings!;
+      const relevant = ranked.slice(0, 4);
+      if (
+        relevant.some(
+          (entry, index) =>
+            index > 0 && entry.votePoints === relevant[index - 1].votePoints,
+        )
+      )
+        throw new ConflictError(
+          "Confirm the final podium to resolve tied vote totals.",
+        );
+    }
+  } else if (!finalState.allComplete)
     throw new ConflictError(
       "Every selected final judge must finish before results can be published.",
     );

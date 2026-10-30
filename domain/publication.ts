@@ -24,13 +24,24 @@ export function validatePublication(value: unknown): PublishedResults {
     !Number.isFinite(Date.parse(snapshot.publishedAt)) ||
     !snapshot.publishedBy ||
     !Array.isArray(snapshot.results) ||
-    snapshot.finals?.allComplete !== true ||
+    (snapshot.finals?.votingMode !== "podium-v1" &&
+      snapshot.finals?.allComplete !== true) ||
     !Array.isArray(snapshot.finals.judges) ||
     !Array.isArray(snapshot.finals.finalists) ||
     !Array.isArray(snapshot.finals.topThree) ||
     !Array.isArray(snapshot.normalization?.judges)
   )
     throw new Error("Invalid published results snapshot.");
+  if (snapshot.finals.votingMode === "podium-v1") {
+    const ids = new Set(snapshot.finals.finalists.map((entry) => entry.id));
+    if (
+      !snapshot.finals.completedReviews ||
+      snapshot.finals.topThree.length !== 3 ||
+      new Set(snapshot.finals.topThree.map((entry) => entry.id)).size !== 3 ||
+      !snapshot.finals.topThree.every((entry) => ids.has(entry.id))
+    )
+      throw new Error("Invalid published podium.");
+  }
   const policy = readScoringPolicy(snapshot.scoringPolicy);
   if (!snapshot.scoringPolicy || snapshot.finals.scoringPolicy !== policy)
     throw new Error("Published scoring policy mismatch.");
@@ -59,9 +70,10 @@ export function validatePublication(value: unknown): PublishedResults {
     if (
       !Number.isFinite(finalist.finalNormalizedScore) ||
       !Array.isArray(finalist.finalReviews) ||
-      !snapshot.finals.judges.every((judge) =>
-        finalist.finalReviews.some((review) => review.judgeName === judge),
-      )
+      (snapshot.finals.votingMode !== "podium-v1" &&
+        !snapshot.finals.judges.every((judge) =>
+          finalist.finalReviews.some((review) => review.judgeName === judge),
+        ))
     ) {
       throw new Error("Invalid published final scorecard.");
     }
@@ -77,12 +89,14 @@ export function publishedFinals(
   const state = structuredClone(snapshot.finals);
   const personalize = (entry: FinalsState["finalists"][number]) => ({
     ...entry,
-    reviewedByYou: entry.finalReviews.some(
-      (review) => review.judgeName === judgeName,
-    ),
+    reviewedByYou:
+      state.votingMode === "podium-v1"
+        ? false
+        : entry.finalReviews.some((review) => review.judgeName === judgeName),
   });
   return {
     ...state,
+    ownBallot: null,
     publishedAt: snapshot.publishedAt,
     canStart: false,
     eligibleJudge: state.judges.includes(judgeName),

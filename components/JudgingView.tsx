@@ -81,32 +81,39 @@ export function JudgingView({
     return () => document.body.classList.remove("judging-scroll-lock");
   }, []);
 
-  const claim = useCallback(async (showFullPageLoader = false) => {
-    if (showFullPageLoader) setLoading(true);
-    setError("");
-    try {
-      const response = await fetch(`${apiBase}/queue/claim`, { method: "POST" });
-      if (response.status === 401) {
-        window.location.href = hackathon ? `/${hackathon}` : "/";
-        return;
+  const claim = useCallback(
+    async (showFullPageLoader = false) => {
+      if (showFullPageLoader) setLoading(true);
+      setError("");
+      try {
+        const response = await fetch(`${apiBase}/queue/claim`, {
+          method: "POST",
+        });
+        if (response.status === 401) {
+          window.location.href = hackathon ? `/${hackathon}` : "/";
+          return;
+        }
+        const result = (await response.json()) as ClaimResponse;
+        if (!response.ok) throw new Error(result.error);
+        setSubmission(result.submission);
+        setStats(result.stats);
+        setDemoMode(result.demoMode);
+        setProgress(0);
+        setPracticality(0);
+        setComplexity(0);
+        setNotes("");
+      } catch (caught) {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Could not load the queue.",
+        );
+      } finally {
+        if (showFullPageLoader) setLoading(false);
       }
-      const result = (await response.json()) as ClaimResponse;
-      if (!response.ok) throw new Error(result.error);
-      setSubmission(result.submission);
-      setStats(result.stats);
-      setDemoMode(result.demoMode);
-      setProgress(0);
-      setPracticality(0);
-      setComplexity(0);
-      setNotes("");
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Could not load the queue.",
-      );
-    } finally {
-      if (showFullPageLoader) setLoading(false);
-    }
-  }, [apiBase, hackathon]);
+    },
+    [apiBase, hackathon],
+  );
 
   useEffect(() => {
     async function initialize() {
@@ -145,14 +152,17 @@ export function JudgingView({
         reviewParam !== null && /^\d+$/.test(reviewParam)
           ? Number(reviewParam)
           : null;
+      if (isFinalMode) {
+        window.location.replace(`${pageBase}/leaderboard`);
+        return;
+      }
       if (isFinalMode && submissionId) {
         setFinalMode(true);
         setLoading(true);
         const finalResponse = await fetch(
           `${apiBase}/finals?id=${encodeURIComponent(submissionId)}`,
         );
-        const result =
-          (await finalResponse.json()) as FinalSubmissionResponse;
+        const result = (await finalResponse.json()) as FinalSubmissionResponse;
         if (!finalResponse.ok) {
           setError(result.error || "Could not load this finalist.");
           setLoading(false);
@@ -178,9 +188,7 @@ export function JudgingView({
         setLoading(true);
         const inspectionResponse = await fetch(
           `${apiBase}/admin/submission?id=${encodeURIComponent(submissionId)}${
-            selectedReviewIndex !== null
-              ? `&review=${selectedReviewIndex}`
-              : ""
+            selectedReviewIndex !== null ? `&review=${selectedReviewIndex}` : ""
           }`,
         );
         const result = (await inspectionResponse.json()) as ClaimResponse;
@@ -196,8 +204,7 @@ export function JudgingView({
           selectedReviewIndex !== null &&
           result.submission?.reviews[selectedReviewIndex]
         ) {
-          const selectedReview =
-            result.submission.reviews[selectedReviewIndex];
+          const selectedReview = result.submission.reviews[selectedReviewIndex];
           setProgress(selectedReview.progressScore);
           setPracticality(selectedReview.practicalityScore);
           setComplexity(selectedReview.complexityScore);
@@ -210,7 +217,7 @@ export function JudgingView({
       await claim(true);
     }
     void initialize();
-  }, [apiBase, claim, hackathon]);
+  }, [apiBase, claim, hackathon, pageBase]);
 
   useEffect(() => {
     if (!name || finalMode) return;
@@ -390,13 +397,12 @@ export function JudgingView({
   if (!name || loading) return <LoadingScreen />;
 
   const reviewed = finalMode
-    ? finalsState?.finalists.filter((finalist) => finalist.reviewedByYou)
-        .length ?? 0
-    : stats?.completed ?? 0;
+    ? (finalsState?.finalists.filter((finalist) => finalist.reviewedByYou)
+        .length ?? 0)
+    : (stats?.completed ?? 0);
   const total = finalMode
-    ? finalsState?.finalists.length ??
-      JUDGING_POLICY.finals.finalistCount
-    : stats?.total ?? 0;
+    ? (finalsState?.finalists.length ?? JUDGING_POLICY.finals.finalistCount)
+    : (stats?.total ?? 0);
   const totalScore = progress + practicality + complexity;
   return (
     <AppShell
@@ -420,24 +426,26 @@ export function JudgingView({
                 {finalMode
                   ? "Final-round presentation"
                   : editingReviewIndex !== null
-                  ? "Administrator score editor"
-                  : "Administrator session view"}
+                    ? "Administrator score editor"
+                    : "Administrator session view"}
               </span>
             )}
             <h1>
               {finalMode
                 ? "Judge finalist"
                 : editingReviewIndex !== null
-                ? "Inspect submitted score"
-                : inspectionMode
-                  ? "Inspect judging session"
-                  : "Judging"}
+                  ? "Inspect submitted score"
+                  : inspectionMode
+                    ? "Inspect judging session"
+                    : "Judging"}
             </h1>
           </div>
           <div className="queue-progress">
             <div className="progress-copy">
               <span>
-                {finalMode ? "Your finalist progress" : "Collective queue progress"}
+                {finalMode
+                  ? "Your finalist progress"
+                  : "Collective queue progress"}
               </span>
               <strong>
                 {reviewed} / {total}
@@ -466,7 +474,10 @@ export function JudgingView({
                 {completedNow} {completedNow === 1 ? "review" : "reviews"} in
                 this session.
               </p>
-              <a className="empty-state-results-link" href={`${pageBase}/results`}>
+              <a
+                className="empty-state-results-link"
+                href={`${pageBase}/results`}
+              >
                 See results <span aria-hidden>→</span>
               </a>
             </section>
@@ -477,182 +488,193 @@ export function JudgingView({
               </div>
 
               {inspectionMode && editingReviewIndex === null ? (
-              <aside className="compact-score-card admin-inspection-card card">
-                <header className="compact-score-header">
-                  <div>
-                    <span className="eyebrow">Administrator controls</span>
-                    <h2>Active session</h2>
-                  </div>
-                  <span className="table-status in-progress">In progress</span>
-                </header>
-
-                <div className="admin-session-details">
-                  <div>
-                    <span>Assigned judge</span>
-                    <strong>{submission.claimedBy || "Unknown judge"}</strong>
-                  </div>
-                  <div>
-                    <span>Project</span>
-                    <strong>{submission.projectName}</strong>
-                  </div>
-                  <div>
-                    <span>Claimed</span>
-                    <strong>{formatSubmitted(submission.claimedAt)}</strong>
-                  </div>
-                  <div>
-                    <span>Completed reviews</span>
-                    <strong>
-                      {submission.reviews.length} of{" "}
-                      {JUDGING_POLICY.preliminary.requiredReviews}
-                    </strong>
-                  </div>
-                </div>
-
-                <div className="release-explanation">
-                  <strong>Return this project to the queue</strong>
-                  <p>
-                    Releasing removes the current reservation. Another judge can
-                    immediately claim this submission.
-                  </p>
-                </div>
-
-                <button
-                  className="danger-button"
-                  disabled={releasing}
-                  onClick={releaseSession}
-                  type="button"
-                >
-                  {releasing ? "Releasing…" : "Release submission"}
-                  {!releasing && <span>↗</span>}
-                </button>
-
-                <a className="back-to-dashboard" href={`${pageBase}/dashboard`}>
-                  ← Back to dashboard
-                </a>
-              </aside>
-            ) : (
-              <aside className="compact-score-card card">
-                <header className="compact-score-header">
-                  <div>
-                    <span className="eyebrow">
-                      {finalMode
-                        ? editingFinalReview
-                          ? `Editing your final review`
-                          : "Final-round review"
-                        : editingReviewIndex !== null
-                        ? `Review by ${
-                            submission.reviews[editingReviewIndex]?.judgeName ||
-                            "unknown judge"
-                          }`
-                        : `Review ${Math.min(
-                          submission.reviews.length + 1,
-                          JUDGING_POLICY.preliminary.requiredReviews,
-                        )} of {JUDGING_POLICY.preliminary.requiredReviews}`}
+                <aside className="compact-score-card admin-inspection-card card">
+                  <header className="compact-score-header">
+                    <div>
+                      <span className="eyebrow">Administrator controls</span>
+                      <h2>Active session</h2>
+                    </div>
+                    <span className="table-status in-progress">
+                      In progress
                     </span>
-                    <h2>
-                      {finalMode
-                        ? editingFinalReview
-                          ? "Edit presentation score"
-                          : "Score this presentation"
-                        : editingReviewIndex !== null
-                        ? "Edit submitted score"
-                        : "Score this project"}
-                    </h2>
+                  </header>
+
+                  <div className="admin-session-details">
+                    <div>
+                      <span>Assigned judge</span>
+                      <strong>{submission.claimedBy || "Unknown judge"}</strong>
+                    </div>
+                    <div>
+                      <span>Project</span>
+                      <strong>{submission.projectName}</strong>
+                    </div>
+                    <div>
+                      <span>Claimed</span>
+                      <strong>{formatSubmitted(submission.claimedAt)}</strong>
+                    </div>
+                    <div>
+                      <span>Completed reviews</span>
+                      <strong>
+                        {submission.reviews.length} of{" "}
+                        {JUDGING_POLICY.preliminary.requiredReviews}
+                      </strong>
+                    </div>
                   </div>
-                  <div className="compact-total">
-                    <strong>{totalScore || "—"}</strong>
-                    <span>/{RUBRIC_SCORE_MAX}</span>
+
+                  <div className="release-explanation">
+                    <strong>Return this project to the queue</strong>
+                    <p>
+                      Releasing removes the current reservation. Another judge
+                      can immediately claim this submission.
+                    </p>
                   </div>
-                </header>
 
-                <ScoreControl
-                  highAnchor="Exceptional progress tonight"
-                  label={RUBRIC.progress.label}
-                  lowAnchor="Little meaningful progress"
-                  onChange={setProgress}
-                  value={progress}
-                />
-                <ScoreControl
-                  highAnchor="Solves an actual problem"
-                  label={RUBRIC.practicality.label}
-                  lowAnchor="No real-world use case"
-                  onChange={setPracticality}
-                  value={practicality}
-                />
-                <ScoreControl
-                  highAnchor="Complex and well executed"
-                  label={RUBRIC.complexity.label}
-                  lowAnchor="Technically straightforward"
-                  onChange={setComplexity}
-                  value={complexity}
-                />
-
-                <label className="field compact-notes">
-                  <span>
-                    Private notes <small>Optional</small>
-                  </span>
-                  <textarea
-                    onChange={(event) => setNotes(event.target.value)}
-                    placeholder="Add context for this score…"
-                    rows={3}
-                    value={notes}
-                  />
-                </label>
-
-                <footer className="compact-submit">
-                  <p>
-                    {finalMode ? (
-                      <>
-                        Score the team’s live presentation. You can return and
-                        edit this review from the Top{" "}
-                        {JUDGING_POLICY.finals.finalistCount} tab.
-                      </>
-                    ) : editingReviewIndex !== null ? (
-                      <>
-                        Updating this judge’s review will recalculate the
-                        project’s total score.
-                      </>
-                    ) : (
-                      <>
-                        This project is reserved for <strong>{name}</strong>.
-                      </>
-                    )}
-                  </p>
                   <button
-                    className="primary-button"
-                    disabled={submitting}
-                    onClick={
-                      finalMode
-                        ? submitFinalScore
-                        : editingReviewIndex !== null
-                        ? updateSelectedReview
-                        : submitScore
-                    }
+                    className="danger-button"
+                    disabled={releasing}
+                    onClick={releaseSession}
                     type="button"
                   >
-                    {submitting
-                      ? "Saving…"
-                      : finalMode
-                        ? editingFinalReview
-                          ? "Update final score"
-                          : "Submit final score"
-                        : editingReviewIndex !== null
-                        ? "Update score"
-                        : "Submit score"}
-                    {!submitting && <span>→</span>}
+                    {releasing ? "Releasing…" : "Release submission"}
+                    {!releasing && <span>↗</span>}
                   </button>
-                </footer>
-                {finalMode && (
-                  <a className="back-to-dashboard" href={`${pageBase}/leaderboard`}>
-                    ← Back to Top {JUDGING_POLICY.finals.finalistCount}
+
+                  <a
+                    className="back-to-dashboard"
+                    href={`${pageBase}/dashboard`}
+                  >
+                    ← Back to dashboard
                   </a>
-                )}
-                {!finalMode && editingReviewIndex !== null && (
-                  <a className="back-to-dashboard" href={`${pageBase}/results`}>
-                    ← Back to results
-                  </a>
-                )}
-              </aside>
+                </aside>
+              ) : (
+                <aside className="compact-score-card card">
+                  <header className="compact-score-header">
+                    <div>
+                      <span className="eyebrow">
+                        {finalMode
+                          ? editingFinalReview
+                            ? `Editing your final review`
+                            : "Final-round review"
+                          : editingReviewIndex !== null
+                            ? `Review by ${
+                                submission.reviews[editingReviewIndex]
+                                  ?.judgeName || "unknown judge"
+                              }`
+                            : `Review ${Math.min(
+                                submission.reviews.length + 1,
+                                JUDGING_POLICY.preliminary.requiredReviews,
+                              )} of {JUDGING_POLICY.preliminary.requiredReviews}`}
+                      </span>
+                      <h2>
+                        {finalMode
+                          ? editingFinalReview
+                            ? "Edit presentation score"
+                            : "Score this presentation"
+                          : editingReviewIndex !== null
+                            ? "Edit submitted score"
+                            : "Score this project"}
+                      </h2>
+                    </div>
+                    <div className="compact-total">
+                      <strong>{totalScore || "—"}</strong>
+                      <span>/{RUBRIC_SCORE_MAX}</span>
+                    </div>
+                  </header>
+
+                  <ScoreControl
+                    highAnchor="Exceptional progress tonight"
+                    label={RUBRIC.progress.label}
+                    lowAnchor="Little meaningful progress"
+                    onChange={setProgress}
+                    value={progress}
+                  />
+                  <ScoreControl
+                    highAnchor="Solves an actual problem"
+                    label={RUBRIC.practicality.label}
+                    lowAnchor="No real-world use case"
+                    onChange={setPracticality}
+                    value={practicality}
+                  />
+                  <ScoreControl
+                    highAnchor="Complex and well executed"
+                    label={RUBRIC.complexity.label}
+                    lowAnchor="Technically straightforward"
+                    onChange={setComplexity}
+                    value={complexity}
+                  />
+
+                  <label className="field compact-notes">
+                    <span>
+                      Private notes <small>Optional</small>
+                    </span>
+                    <textarea
+                      onChange={(event) => setNotes(event.target.value)}
+                      placeholder="Add context for this score…"
+                      rows={3}
+                      value={notes}
+                    />
+                  </label>
+
+                  <footer className="compact-submit">
+                    <p>
+                      {finalMode ? (
+                        <>
+                          Score the team’s live presentation. You can return and
+                          edit this review from the Top{" "}
+                          {JUDGING_POLICY.finals.finalistCount} tab.
+                        </>
+                      ) : editingReviewIndex !== null ? (
+                        <>
+                          Updating this judge’s review will recalculate the
+                          project’s total score.
+                        </>
+                      ) : (
+                        <>
+                          This project is reserved for <strong>{name}</strong>.
+                        </>
+                      )}
+                    </p>
+                    <button
+                      className="primary-button"
+                      disabled={submitting}
+                      onClick={
+                        finalMode
+                          ? submitFinalScore
+                          : editingReviewIndex !== null
+                            ? updateSelectedReview
+                            : submitScore
+                      }
+                      type="button"
+                    >
+                      {submitting
+                        ? "Saving…"
+                        : finalMode
+                          ? editingFinalReview
+                            ? "Update final score"
+                            : "Submit final score"
+                          : editingReviewIndex !== null
+                            ? "Update score"
+                            : "Submit score"}
+                      {!submitting && <span>→</span>}
+                    </button>
+                  </footer>
+                  {finalMode && (
+                    <a
+                      className="back-to-dashboard"
+                      href={`${pageBase}/leaderboard`}
+                    >
+                      ← Back to Top {JUDGING_POLICY.finals.finalistCount}
+                    </a>
+                  )}
+                  {!finalMode && editingReviewIndex !== null && (
+                    <a
+                      className="back-to-dashboard"
+                      href={`${pageBase}/results`}
+                    >
+                      ← Back to results
+                    </a>
+                  )}
+                </aside>
               )}
             </div>
           )}
@@ -666,12 +688,13 @@ export function JudgingView({
       >
         <div className="submission-confirmation-content">
           <span className="submission-saving-spinner" aria-hidden />
-          <svg
-            aria-hidden
-            className="submission-check"
-            viewBox="0 0 80 80"
-          >
-            <circle className="submission-check-circle" cx="40" cy="40" r="35" />
+          <svg aria-hidden className="submission-check" viewBox="0 0 80 80">
+            <circle
+              className="submission-check-circle"
+              cx="40"
+              cy="40"
+              r="35"
+            />
             <path
               className="submission-check-mark"
               d="M24 41.5 35.5 53 57 29.5"
@@ -695,8 +718,6 @@ export function JudgingView({
           </div>
         </div>
       </div>
-
     </AppShell>
   );
 }
-
