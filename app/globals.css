@@ -5566,6 +5566,57 @@ td:first-child span {
   }
 }
 
+/* Calibration uses the existing f.inc typography and neutral surfaces. */
+.normalization-explanation {
+  padding: 24px;
+  margin-bottom: 24px;
+  background: #f1f1f1;
+  border: 0;
+  border-radius: 15px;
+  color: #000;
+  letter-spacing: -0.02em;
+}
+.normalization-explanation h2 { margin: 0 0 15px; }
+.normalization-explanation p {
+  max-width: 550px;
+  line-height: 1.5;
+  margin: 10px 0;
+}
+.normalization-explanation summary {
+  cursor: pointer;
+  padding: 15px 0;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+.normalization-explanation caption {
+  text-align: left;
+  padding: 15px;
+  color: rgba(0, 0, 0, 0.4);
+  white-space: normal;
+}
+.normalized-finalist-score {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.4);
+  font-variant-numeric: tabular-nums;
+}
+
+.normalization-explanation .results-table { min-width: 650px; }
+.results-table th:nth-child(3) { min-width: 100px; }
+
+.normalization-compare {
+  background: #f1f1f1;
+  color: #000;
+  border: 0;
+  border-radius: 100px;
+  padding: 10px 20px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  cursor: pointer;
+}
+.normalization-compare:hover { background: #e7e7e7; }
+
 /* Personal judging history */
 .workspace-main.history-main { width: calc(100% - 48px); max-width: 1380px; margin: 0 auto; }
 .history-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 30px; }

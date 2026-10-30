@@ -2,6 +2,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { FinalsService } = require("../application/finals-service.ts");
+const { ballotReview } = require("../domain/final-ballot.ts");
 
 function fixture() {
   const submissions = Array.from({ length: 10 }, (_, index) => ({
@@ -11,6 +12,11 @@ function fixture() {
     complexityScore: 20 - index, completedAt: "2026-01-01", reviews: [],
     finalJudging: { judges: ["judge"], startedAt: "2026-01-02", reviews: [] },
   })).reverse();
+  // A ballot can be anchored on a team outside the reduced cohort.
+  submissions[0].finalJudging.reviews.push(ballotReview({
+    judgeName: "judge", picks: ["team-0", "team-1", "team-2"],
+    submittedAt: "2026-01-03T00:00:00Z",
+  }));
   const saves = [];
   const repository = {
     list: async () => submissions,
@@ -20,25 +26,31 @@ function fixture() {
   return { service: new FinalsService(() => repository), submissions, saves };
 }
 
-test("a saved ten-team round exposes only the seven highest preliminary teams", async () => {
+test("a saved ten-team round exposes the seven highest preliminary teams and retains ballots on excluded records", async () => {
   const { service, submissions } = fixture();
   const state = await service.state("judge");
   assert.deepEqual(state.finalists.map(s => s.id), Array.from({ length: 7 }, (_, i) => `team-${i}`));
-  assert.equal(state.requiredReviews, 7);
+  assert.equal(state.completedReviews, 1);
+  assert.deepEqual(state.ownBallot.picks, ["team-0", "team-1", "team-2"]);
+  assert.equal(state.standings.length, 7);
+  assert.deepEqual(state.topThree.map(s => s.id), ["team-0", "team-1", "team-2"]);
   assert.equal(submissions.filter(s => s.finalJudging).length, 10);
 });
 
-test("excluded teams cannot be opened or reviewed", async () => {
+test("excluded teams cannot be opened or voted for; a top-seven ballot is accepted", async () => {
   const { service, saves } = fixture();
   await assert.rejects(service.finalist("team-7", "judge"), /not in the final round/);
-  await assert.rejects(service.submitReview("team-7", "judge", { progress: 8, practicality: 8, complexity: 8, notes: "" }), /not in the final round/);
+  await assert.rejects(service.submitBallot("judge", ["team-0", "team-1", "team-7"]), /three distinct finalists/);
   assert.equal(saves.length, 0);
-  await service.submitReview("team-6", "judge", { progress: 8, practicality: 8, complexity: 8, notes: "" });
+  await service.submitBallot("judge", ["team-0", "team-1", "team-6"]);
   assert.equal(saves.length, 1);
 });
 
 test("reviews on an excluded team still prevent destructive finalist synchronization", async () => {
   const { service, submissions } = fixture();
-  submissions[0].finalJudging.reviews.push({ judgeName: "judge", totalScore: 24 });
+  // A legacy rubric review is not counted as a podium ballot, but must still
+  // prevent synchronization from clearing the saved review ledger.
+  submissions[0].finalJudging.reviews = [{ judgeName: "judge", totalScore: 24, notes: "Legacy review" }];
+  assert.equal((await service.state("judge")).completedReviews, 0);
   await assert.rejects(service.sync("admin"), /cannot be changed/);
 });

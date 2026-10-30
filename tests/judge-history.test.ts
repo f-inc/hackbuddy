@@ -62,6 +62,7 @@ test("history includes a judge's incomplete projects and excludes other judges' 
   assert.equal(result[0].myReviews[0].review.totalScore, 24);
   assert.deepEqual(result[0].result, {
     score: null,
+    normalizedScore: null,
     maximum: 60,
     rank: null,
     complete: false,

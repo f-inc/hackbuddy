@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNormalizedScore } from "@/domain/normalization";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "./AppShell";
@@ -34,13 +35,20 @@ function reviewedDate(value: string) {
 function ResultSummary({ project }: { project: JudgedProject }) {
   return (
     <div className="history-result">
+      {project.publishedAt && <span>Published and locked</span>}
       <div>
         <span>Preliminary result</span>
         <strong>
           {project.result.complete ? (
             <>
-              {project.result.score}
-              <small> / {project.result.maximum}</small>
+              {project.result.normalizedScore !== null
+                ? formatNormalizedScore(project.result.normalizedScore)
+                : project.result.score}
+              <small>
+                {project.result.normalizedScore !== null
+                  ? ` normalized · Raw ${project.result.score}/${project.result.maximum}`
+                  : ` / ${project.result.maximum}`}
+              </small>
             </>
           ) : (
             "Awaiting another review"
@@ -59,8 +67,14 @@ function ResultSummary({ project }: { project: JudgedProject }) {
             Final round{!project.finalResult.complete && " · in progress"}
           </span>
           <strong>
-            {project.finalResult.score}
-            <small> / {project.finalResult.maximum}</small>
+            {project.finalResult.normalizedScore !== null
+              ? formatNormalizedScore(project.finalResult.normalizedScore)
+              : project.finalResult.score}
+            <small>
+              {project.finalResult.normalizedScore !== null
+                ? ` normalized · Raw ${project.finalResult.score}/${project.finalResult.maximum}`
+                : ` / ${project.finalResult.maximum}`}
+            </small>
           </strong>
         </div>
       )}

@@ -1,4 +1,4 @@
-import { JudgingView } from "@/app/judging/page";
+import { JudgingView } from "@/components/JudgingView";
 import { getHackathon } from "@/lib/hackathons";
 import { notFound } from "next/navigation";
 

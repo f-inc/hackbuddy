@@ -1,5 +1,7 @@
 import { PRELIMINARY_SCORE_MAX, RUBRIC_SCORE_MAX } from "./judging-policy";
-import { comparePreliminaryRank, scoredCompleted } from "./ranking";
+import { preliminaryRanking, finalRanking } from "./ranking";
+import type { ScoringPolicy } from "./event-scoring";
+import type { PublishedResults } from "./publication";
 import type { ReviewPhase, Submission, SubmissionReview } from "./submission";
 
 export type PersonalReview = { phase: ReviewPhase; review: SubmissionReview };
@@ -7,15 +9,23 @@ export type JudgedProject = Pick<
   Submission,
   "id" | "projectName" | "teamName" | "track" | "oneLiner" | "teamPhotoUrl"
 > & {
+  scoringPolicy: ScoringPolicy;
+  publishedAt: string;
   myReviews: PersonalReview[];
   reviewedAt: string;
   result: {
     score: number | null;
+    normalizedScore: number | null;
     maximum: number;
     rank: number | null;
     complete: boolean;
   };
-  finalResult: { score: number; maximum: number; complete: boolean } | null;
+  finalResult: {
+    score: number;
+    normalizedScore: number | null;
+    maximum: number;
+    complete: boolean;
+  } | null;
 };
 
 function belongsTo(review: SubmissionReview, judgeName: string) {
@@ -41,11 +51,31 @@ export function personalReviews(
 export function judgedProjects(
   submissions: Submission[],
   judgeName: string,
+  policy: ScoringPolicy = "raw-v1",
+  publication: PublishedResults | null = null,
 ): JudgedProject[] {
-  const ranks = new Map(
-    scoredCompleted(submissions)
-      .sort(comparePreliminaryRank)
-      .map((s, index) => [s.id, index + 1]),
+  const ranked =
+    publication?.results ?? preliminaryRanking(submissions, policy).results;
+  const ranks = new Map(ranked.map((s, index) => [s.id, index + 1]));
+  const scores = new Map(ranked.map((s) => [s.id, s]));
+  const finalScores =
+    publication?.finals.finalists ??
+    finalRanking(
+      submissions
+        .filter((s) => s.finalJudging && ranks.has(s.id))
+        .map((s) => ({
+          id: s.id,
+          projectName: s.projectName,
+          finalReviews: (s.finalJudging?.reviews ?? []).filter(
+            (review) =>
+              policy === "raw-v1" ||
+              s.finalJudging?.judges.includes(review.judgeName),
+          ),
+        })),
+      policy,
+    );
+  const finalScoreById = new Map(
+    finalScores.map((s) => [s.id, s.finalNormalizedScore]),
   );
   return submissions
     .flatMap((submission): JudgedProject[] => {
@@ -54,12 +84,14 @@ export function judgedProjects(
       const final = submission.finalJudging;
       const finalComplete = Boolean(
         final?.judges.length &&
-          final.judges.every((judge) =>
-            final.reviews.some((review) => belongsTo(review, judge)),
-          ),
+        final.judges.every((judge) =>
+          final.reviews.some((review) => belongsTo(review, judge)),
+        ),
       );
       return [
         {
+          scoringPolicy: policy,
+          publishedAt: publication?.publishedAt ?? "",
           id: submission.id,
           projectName: submission.projectName,
           teamName: submission.teamName,
@@ -73,7 +105,11 @@ export function judgedProjects(
               .sort()
               .at(-1) || "",
           result: {
-            score: ranks.has(submission.id) ? submission.totalScore : null,
+            score: scores.get(submission.id)?.totalScore ?? null,
+            normalizedScore:
+              policy === "normalized-v1"
+                ? (scores.get(submission.id)?.normalizedScore ?? null)
+                : null,
             maximum: PRELIMINARY_SCORE_MAX,
             rank: ranks.get(submission.id) ?? null,
             complete: ranks.has(submission.id),
@@ -84,6 +120,10 @@ export function judgedProjects(
                   (sum, review) => sum + review.totalScore,
                   0,
                 ),
+                normalizedScore:
+                  policy === "normalized-v1"
+                    ? (finalScoreById.get(submission.id) ?? null)
+                    : null,
                 maximum: final.judges.length * RUBRIC_SCORE_MAX,
                 complete: finalComplete,
               }

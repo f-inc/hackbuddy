@@ -1,4 +1,4 @@
-import { ResultsView } from "@/app/results/page";
+import { ResultsView } from "@/components/ResultsView";
 import { getHackathon } from "@/lib/hackathons";
 import { notFound } from "next/navigation";
 

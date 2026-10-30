@@ -217,3 +217,112 @@ Airtable does not provide compare-and-swap transactions. HackBuddy uses a
 unique claim token and verifies each claim after writing it, which is suitable
 for normal hackathon judging traffic. For very high concurrency, put a small
 transactional queue in front of Airtable and continue syncing scores back.
+
+## Judge score normalization
+
+Each hackathon has a fixed, versioned scoring policy. Existing registry records
+without a policy, and legacy environment-configured events, use `raw-v1`: the
+original raw sums and original completion-time tie-breaks. Existing final winner
+selection keeps its raw sums and alphabetical tie-breaks. Deploying this feature
+does not normalize or publish historical events, including Night Hack III.
+
+New events default to `normalized-v1`; organizers can select original raw
+scoring when creating an event. The policy is immutable from creation (a
+stronger lock than waiting for the first review). The submissions/reviews data
+sources are immutable too, so editing an event cannot switch it onto another
+scoring history. Normalized event creation rejects nonempty review ledgers and
+submission tables already attached to another event. Register an existing event
+with raw scoring instead.
+
+For normalized events, preliminary results, the dashboard leaderboard, and
+top-seven selection use a relative score calculated from that event's review
+ledger. Final winners use a separate calculation over the frozen finalists and
+selected final-round judges. Raw scores and notes are preserved.
+
+For each judge and each criterion, compute the mean `m` and population variance
+`v` of their submitted scores. Let `n` be their review count, `w = n / (n + 5)`,
+and `V` the event/round's review-count-weighted mean of the judges' within-judge
+variances for that criterion. A score `x` contributes:
+
+```text
+relative = w * (x - m) / max(1, sqrt(w * v + (1 - w) * V))
+```
+
+This is a regularized z-score: judge means remove generosity/strictness,
+pooled variance stabilizes scoring ranges, the one-point spread floor avoids
+amplifying tiny differences, and `w` shrinks small histories toward neutral.
+A judge with fewer than two reviews, or a criterion with zero variance,
+contributes zero for that criterion. Average the three criterion contributions,
+then average the project's reviews equally. More reviews do not increase a
+project's score just by increasing the sum. Higher is better; zero is neutral.
+Scores are displayed to three decimal places but ranked at full precision
+(with a `1e-10` tolerance for numerical ties). Ties sort by project name then
+record ID; completion time and inflated raw totals do not break ties.
+
+All saved preliminary reviews, including those on projects awaiting another
+review, contribute to calibration. Only completed, scored projects enter
+rankings. Rankings recalculate after reviews arrive or change. Finalist cohorts
+already stored in Airtable remain fixed; the existing sync action can update a
+cohort before final reviews start. Starting or syncing a round selects the
+normalized top seven. Final winners appear only once every selected judge has
+reviewed every finalist.
+
+Results retain raw rubric scores and raw ranks, with a comparison control.
+Administrator calibration details show each judge's sample count, criterion
+means/spreads, low-sample and flat-criterion indicators, disconnected judge
+comparison groups, and projects with no individual review history. Such legacy
+projects get a neutral normalized score; restore their review ledger before
+relying on their ranks.
+
+Calibration assumes comparable project mixes across judges. The newest-first
+claim queue does not guarantee this, and two reviews per project cannot always
+separate project quality from judge generosity. Disconnected judge groups are
+flagged, but connected groups can still have uneven assignments. Organizers
+should review assignment overlap and raw-versus-normalized rankings before
+starting finals. No data from another hackathon or judging phase is pooled.
+
+Run `npm test` for scoring/ranking simulations, `npm run lint`, and
+`npx tsc --noEmit` for static checks. Test compilation uses a unique temporary
+directory per run so parallel checkouts cannot pick up stale test files.
+
+
+## Publishing and preserving official results
+
+Before deploying, run `npm run setup:hackathons` with the normal Airtable
+configuration to add two registry fields (the worktree does not run this against
+live Airtable automatically):
+
+| Field | Airtable type | Meaning |
+| --- | --- | --- |
+| Scoring Policy | Single line text | `raw-v1` or `normalized-v1`; blank means legacy raw scoring |
+| Published Results | Long text | Read-only compatibility field for existing snapshots |
+
+The setup script also creates a `HackBuddy Publications` journal with an auto-numbered `Sequence`, `Hackathon ID`, and compressed `Snapshot`. Official publication appends a row and reads the lowest sequence for that event; concurrent publishes cannot overwrite the first snapshot. Existing registry snapshots remain readable and authoritative.
+
+The setup script leaves historical policy fields blank, preserving raw scoring;
+it does not publish snapshots or alter scores. Missing fields fail writes
+explicitly rather than silently opting an event into normalization.
+
+Once every selected final judge has reviewed every finalist, an administrator
+can choose **Publish and lock results** on the leaderboard. Until then,
+rankings are provisional. Publication reads the event ledger once and saves
+its preliminary ranking, raw and normalized score values, final rankings,
+individual scorecards, judge roster, scoring version, publisher and timestamp.
+The snapshot is compressed to fit the journal long-text field; an oversized
+snapshot is rejected before writing. Publication is idempotent and the app
+never intentionally replaces an existing snapshot.
+
+Results and finals pages read published snapshots rather than recomputing
+scores. A later score-ledger edit or a new normalization implementation cannot
+change those official rankings. The snapshot pins its own scoring version.
+Unknown/corrupt snapshot formats fail closed with an error, never a recalculated
+ranking. Queue claims, review edits/submissions, final-round start/sync/reset,
+and session releases are rejected after publication. UI edit controls are hidden.
+There is no unpublish/reset action for a published event. Corrections require a
+separately managed replacement event; they cannot silently replace the record.
+
+Legacy environment-only events must first be registered with raw scoring before
+a permanent snapshot can be published. A historical comparison report remains a
+simulation and does not set the event's scoring policy or official results.
+`DEMO_SCORING_POLICY=normalized-v1` opts local preview data into normalization;
+the default preview policy is raw, just like an existing event.

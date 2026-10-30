@@ -12,8 +12,6 @@ export type {
   SubmissionReview,
 } from "@/domain/submission";
 
-import type { SubmissionReview } from "@/domain/submission";
-
 export type QueueStats = {
   total: number;
   available: number;
@@ -45,37 +43,4 @@ export type ActiveSession = {
   claimedAt: string;
 };
 
-export type ResultEntry = {
-  id: string;
-  teamName: string;
-  projectName: string;
-  oneLiner: string;
-  submitterNames: string;
-  teamPhotoUrl: string;
-  track: string;
-  reviews: SubmissionReview[];
-  progressScore: number;
-  practicalityScore: number;
-  complexityScore: number;
-  totalScore: number;
-  completedAt: string;
-};
-
-export type FinalistEntry = ResultEntry & {
-  finalReviews: SubmissionReview[];
-  reviewedByYou: boolean;
-  fullyReviewed: boolean;
-};
-
-export type FinalsState = {
-  started: boolean;
-  canStart: boolean;
-  startedAt: string;
-  judges: string[];
-  eligibleJudge: boolean;
-  finalists: FinalistEntry[];
-  completedReviews: number;
-  requiredReviews: number;
-  allComplete: boolean;
-  topThree: FinalistEntry[];
-};
+export type { ResultEntry, FinalistEntry, FinalsState } from "@/domain/results";
