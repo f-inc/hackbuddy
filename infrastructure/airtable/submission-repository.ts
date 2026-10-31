@@ -143,6 +143,14 @@ function mapSubmission(
     demoType: demo.type,
     demoFilename: demo.filename,
     repositoryUrl: text(values[field.repositoryUrl]),
+    toolsUsed: Array.isArray(values[field.toolsUsed])
+      ? (values[field.toolsUsed] as unknown[]).filter(
+          (value): value is string => typeof value === "string",
+        )
+      : text(values[field.toolsUsed])
+        ? [text(values[field.toolsUsed])]
+        : [],
+    progressOutline: text(values[field.progressOutline]),
     track: text(values[field.track]) || "General",
     status,
     createdAt: text(values[field.submittedAt]) || record.createdTime,

@@ -16,6 +16,7 @@ const eventNavigation = [
   { href: "/second-pass", label: "Second pass judging", icon: "◷" },
   { href: "/winners", label: "Winners", icon: "♛" },
   { href: "/results", label: "Results", icon: "≡" },
+  { href: "/photon", label: "Photon", icon: "✦" },
   { href: "/judged", label: "Projects judged", icon: "▤" },
 ];
 

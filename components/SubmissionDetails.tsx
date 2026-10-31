@@ -160,6 +160,18 @@ export function SubmissionDetails({ submission }: { submission: Submission }) {
                 <p>{submission.description}</p>
               </div>
             )}
+          {submission.progressOutline && (
+            <div className="story-block">
+              <span>Progress outline</span>
+              <p>{submission.progressOutline}</p>
+            </div>
+          )}
+          {Boolean(submission.toolsUsed?.length) && (
+            <div className="story-block">
+              <span>Tools used</span>
+              <p>{submission.toolsUsed!.join(", ")}</p>
+            </div>
+          )}
         </section>
 
         <section className="submission-details">

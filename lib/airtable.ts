@@ -38,6 +38,11 @@ export function isDemoMode() {
   return queue.isDemoMode();
 }
 
+export async function getPhotonSubmissions() {
+  const { photonEntries } = await import("@/domain/photon");
+  return photonEntries(await repository().list());
+}
+
 export function getQueueStats() {
   return queue.getStats();
 }

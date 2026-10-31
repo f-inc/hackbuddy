@@ -40,6 +40,8 @@ export type SubmissionContact = {
 };
 
 export type SubmissionProject = {
+  toolsUsed?: string[];
+  progressOutline?: string;
   oneLiner: string;
   description: string;
   previewImageUrl: string;
