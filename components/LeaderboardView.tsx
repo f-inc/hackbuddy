@@ -647,7 +647,15 @@ export function LeaderboardView({
   const finalState = finals;
   const livePodium = isWinners && finalState.started && !finalState.publishedAt;
   const showingTopThree = isWinners;
-  const results = isWinners ? finalState.topThree : finalState.finalists;
+  const results = isWinners
+    ? finalState.topThree
+    : view === "top-seven"
+      ? [...finalState.finalists].sort((a, b) =>
+          a.projectName.localeCompare(b.projectName, "en", { sensitivity: "base" }) ||
+          a.id.localeCompare(b.id),
+        )
+      : finalState.finalists;
+  const ResultsList = view === "top-seven" ? "ul" : "ol";
   const heading = isWinners
     ? "Winners"
     : isSecondPass
@@ -662,8 +670,8 @@ export function LeaderboardView({
         ? "Voting is closed. You can still review the finalist submissions below."
         : "Review the finalists and choose your first, second, and third place."
       : finalState.started || finalState.publishedAt
-        ? "Meet the finalists selected from preliminary judging."
-        : "The current shortlist from preliminary judging. Teams may change until the second pass starts.";
+        ? "Meet the finalists selected from preliminary judging, listed alphabetically."
+        : "The current shortlist, listed alphabetically. Teams may change until the second pass starts.";
   const availableJudgeNames = Array.from(
     new Set([...finalState.judges, ...selectedJudges]),
   ).sort();
@@ -684,7 +692,8 @@ export function LeaderboardView({
               ) && " · Tied"}
             </span>
           )}
-          {finalState.scoringPolicy === "normalized-v1" &&
+          {view !== "top-seven" &&
+            finalState.scoringPolicy === "normalized-v1" &&
             !(showingTopThree && finalState.votingMode === "podium-v1") && (
               <small className="normalized-finalist-score">
                 {formatNormalizedScore(
@@ -1036,7 +1045,7 @@ export function LeaderboardView({
       {isSecondPass &&
       finalState.started &&
       !finalState.publishedAt ? null : results.length ? (
-        <ol
+        <ResultsList
           className={`tv-ranking${showingTopThree ? " top-three-ranking" : ""}`}
         >
           {results.map((result, index) => (
@@ -1063,14 +1072,6 @@ export function LeaderboardView({
                   onClick={() => void inspectSubmission(result.id)}
                   type="button"
                 />
-                {!showingTopThree && (
-                  <span
-                    className="finalist-place"
-                    aria-label={`Finalist ${index + 1}`}
-                  >
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                )}
                 {showingTopThree && (
                   <span
                     aria-label={
@@ -1104,7 +1105,7 @@ export function LeaderboardView({
               </div>
             </li>
           ))}
-        </ol>
+        </ResultsList>
       ) : (
         <section className="tv-empty card">
           <span>★</span>
