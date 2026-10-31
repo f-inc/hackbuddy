@@ -72,25 +72,15 @@ test("reviews aggregate and complete only at the policy threshold", () => {
     complexity: 9,
     notes: "Strong demo",
   };
-  const first = createReview(
-    " Judge One ",
-    scores,
-    "2026-01-01T00:00:00.000Z",
-  );
-  const second = createReview(
-    "judge-two",
-    scores,
-    "2026-01-01T01:00:00.000Z",
-  );
+  const first = createReview(" Judge One ", scores, "2026-01-01T00:00:00.000Z");
+  const second = createReview("judge-two", scores, "2026-01-01T01:00:00.000Z");
   const aggregate = aggregateReviews([first, second]);
 
   assert.equal(first.judgeName, "judge one");
   assert.equal(first.totalScore, 24);
   assert.equal(aggregate.total, 48);
   assert.equal(
-    statusForReviewCount(
-      JUDGING_POLICY.preliminary.requiredReviews - 1,
-    ),
+    statusForReviewCount(JUDGING_POLICY.preliminary.requiredReviews - 1),
     "available",
   );
   assert.equal(
@@ -102,31 +92,46 @@ test("reviews aggregate and complete only at the policy threshold", () => {
 test("finalist and winner selection use policy counts", () => {
   const submissions = Array.from(
     { length: JUDGING_POLICY.finals.finalistCount + 4 },
-    (_, index) => submission(`Project ${index + 1}`, index + 1),
+    (_, index) => {
+      const review = createReview(
+        "judge",
+        {
+          progress: 1 + Math.floor(index / 3),
+          practicality: 1 + Math.floor((index + 1) / 3),
+          complexity: 1 + Math.floor((index + 2) / 3),
+          notes: "",
+        },
+        "",
+      );
+      return {
+        ...submission(`Project ${index + 1}`, review.totalScore),
+        reviews: [review],
+      };
+    },
   );
   const finalists = selectFinalists(submissions);
   assert.equal(finalists.length, JUDGING_POLICY.finals.finalistCount);
   assert.equal(
-    finalists[0].totalScore,
-    JUDGING_POLICY.finals.finalistCount + 4,
+    finalists[0].id,
+    `Project ${JUDGING_POLICY.finals.finalistCount + 4}`,
   );
 
   const winners = selectWinners(
     finalists.map((finalist, index) => ({
       ...finalist,
       finalReviews: [
-        {
-          judgeName: "judge",
-          progressScore: 1,
-          practicalityScore: 1,
-          complexityScore: 1,
-          totalScore: index + 1,
-          notes: "",
-          completedAt: "",
-        },
+        createReview(
+          "judge",
+          {
+            progress: index + 1,
+            practicality: index + 1,
+            complexity: index + 1,
+            notes: "",
+          },
+          "",
+        ),
       ],
     })),
   );
   assert.equal(winners.length, JUDGING_POLICY.finals.winnerCount);
 });
-

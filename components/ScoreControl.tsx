@@ -6,15 +6,17 @@ export function ScoreControl({
   highAnchor,
   value,
   onChange,
+  readOnly = false,
 }: {
   label: string;
   lowAnchor: string;
   highAnchor: string;
   value: number;
-  onChange: (value: number) => void;
+  onChange?: (value: number) => void;
+  readOnly?: boolean;
 }) {
   return (
-    <fieldset className="score-control">
+    <fieldset className="score-control" disabled={readOnly}>
       <div className="score-label">
         <div>
           <legend>{label}</legend>
@@ -34,7 +36,7 @@ export function ScoreControl({
             aria-pressed={value === score}
             className={value === score ? "selected" : ""}
             key={score}
-            onClick={() => onChange(score)}
+            onClick={() => onChange?.(score)}
             type="button"
           >
             {score}

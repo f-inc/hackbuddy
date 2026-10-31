@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 type AirtableContext = {
+  hackathonId?: string;
   baseId: string;
   tableName: string;
   reviewsTableName: string;
@@ -20,7 +21,9 @@ export function currentAirtableBase() {
 }
 
 export function currentAirtableTable() {
-  return airtableContext.getStore()?.tableName || process.env.AIRTABLE_TABLE_NAME;
+  return (
+    airtableContext.getStore()?.tableName || process.env.AIRTABLE_TABLE_NAME
+  );
 }
 
 export function currentAirtableReviewsTable() {
@@ -35,4 +38,8 @@ export function currentAirtableReviewsTable() {
 
 export function hasAirtableRequestContext() {
   return Boolean(airtableContext.getStore());
+}
+
+export function currentHackathonId() {
+  return airtableContext.getStore()?.hackathonId;
 }

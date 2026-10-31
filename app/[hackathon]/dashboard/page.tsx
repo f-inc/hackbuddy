@@ -1,4 +1,4 @@
-import { DashboardView } from "@/app/dashboard/page";
+import { DashboardView } from "@/components/DashboardView";
 import { getHackathon } from "@/lib/hackathons";
 import { notFound } from "next/navigation";
 

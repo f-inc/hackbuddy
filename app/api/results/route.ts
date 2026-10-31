@@ -1,4 +1,4 @@
-import { getCompletedResults, isDemoMode } from "@/lib/airtable";
+import { getResultsReport, isDemoMode } from "@/lib/airtable";
 import { requireHackathonSession } from "@/server/auth/policies";
 import { errorResponse } from "@/server/http/errors";
 import { NextResponse } from "next/server";
@@ -7,7 +7,7 @@ export async function GET() {
   try {
     await requireHackathonSession();
     return NextResponse.json({
-      results: await getCompletedResults(),
+      ...await getResultsReport(),
       demoMode: isDemoMode(),
     });
   } catch (error) {

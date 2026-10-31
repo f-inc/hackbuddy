@@ -1,0 +1,301 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Instrument+Sans:wght@400;500;600&display=swap");
+
+.mobile-tab-bar,
+.mobile-workspace-menu {
+  display: none;
+}
+
+@media (max-width: 800px) {
+  .product-shell .product-content {
+    overflow-x: clip;
+    padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .product-shell .mobile-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    min-height: 76px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 20px 10px;
+    border: 0;
+    background: #fff;
+    backdrop-filter: none;
+  }
+
+  .mobile-event-brand {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .product-shell .mobile-header .brand-wordmark {
+    display: block;
+    font-size: 16px;
+  }
+
+  .mobile-event-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgb(0 0 0 / 40%);
+    font:
+      14px/1.4 "Instrument Sans",
+      sans-serif;
+    letter-spacing: -0.04em;
+  }
+
+  .mobile-menu-trigger,
+  .mobile-menu-account button,
+  .mobile-menu-heading button {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 10px 15px;
+    border: 0;
+    border-radius: 100px;
+    background: #f1f1f1;
+    color: #000;
+    font:
+      500 14px/1.4 "Instrument Sans",
+      sans-serif;
+    letter-spacing: -0.04em;
+    cursor: pointer;
+  }
+
+  .mobile-menu-trigger svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .mobile-tab-bar {
+    position: fixed;
+    z-index: 40;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+    padding: 8px max(10px, env(safe-area-inset-right, 0px))
+      calc(8px + env(safe-area-inset-bottom, 0px))
+      max(10px, env(safe-area-inset-left, 0px));
+    background: #fff;
+    font-family: "Instrument Sans", sans-serif;
+    letter-spacing: -0.04em;
+  }
+
+  .mobile-tab-bar a {
+    display: flex;
+    min-height: 60px;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border-radius: 15px;
+    color: rgb(0 0 0 / 60%);
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .mobile-tab-bar a[aria-current="page"] {
+    color: #000;
+    background: #f1f1f1;
+  }
+
+  .mobile-tab-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 24px;
+  }
+
+  .mobile-tab-icon svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  .mobile-tab-bar a:focus-visible,
+  .mobile-menu-trigger:focus-visible,
+  .mobile-workspace-menu a:focus-visible,
+  .mobile-workspace-menu button:focus-visible {
+    outline: 2px solid #333;
+    outline-offset: 2px;
+  }
+
+  .mobile-workspace-menu:popover-open {
+    position: fixed;
+    inset: calc(85px + env(safe-area-inset-top, 0px)) 15px auto auto;
+    display: grid;
+    gap: 15px;
+    width: min(340px, calc(100vw - 30px));
+    max-height: calc(100dvh - 190px);
+    overflow: auto;
+    margin: 0;
+    padding: 20px;
+    border: 0;
+    border-radius: 15px;
+    background: #fff;
+    color: #000;
+    font:
+      16px/1.4 "Instrument Sans",
+      sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .mobile-workspace-menu::backdrop {
+    background: rgb(0 0 0 / 15%);
+  }
+
+  .mobile-menu-heading,
+  .mobile-menu-account {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+  }
+
+  .mobile-menu-heading > span {
+    color: rgb(0 0 0 / 40%);
+    font-size: 14px;
+  }
+
+  .mobile-menu-heading button {
+    width: 44px;
+    padding: 0;
+    font-size: 24px;
+  }
+
+  .mobile-workspace-menu nav {
+    display: grid;
+    gap: 5px;
+  }
+
+  .mobile-workspace-menu nav a {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    min-height: 48px;
+    padding: 12px 15px;
+    border-radius: 100px;
+    color: #000;
+    text-decoration: none;
+  }
+
+  .mobile-workspace-menu nav a[aria-current="page"],
+  .mobile-workspace-menu nav a:hover,
+  .mobile-tab-bar a:hover {
+    background: #f1f1f1;
+    color: #000;
+  }
+
+  .mobile-menu-account {
+    padding-top: 10px;
+  }
+
+  .mobile-menu-account strong,
+  .mobile-menu-account small {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-menu-account strong {
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  .mobile-menu-account small {
+    color: rgb(0 0 0 / 40%);
+    font-size: 14px;
+  }
+
+  .product-shell:has(.is-presenting) .mobile-header,
+  .product-shell:has(.is-presenting) .mobile-tab-bar {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .product-shell .podium-voting {
+    padding: 20px 15px;
+    margin-top: 20px;
+    min-width: 0;
+  }
+
+  .podium-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .podium-card-picks button,
+  .podium-submit button,
+  .final-round-admin-actions button {
+    min-height: 44px;
+  }
+
+  .final-roster-actions,
+  .final-round-status-meta,
+  .final-add-judge > div {
+    flex-wrap: wrap;
+  }
+
+  .final-roster-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .final-add-judge input {
+    min-width: 0;
+  }
+
+  .product-shell .compact-score-card .score-options {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .product-shell .compact-score-card .score-options button {
+    min-height: 44px;
+  }
+
+  .tv-project,
+  .tv-builders-copy {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .product-shell .tv-project strong,
+  .product-shell .tv-project > span {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
+@media (max-width: 800px) {
+  .product-shell .tv-present-button,
+  .product-shell [data-finals-view="winners"] .final-round-status,
+  .product-shell [data-finals-view="top-seven"] .final-round-status,
+  .product-shell .live-podium-detail {
+    display: none;
+  }
+
+  .product-shell .live-podium-note {
+    margin: 15px 0;
+    font-size: 14px;
+    letter-spacing: -0.04em;
+  }
+
+  .product-shell .tv-leaderboard-actions {
+    gap: 0;
+  }
+
+  .product-shell .tv-leaderboard-header {
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+}

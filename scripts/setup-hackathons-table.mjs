@@ -1,6 +1,12 @@
 import { readFile } from "node:fs/promises";
 
-const envText = await readFile(new URL("../.env.local", import.meta.url), "utf8");
+const envText = await readFile(
+  new URL("../.env.local", import.meta.url),
+  "utf8",
+).catch((error) => {
+  if (error.code === "ENOENT") return "";
+  throw error;
+});
 for (const line of envText.split(/\r?\n/)) {
   const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
   if (!match || process.env[match[1]]) continue;
@@ -16,15 +22,20 @@ const fieldNames = {
   name: process.env.AIRTABLE_HACKATHON_NAME_FIELD || "Name",
   slug: process.env.AIRTABLE_HACKATHON_SLUG_FIELD || "Slug",
   base: process.env.AIRTABLE_HACKATHON_BASE_ID_FIELD || "Airtable Base ID",
-  table: process.env.AIRTABLE_HACKATHON_TABLE_NAME_FIELD || "Airtable Table Name",
+  table:
+    process.env.AIRTABLE_HACKATHON_TABLE_NAME_FIELD || "Airtable Table Name",
   reviewsTable:
     process.env.AIRTABLE_HACKATHON_REVIEWS_TABLE_NAME_FIELD ||
     "Airtable Reviews Table Name",
   image: process.env.AIRTABLE_HACKATHON_IMAGE_URL_FIELD || "Image URL",
   squareImage:
-    process.env.AIRTABLE_HACKATHON_SQUARE_IMAGE_URL_FIELD ||
-    "Square Image URL",
+    process.env.AIRTABLE_HACKATHON_SQUARE_IMAGE_URL_FIELD || "Square Image URL",
   active: process.env.AIRTABLE_HACKATHON_ACTIVE_FIELD || "Active",
+  scoringPolicy:
+    process.env.AIRTABLE_HACKATHON_SCORING_POLICY_FIELD || "Scoring Policy",
+  publishedResults:
+    process.env.AIRTABLE_HACKATHON_PUBLISHED_RESULTS_FIELD ||
+    "Published Results",
 };
 const headers = {
   Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}`,
@@ -39,7 +50,9 @@ if (!response.ok) {
 }
 
 const metadata = await response.json();
-let table = metadata.tables.find((candidate) => candidate.name === registryName);
+let table = metadata.tables.find(
+  (candidate) => candidate.name === registryName,
+);
 if (!table) {
   const createResponse = await fetch(metaUrl, {
     method: "POST",
@@ -55,6 +68,8 @@ if (!table) {
         { name: fieldNames.reviewsTable, type: "singleLineText" },
         { name: fieldNames.image, type: "url" },
         { name: fieldNames.squareImage, type: "url" },
+        { name: fieldNames.scoringPolicy, type: "singleLineText" },
+        { name: fieldNames.publishedResults, type: "multilineText" },
         {
           name: fieldNames.active,
           type: "checkbox",
@@ -75,6 +90,8 @@ if (!table) {
 }
 
 for (const missingField of [
+  { name: fieldNames.scoringPolicy, type: "singleLineText" },
+  { name: fieldNames.publishedResults, type: "multilineText" },
   { name: fieldNames.base, type: "singleLineText" },
   { name: fieldNames.reviewsTable, type: "singleLineText" },
   { name: fieldNames.image, type: "url" },
@@ -99,7 +116,9 @@ const legacyTable = process.env.AIRTABLE_TABLE_NAME?.trim();
 const dataUrl = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodeURIComponent(registryName)}`;
 const listResponse = await fetch(`${dataUrl}?maxRecords=100`, { headers });
 if (!listResponse.ok) {
-  throw new Error(`Could not inspect registry records (${listResponse.status}).`);
+  throw new Error(
+    `Could not inspect registry records (${listResponse.status}).`,
+  );
 }
 const records = (await listResponse.json()).records;
 const registryMigrations = records
@@ -158,8 +177,7 @@ if (legacyTable) {
                 `${process.env.DEFAULT_HACKATHON_NAME || "Night Hack III"} - Reviews`,
               ...(process.env.DEFAULT_HACKATHON_IMAGE_URL
                 ? {
-                    [fieldNames.image]:
-                      process.env.DEFAULT_HACKATHON_IMAGE_URL,
+                    [fieldNames.image]: process.env.DEFAULT_HACKATHON_IMAGE_URL,
                   }
                 : {}),
               ...(process.env.DEFAULT_HACKATHON_SQUARE_IMAGE_URL
@@ -175,8 +193,55 @@ if (legacyTable) {
       }),
     });
     if (!seedResponse.ok) {
-      throw new Error(`Could not seed the default event (${seedResponse.status}).`);
+      throw new Error(
+        `Could not seed the default event (${seedResponse.status}).`,
+      );
     }
     console.log(`Added default event "${slug}".`);
   }
+}
+
+// Immutable snapshots use an append-only journal. An auto-numbered primary
+// field provides a database-assigned order across separate server instances.
+const publicationsName =
+  process.env.AIRTABLE_PUBLICATIONS_TABLE || "HackBuddy Publications";
+const publicationFields = [
+  { name: "Sequence", type: "autoNumber" },
+  { name: "Hackathon ID", type: "singleLineText" },
+  { name: "Snapshot", type: "multilineText" },
+];
+let publications = metadata.tables.find(
+  (candidate) => candidate.name === publicationsName,
+);
+if (!publications) {
+  const response = await fetch(metaUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      name: publicationsName,
+      description:
+        "Append-only official HackBuddy results. The lowest Sequence per event is authoritative; never edit or delete published rows.",
+      fields: publicationFields,
+    }),
+  });
+  if (!response.ok)
+    throw new Error(
+      `Could not create publication journal (HTTP ${response.status}).`,
+    );
+  publications = await response.json();
+  console.log(`Created "${publicationsName}" publication journal.`);
+} else {
+  for (const definition of publicationFields) {
+    if (
+      !publications.fields.some(
+        (field) =>
+          field.name === definition.name && field.type === definition.type,
+      )
+    ) {
+      throw new Error(
+        `Publication journal field "${definition.name}" is missing or has the wrong type. Migration stopped without changing published rows.`,
+      );
+    }
+  }
+  console.log(`"${publicationsName}" publication journal already exists.`);
 }

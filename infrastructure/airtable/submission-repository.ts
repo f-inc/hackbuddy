@@ -18,14 +18,8 @@ import {
   NotFoundError,
   UpstreamError,
 } from "@/server/http/errors";
-import {
-  AirtableClient,
-  type AirtableRecord,
-} from "./client";
-import {
-  airtableStatus,
-  submissionField as field,
-} from "./field-config";
+import { AirtableClient, type AirtableRecord } from "./client";
+import { airtableStatus, submissionField as field } from "./field-config";
 import {
   AirtableReviewRepository,
   type StoredReview,
@@ -93,10 +87,7 @@ function parseFinalState(
   };
 }
 
-function reviewsForPhase(
-  storedReviews: StoredReview[],
-  phase: ReviewPhase,
-) {
+function reviewsForPhase(storedReviews: StoredReview[], phase: ReviewPhase) {
   const byJudge = new Map<string, SubmissionReview>();
   for (const stored of storedReviews) {
     if (stored.phase !== phase) continue;
@@ -121,9 +112,12 @@ function mapSubmission(
   const teamName = text(values[field.teamName]) || "Unnamed team";
   const preview = attachment(values[field.preview]);
   const teamPhoto = attachment(values[field.teamPhoto]);
-  const demo = attachment(
+  const uploadedDemo = attachment(
     values[field.demoUrl] ?? values["Video Demo"] ?? values.Demo,
   );
+  const demo = uploadedDemo.url
+    ? uploadedDemo
+    : attachment(values[field.demoVideoUrl]);
   const reviews = reviewsForPhase(storedReviews, "preliminary");
   const finalReviews = reviewsForPhase(storedReviews, "final");
   const rawStatus = normalizeStatus(values[field.status]);
@@ -140,12 +134,12 @@ function mapSubmission(
     submitterNames: text(values[field.submitters]),
     contactEmail: text(values[field.email]),
     attendance: text(values[field.attendance]),
-    oneLiner:
-      text(values[field.oneLiner]) || text(values[field.description]),
+    oneLiner: text(values[field.oneLiner]) || text(values[field.description]),
     description: text(values[field.description]),
     previewImageUrl: preview.url,
     teamPhotoUrl: teamPhoto.url,
     demoUrl: demo.url,
+    demoVideoUrl: text(values[field.demoVideoUrl]),
     demoType: demo.type,
     demoFilename: demo.filename,
     repositoryUrl: text(values[field.repositoryUrl]),
@@ -156,9 +150,7 @@ function mapSubmission(
     claimedAt: text(values[field.claimedAt]),
     completedAt:
       status === "completed"
-        ? text(values[field.completedAt]) ||
-          reviews.at(-1)?.completedAt ||
-          ""
+        ? text(values[field.completedAt]) || reviews.at(-1)?.completedAt || ""
         : "",
     progressScore: reviews.length ? aggregate.progress : null,
     practicalityScore: reviews.length ? aggregate.practicality : null,
@@ -183,9 +175,7 @@ function groupReviews(reviews: StoredReview[]) {
   return result;
 }
 
-export class AirtableSubmissionRepository
-  implements SubmissionRepository
-{
+export class AirtableSubmissionRepository implements SubmissionRepository {
   readonly demoMode = false;
   private readonly submissions: AirtableClient;
   private readonly reviews: AirtableReviewRepository;
@@ -234,11 +224,7 @@ export class AirtableSubmissionRepository
     return mapSubmission(verified, reviews);
   }
 
-  async saveReview(
-    id: string,
-    phase: ReviewPhase,
-    review: SubmissionReview,
-  ) {
+  async saveReview(id: string, phase: ReviewPhase, review: SubmissionReview) {
     await this.reviews.upsert(id, phase, review);
   }
 
@@ -302,11 +288,7 @@ export function airtableRepositoryFromContext() {
       "The Airtable submission and review tables are not configured.",
     );
   }
-  return new AirtableSubmissionRepository(
-    baseId,
-    tableName,
-    reviewsTableName,
-  );
+  return new AirtableSubmissionRepository(baseId, tableName, reviewsTableName);
 }
 
 export function airtableIsConfigured() {
@@ -321,9 +303,7 @@ export function airtableIsConfigured() {
     );
   }
   if (!/^app[a-zA-Z0-9]+$/.test(baseId)) {
-    throw new ConfigurationError(
-      "The configured Airtable base ID is invalid.",
-    );
+    throw new ConfigurationError("The configured Airtable base ID is invalid.");
   }
   return true;
 }
