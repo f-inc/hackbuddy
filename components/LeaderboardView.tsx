@@ -1,6 +1,7 @@
 "use client";
 
 import "./winner-presentation.css";
+import "./top-seven-presentation.css";
 import { FinalVotingPanel } from "@/components/FinalVotingPanel";
 import { formatNormalizedScore } from "@/domain/normalization";
 import Image from "next/image";
@@ -647,6 +648,7 @@ export function LeaderboardView({
   const finalState = finals;
   const livePodium = isWinners && finalState.started && !finalState.publishedAt;
   const showingTopThree = isWinners;
+  const presentingFinalists = presenting && view === "top-seven";
   const results = isWinners
     ? finalState.topThree
     : view === "top-seven"
@@ -730,9 +732,10 @@ export function LeaderboardView({
             />
           ) : (
             <span className="tv-team-photo fallback">
-              {(result.submitterNames || result.teamName)
-                .slice(0, 1)
-                .toUpperCase()}
+              {(presentingFinalists
+                ? result.projectName
+                : result.submitterNames || result.teamName
+              ).slice(0, 1).toUpperCase()}
             </span>
           )}
           <span className="tv-builders-copy">
@@ -773,9 +776,15 @@ export function LeaderboardView({
           <span aria-hidden className="brand-mark small" />
           <div>
             <span className="eyebrow">{hackathonName || "HackBuddy"}</span>
-            <h1>{heading}</h1>
+            <h1>{presentingFinalists ? "The finalists" : heading}</h1>
           </div>
         </div>
+        {presentingFinalists && (
+          <div className="tv-showcase-label">
+            <span>Top {JUDGING_POLICY.finals.finalistCount}</span>
+            <small>Finalist showcase</small>
+          </div>
+        )}
         <div className="tv-leaderboard-actions">
           <span
             className={`results-live${presenting && livePodium ? " tv-live-status" : ""}`}
@@ -844,7 +853,7 @@ export function LeaderboardView({
 
       {error && <div className="error-banner page-error">{error}</div>}
 
-      {finalState.publishedAt && (
+      {finalState.publishedAt && !presentingFinalists && (
         <p>Published {new Date(finalState.publishedAt).toLocaleString()}</p>
       )}
       <section className="final-round-status">
@@ -1150,7 +1159,9 @@ export function LeaderboardView({
               ? finalState.started
                 ? "Live standings · voting remains open"
                 : "Waiting for second-pass voting"
-              : `${results.length} finalist teams shown`}
+              : presentingFinalists
+                ? `${results.length} finalists · Listed alphabetically`
+                : `${results.length} finalist teams shown`}
         </span>
       </footer>
     </main>
