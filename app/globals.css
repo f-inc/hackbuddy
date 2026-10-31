@@ -4000,6 +4000,14 @@ td:first-child span {
   display: none;
 }
 
+.tv-leaderboard.is-presenting .results-live.tv-live-status {
+  display: inline-flex;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
 .tv-leaderboard.is-presenting .tv-ranking {
   gap: clamp(7px, 0.8vh, 11px);
 }
@@ -5782,4 +5790,80 @@ td:first-child span {
 }
 @media (prefers-reduced-motion: reduce) {
   .history-project-row { transition: none; }
+}
+
+/* Dedicated finalist showcase and round descriptions. */
+.finals-view-description {
+  margin: 0 0 24px;
+  color: rgb(0 0 0 / 40%);
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 16px;
+  letter-spacing: -0.04em;
+  max-width: 750px;
+}
+
+[data-finals-view="top-seven"] .tv-ranking {
+  gap: 15px;
+}
+
+[data-finals-view="top-seven"] .tv-ranking li {
+  border: 0;
+  border-radius: 15px;
+  background: #f1f1f1;
+  box-shadow: none;
+}
+
+.tv-leaderboard .tv-finalist-card.finalist-showcase-card {
+  grid-template-columns: 50px minmax(0, 1.4fr) minmax(180px, 1fr);
+  min-height: 90px;
+  padding: 15px 20px;
+}
+
+.finalist-place {
+  color: rgb(0 0 0 / 40%);
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: -0.04em;
+}
+
+[data-finals-view="top-seven"] .tv-project,
+[data-finals-view="top-seven"] .tv-builders-copy {
+  min-width: 0;
+  font-family: "Instrument Sans", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+[data-finals-view="top-seven"] .tv-project strong {
+  color: #000;
+  font-weight: 500;
+}
+
+@media (max-width: 620px) {
+  .tv-leaderboard .tv-finalist-card.finalist-showcase-card {
+    grid-template-columns: 35px minmax(0, 1fr);
+    gap: 10px 15px;
+  }
+
+  .finalist-showcase-card .finalist-place {
+    grid-row: 1 / 3;
+    align-self: start;
+  }
+
+  .finalist-showcase-card .tv-builders {
+    grid-column: 2;
+  }
+}
+
+.tv-leaderboard .tv-leaderboard-title h1 {
+  font-family: "Instrument Serif", serif;
+  font-weight: 400;
+  letter-spacing: 0;
+  -webkit-text-stroke: 0.05em currentColor;
+}
+
+.tv-leaderboard.is-presenting .tv-finalist-card.finalist-showcase-card {
+  min-height: inherit;
+  padding-top: 9px;
+  padding-bottom: 9px;
 }

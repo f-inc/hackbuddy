@@ -9,20 +9,13 @@ export function finalsForViewer(
   const clean = (entry: FinalsState["finalists"][number]) => ({
     ...entry,
     finalReviews: [],
-    votePoints: undefined,
-    firstVotes: undefined,
-    secondVotes: undefined,
-    thirdVotes: undefined,
   });
   return {
     ...state,
     submittedJudges: undefined,
-    standings: [],
-    completedReviews: state.ownBallot ? 1 : 0,
-    requiredReviews: 1,
-    allComplete: Boolean(state.ownBallot),
+    standings: state.standings?.map(clean),
     finalists: state.finalists.map(clean),
-    topThree: state.publishedAt ? state.topThree.map(clean) : [],
+    topThree: state.topThree.map(clean),
   };
 }
 

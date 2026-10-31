@@ -215,7 +215,9 @@ export function LeaderboardView({
   hackathon,
   hackathonName,
   hackathonImageUrl,
+  view = "top-seven",
 }: {
+  view?: "top-seven" | "second-pass" | "winners";
   hackathon?: string;
   hackathonName?: string;
   hackathonImageUrl?: string;
@@ -231,7 +233,8 @@ export function LeaderboardView({
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
   const [presenting, setPresenting] = useState(false);
-  const [showAllFinalists, setShowAllFinalists] = useState(false);
+  const isSecondPass = view === "second-pass";
+  const isWinners = view === "winners";
   const [selectedFinalist, setSelectedFinalist] =
     useState<FinalistEntry | null>(null);
   const [inspectingId, setInspectingId] = useState("");
@@ -263,7 +266,9 @@ export function LeaderboardView({
     async (quiet = false) => {
       if (!quiet) setLoading(true);
       try {
-        const response = await fetch(`${apiBase}/finals`);
+        const response = await fetch(`${apiBase}/finals`, {
+          cache: "no-store",
+        });
         if (response.status === 401) {
           window.location.href = hackathon ? `/${hackathon}` : "/";
           return;
@@ -303,7 +308,7 @@ export function LeaderboardView({
       };
       if (!hackathon && session.role === "judge") {
         window.location.href = session.hackathon
-          ? `/${session.hackathon}/leaderboard`
+          ? `/${session.hackathon}/${isSecondPass ? "second-pass" : isWinners ? "winners" : "leaderboard"}`
           : "/";
         return;
       }
@@ -321,9 +326,9 @@ export function LeaderboardView({
     }
 
     void initialize();
-    const interval = window.setInterval(() => void refresh(true), 10_000);
+    const interval = window.setInterval(() => void refresh(true), 5_000);
     return () => window.clearInterval(interval);
-  }, [hackathon, refresh]);
+  }, [hackathon, refresh, isSecondPass, isWinners]);
 
   useEffect(() => {
     function syncFullscreenState() {
@@ -372,12 +377,7 @@ export function LeaderboardView({
   }, [presenting]);
 
   useEffect(() => {
-    if (
-      !presenting ||
-      role !== "admin" ||
-      !finals?.publishedAt ||
-      showAllFinalists
-    ) {
+    if (!presenting || role !== "admin" || !ceremonyMode || !isWinners) {
       return;
     }
 
@@ -412,14 +412,7 @@ export function LeaderboardView({
 
     document.addEventListener("keydown", handleRevealKey);
     return () => document.removeEventListener("keydown", handleRevealKey);
-  }, [
-    finals?.publishedAt,
-    launchConfetti,
-    presenting,
-    revealStage,
-    role,
-    showAllFinalists,
-  ]);
+  }, [ceremonyMode, launchConfetti, presenting, revealStage, role, isWinners]);
 
   useEffect(() => {
     if (!selectedFinalist && !inspectingId) return;
@@ -481,7 +474,12 @@ export function LeaderboardView({
       return;
     }
 
-    if (role === "admin" && finals?.publishedAt && !showAllFinalists) {
+    if (
+      role === "admin" &&
+      finals &&
+      Boolean(finals.publishedAt) &&
+      isWinners
+    ) {
       if (ceremonyTimer.current) {
         window.clearTimeout(ceremonyTimer.current);
         ceremonyTimer.current = null;
@@ -602,7 +600,6 @@ export function LeaderboardView({
       setFinals(data.finals);
       setSelectedJudges(data.finals.judges);
       rosterInitialized.current = true;
-      setShowAllFinalists(false);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -633,16 +630,25 @@ export function LeaderboardView({
   if (!name || loading || !finals) return <LoadingScreen />;
 
   const finalState = finals;
-  const results =
-    Boolean(finalState.publishedAt) && !showAllFinalists
-      ? finalState.topThree
-      : finalState.finalists;
-  const showingTopThree = Boolean(finalState.publishedAt) && !showAllFinalists;
-  const heading = Boolean(finalState.publishedAt)
-    ? showAllFinalists
-      ? "Final judging"
-      : `Top ${JUDGING_POLICY.finals.winnerCount} finalists`
-    : `Top ${JUDGING_POLICY.finals.finalistCount} teams`;
+  const livePodium = isWinners && finalState.started && !finalState.publishedAt;
+  const showingTopThree = isWinners;
+  const results = isWinners ? finalState.topThree : finalState.finalists;
+  const heading = isWinners
+    ? "Winners"
+    : isSecondPass
+      ? "Second pass judging"
+      : `Top ${JUDGING_POLICY.finals.finalistCount}`;
+  const description = isWinners
+    ? finalState.publishedAt
+      ? "The final podium, confirmed by the organizer."
+      : "Live podium standings. Results are provisional until the organizer publishes them."
+    : isSecondPass
+      ? finalState.publishedAt
+        ? "Voting is closed. You can still review the finalist submissions below."
+        : "Review the finalists and choose your first, second, and third place."
+      : finalState.started || finalState.publishedAt
+        ? "Meet the finalists selected from preliminary judging."
+        : "The current shortlist from preliminary judging. Teams may change until the second pass starts.";
   const availableJudgeNames = Array.from(
     new Set([...finalState.judges, ...selectedJudges]),
   ).sort();
@@ -653,6 +659,16 @@ export function LeaderboardView({
         <div className="tv-project">
           <strong>{result.projectName}</strong>
           <span>{result.oneLiner || result.teamName}</span>
+          {livePodium && showingTopThree && (
+            <span className="live-podium-points">
+              {result.votePoints ?? 0} points
+              {finalState.standings?.some(
+                (other) =>
+                  other.id !== result.id &&
+                  other.votePoints === result.votePoints,
+              ) && " · Tied"}
+            </span>
+          )}
           {finalState.scoringPolicy === "normalized-v1" &&
             !(showingTopThree && finalState.votingMode === "podium-v1") && (
               <small className="normalized-finalist-score">
@@ -700,7 +716,7 @@ export function LeaderboardView({
             <strong>{result.submitterNames || result.teamName}</strong>
           </span>
         </div>
-        {finalState.started && !finalState.publishedAt && (
+        {isSecondPass && finalState.started && !finalState.publishedAt && (
           <span
             className={`final-review-status${
               result.reviewedByYou ? " complete" : ""
@@ -719,10 +735,11 @@ export function LeaderboardView({
 
   const board = (
     <main
+      data-finals-view={view}
       className={`tv-leaderboard${presenting ? " is-presenting" : ""}${
         showingTopThree ? " is-top-three" : ""
       }`}
-      id="top-ten-leaderboard"
+      id="finals-view"
     >
       {showingTopThree && celebrating && (
         <ConfettiCanvas key={`confetti-${confettiRun}`} />
@@ -736,33 +753,30 @@ export function LeaderboardView({
           </div>
         </div>
         <div className="tv-leaderboard-actions">
-          <span className="results-live">
-            <span />
-            {finalState.publishedAt
-              ? "Published and locked"
-              : "Live · refreshes every 10 seconds"}
-          </span>
-          <button
-            className="secondary-button tv-present-button"
-            onClick={togglePresentation}
-            type="button"
+          <span
+            className={`results-live${presenting && livePodium ? " tv-live-status" : ""}`}
           >
-            {presenting ? "Exit presentation" : "Present on TV"}
-            <span aria-hidden>{presenting ? "↙" : "↗"}</span>
-          </button>
-          {Boolean(finalState.publishedAt) && !presenting && (
+            <span />
+            {presenting && livePodium
+              ? "Provisional · updates live"
+              : finalState.publishedAt
+                ? "Published and locked"
+                : "Live · refreshes every 5 seconds"}
+          </span>
+          {!isSecondPass && (
             <button
               className="secondary-button tv-present-button"
-              onClick={() => setShowAllFinalists((current) => !current)}
+              onClick={togglePresentation}
               type="button"
             >
-              {showAllFinalists
-                ? `Show top ${JUDGING_POLICY.finals.winnerCount}`
-                : "Review all finalists"}
+              {presenting ? "Exit presentation" : "Present on TV"}
+              <span aria-hidden>{presenting ? "↙" : "↗"}</span>
             </button>
           )}
         </div>
       </header>
+
+      {!presenting && <p className="finals-view-description">{description}</p>}
 
       {error && <div className="error-banner page-error">{error}</div>}
 
@@ -778,10 +792,8 @@ export function LeaderboardView({
             {finalState.publishedAt
               ? "Results published and locked"
               : finalState.started
-                ? Boolean(finalState.publishedAt)
-                  ? "Final judging complete · awaiting publication"
-                  : "Final judging is live"
-                : "Final judging has not started"}
+                ? "Second pass is live"
+                : "Second pass has not started"}
           </strong>
         </div>
         <div className="final-round-status-meta">
@@ -789,14 +801,18 @@ export function LeaderboardView({
             {finalState.started
               ? role === "admin"
                 ? `${finalState.completedReviews} of ${finalState.requiredReviews} ballots submitted.`
-                : "Choose your top three finalists and submit your ballot below."
-              : role === "admin"
+                : isSecondPass && !finalState.publishedAt
+                  ? "Choose your top three finalists and submit your ballot below."
+                  : `${finalState.completedReviews} of ${finalState.requiredReviews} ballots submitted.`
+              : role === "admin" && isSecondPass
                 ? finalState.canStart
                   ? `Starting will freeze these teams and include ${finalState.judges.length} preliminary judges.`
                   : "Final judging can start after at least three projects receive completed preliminary scores."
-                : "An administrator will start the final round when presentations begin."}
+                : "The second pass will begin when the organizer confirms the finalists and judge roster."}
           </p>
-          {finalState.started &&
+          {isSecondPass &&
+            !presenting &&
+            finalState.started &&
             role === "admin" &&
             !finalState.publishedAt && (
               <div className="final-round-admin-actions">
@@ -838,122 +854,139 @@ export function LeaderboardView({
         </div>
       </section>
 
-      {!presenting && !finalState.started && role === "admin" && (
-        <section
-          aria-labelledby="final-roster-title"
-          className="final-judge-roster card"
-        >
-          <div className="final-roster-header">
-            <div>
-              <span className="eyebrow">Admin setup</span>
-              <h2 id="final-roster-title">Final judge roster</h2>
-              <p>
-                Choose who can vote on the Top{" "}
-                {JUDGING_POLICY.finals.finalistCount} team. This roster locks
-                when final judging starts.
-              </p>
+      {isSecondPass &&
+        !presenting &&
+        !finalState.started &&
+        role === "admin" && (
+          <section
+            aria-labelledby="final-roster-title"
+            className="final-judge-roster card"
+          >
+            <div className="final-roster-header">
+              <div>
+                <span className="eyebrow">Admin setup</span>
+                <h2 id="final-roster-title">Second-pass judge roster</h2>
+                <p>
+                  Choose who can vote on the Top{" "}
+                  {JUDGING_POLICY.finals.finalistCount} teams. This roster locks
+                  when final judging starts.
+                </p>
+              </div>
+              <span className="final-roster-count">
+                {selectedJudges.length} selected
+              </span>
             </div>
-            <span className="final-roster-count">
-              {selectedJudges.length} selected
-            </span>
-          </div>
 
-          <div className="final-roster-options">
-            {availableJudgeNames.map((judge) => {
-              const selected = selectedJudges.includes(judge);
-              const detected = finalState.judges.includes(judge);
-              return (
-                <label
-                  className={`final-judge-option${selected ? " selected" : ""}`}
-                  key={judge}
+            <div className="final-roster-options">
+              {availableJudgeNames.map((judge) => {
+                const selected = selectedJudges.includes(judge);
+                const detected = finalState.judges.includes(judge);
+                return (
+                  <label
+                    className={`final-judge-option${selected ? " selected" : ""}`}
+                    key={judge}
+                  >
+                    <input
+                      checked={selected}
+                      onChange={(event) =>
+                        toggleJudge(judge, event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span className="judge-chip">
+                      {judge.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span>
+                      <strong>{judge}</strong>
+                      <small>
+                        {detected ? "Preliminary judge" : "Added manually"}
+                      </small>
+                    </span>
+                    <b aria-hidden>{selected ? "✓" : ""}</b>
+                  </label>
+                );
+              })}
+            </div>
+
+            <form className="final-add-judge" onSubmit={addJudge}>
+              <label htmlFor="new-final-judge">Add another login name</label>
+              <div>
+                <input
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  id="new-final-judge"
+                  onChange={(event) => setNewJudgeName(event.target.value)}
+                  placeholder="e.g. maya chen"
+                  value={newJudgeName}
+                />
+                <button
+                  className="secondary-button"
+                  disabled={!newJudgeName.trim()}
+                  type="submit"
                 >
-                  <input
-                    checked={selected}
-                    onChange={(event) =>
-                      toggleJudge(judge, event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                  <span className="judge-chip">
-                    {judge.slice(0, 1).toUpperCase()}
-                  </span>
-                  <span>
-                    <strong>{judge}</strong>
-                    <small>
-                      {detected ? "Preliminary judge" : "Added manually"}
-                    </small>
-                  </span>
-                  <b aria-hidden>{selected ? "✓" : ""}</b>
-                </label>
-              );
-            })}
-          </div>
+                  Add judge
+                </button>
+              </div>
+              <small>
+                Names must match what each judge enters at sign-in.
+                Capitalization does not matter.
+              </small>
+            </form>
 
-          <form className="final-add-judge" onSubmit={addJudge}>
-            <label htmlFor="new-final-judge">Add another login name</label>
-            <div>
-              <input
-                autoCapitalize="none"
-                autoComplete="off"
-                id="new-final-judge"
-                onChange={(event) => setNewJudgeName(event.target.value)}
-                placeholder="e.g. maya chen"
-                value={newJudgeName}
-              />
+            <div className="final-roster-actions">
+              <p>
+                {finalState.canStart
+                  ? `${selectedJudges.length} judges will each choose a podium from ${finalState.finalists.length} finalists.`
+                  : "Final judging can start after at least three projects receive completed preliminary scores."}
+              </p>
               <button
-                className="secondary-button"
-                disabled={!newJudgeName.trim()}
-                type="submit"
+                className="primary-button tv-start-button"
+                disabled={
+                  starting || !finalState.canStart || !selectedJudges.length
+                }
+                onClick={startFinals}
+                type="button"
               >
-                Add judge
+                {starting ? "Starting…" : "Confirm roster & start second pass"}
+                {!starting && <span aria-hidden>→</span>}
               </button>
             </div>
-            <small>
-              Names must match what each judge enters at sign-in. Capitalization
-              does not matter.
-            </small>
-          </form>
+          </section>
+        )}
 
-          <div className="final-roster-actions">
-            <p>
-              {finalState.canStart
-                ? `${selectedJudges.length} judges will each choose a podium from ${finalState.finalists.length} finalists.`
-                : "Final judging can start after at least three projects receive completed preliminary scores."}
-            </p>
-            <button
-              className="primary-button tv-start-button"
-              disabled={
-                starting || !finalState.canStart || !selectedJudges.length
-              }
-              onClick={startFinals}
-              type="button"
-            >
-              {starting ? "Starting…" : "Confirm roster & start finals"}
-              {!starting && <span aria-hidden>→</span>}
-            </button>
-          </div>
-        </section>
+      {livePodium && showingTopThree && !presenting && (
+        <p className="live-podium-note" role="status">
+          {finalState.completedReviews} of {finalState.requiredReviews} ballots
+          submitted.
+          <span className="live-podium-detail">
+            {" "}
+            These standings update as judges submit or revise their votes. Tied
+            points are marked; order within a tie is provisional. No results are
+            locked.
+          </span>
+        </p>
       )}
-
-      {finalState.started && !finalState.publishedAt && !presenting && (
-        <FinalVotingPanel
-          key={`${finalState.startedAt}:${finalState.ownBallot?.submittedAt ?? "draft"}`}
-          finals={finalState}
-          admin={role === "admin"}
-          apiBase={apiBase}
-          onInspect={(id) => void inspectSubmission(id)}
-          onUpdate={setFinals}
-        />
+      {isSecondPass && finalState.started && !finalState.publishedAt && (
+        <div>
+          <FinalVotingPanel
+            key={`${finalState.startedAt}:${finalState.ownBallot?.submittedAt ?? "draft"}`}
+            finals={finalState}
+            admin={role === "admin"}
+            apiBase={apiBase}
+            onInspect={(id) => void inspectSubmission(id)}
+            onUpdate={setFinals}
+          />
+        </div>
       )}
-      {finalState.started &&
-      !finalState.publishedAt &&
-      !presenting ? null : results.length ? (
+      {isSecondPass &&
+      finalState.started &&
+      !finalState.publishedAt ? null : results.length ? (
         <ol
           className={`tv-ranking${showingTopThree ? " top-three-ranking" : ""}`}
         >
           {results.map((result, index) => (
             <li
-              className={`${result.reviewedByYou ? "reviewed-by-you" : ""}${
+              className={`${isSecondPass && result.reviewedByYou ? "reviewed-by-you" : ""}${
                 showingTopThree
                   ? ` podium-place podium-place-${index + 1}${
                       ceremonyMode
@@ -966,13 +999,23 @@ export function LeaderboardView({
               }`}
               key={result.id}
             >
-              <div className="tv-finalist-card is-clickable">
+              <div
+                className={`tv-finalist-card is-clickable${!showingTopThree ? " finalist-showcase-card" : ""}`}
+              >
                 <button
                   aria-label={`View ${result.projectName} submission`}
                   className="tv-finalist-open"
                   onClick={() => void inspectSubmission(result.id)}
                   type="button"
                 />
+                {!showingTopThree && (
+                  <span
+                    className="finalist-place"
+                    aria-label={`Finalist ${index + 1}`}
+                  >
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                )}
                 {showingTopThree && (
                   <span
                     aria-label={
@@ -1010,16 +1053,18 @@ export function LeaderboardView({
       ) : (
         <section className="tv-empty card">
           <span>★</span>
-          <h2>Results are coming</h2>
+          <h2>{isWinners ? "The podium is coming" : "Finalists are coming"}</h2>
           <p>
-            The top {JUDGING_POLICY.finals.finalistCount} will appear as
-            projects finish all {JUDGING_POLICY.preliminary.requiredReviews}{" "}
-            reviews.
+            {isWinners
+              ? finalState.started
+                ? "Live standings will appear after the first final ballot is submitted."
+                : "The podium will appear here once the second pass begins and judges submit their votes."
+              : `The top ${JUDGING_POLICY.finals.finalistCount} will appear as projects finish all ${JUDGING_POLICY.preliminary.requiredReviews} reviews.`}
           </p>
         </section>
       )}
 
-      {showingTopThree && (
+      {showingTopThree && results.length > 0 && (
         <section className="tv-winner-sponsors" aria-label="Event sponsors">
           <p>Sponsored by</p>
           <div className="tv-sponsor-logos">
@@ -1043,9 +1088,13 @@ export function LeaderboardView({
       <footer className="tv-leaderboard-footer">
         <span>HackBuddy</span>
         <span>
-          {Boolean(finalState.publishedAt) && !showAllFinalists
+          {Boolean(finalState.publishedAt) && isWinners
             ? `${JUDGING_POLICY.finals.winnerCount} winners confirmed by the organizer`
-            : `${results.length} finalist teams shown`}
+            : showingTopThree
+              ? finalState.started
+                ? "Live standings · voting remains open"
+                : "Waiting for second-pass voting"
+              : `${results.length} finalist teams shown`}
         </span>
       </footer>
     </main>

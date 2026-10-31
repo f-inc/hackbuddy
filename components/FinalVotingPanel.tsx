@@ -194,7 +194,7 @@ export function FinalVotingPanel({
           <div className="podium-table-scroll">
             <table>
               <caption>
-                Organizer view · tied totals await your final decision
+                Organizer view · live points; tied totals are marked
               </caption>
               <thead>
                 <tr>
@@ -228,53 +228,59 @@ export function FinalVotingPanel({
               </tbody>
             </table>
           </div>
-          <h3>Final say</h3>
-          <p>
-            Leave these empty to publish the points leaders. To resolve a tie or
-            use your veto, choose the final podium here. You can publish without
-            waiting for every judge.
-          </p>
-          <div className="podium-override">
-            {places.map((place, index) => (
-              <label key={place}>
-                {place} place
-                <select
-                  value={winners[index]}
-                  disabled={saving}
-                  onChange={(event) =>
-                    setWinners((current) =>
-                      current.map((id, slot) =>
-                        slot === index ? event.target.value : id,
-                      ),
-                    )
-                  }
-                >
-                  <option value="">Use vote results</option>
-                  {finals.finalists.map((entry) => (
-                    <option
-                      key={entry.id}
-                      value={entry.id}
-                      disabled={
-                        winners.includes(entry.id) &&
-                        winners[index] !== entry.id
-                      }
-                    >
-                      {entry.projectName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </div>
-          <button
-            type="button"
-            disabled={
-              saving || !finals.completedReviews || (override && !validOverride)
-            }
-            onClick={() => void save(true)}
-          >
-            {saving ? "Saving…" : "Publish and lock final podium"}
-          </button>
+          <details className="podium-archive">
+            <summary>Archive and lock results (optional)</summary>
+            <h3>Final say</h3>
+            <p>
+              Live winners update automatically without publishing. Only use
+              this to save a permanent result and stop ballot changes. Leave
+              these empty to use the points leaders, or choose a podium to
+              resolve a tie.
+            </p>
+            <div className="podium-override">
+              {places.map((place, index) => (
+                <label key={place}>
+                  {place} place
+                  <select
+                    value={winners[index]}
+                    disabled={saving}
+                    onChange={(event) =>
+                      setWinners((current) =>
+                        current.map((id, slot) =>
+                          slot === index ? event.target.value : id,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="">Use vote results</option>
+                    {finals.finalists.map((entry) => (
+                      <option
+                        key={entry.id}
+                        value={entry.id}
+                        disabled={
+                          winners.includes(entry.id) &&
+                          winners[index] !== entry.id
+                        }
+                      >
+                        {entry.projectName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled={
+                saving ||
+                !finals.completedReviews ||
+                (override && !validOverride)
+              }
+              onClick={() => void save(true)}
+            >
+              {saving ? "Saving…" : "Archive and lock final podium"}
+            </button>
+          </details>
         </section>
       )}
       {error && (

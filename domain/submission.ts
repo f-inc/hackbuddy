@@ -45,6 +45,7 @@ export type SubmissionProject = {
   previewImageUrl: string;
   teamPhotoUrl: string;
   demoUrl: string;
+  demoVideoUrl?: string;
   demoType: string;
   demoFilename: string;
   repositoryUrl: string;

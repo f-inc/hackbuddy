@@ -153,7 +153,7 @@ export function JudgingView({
           ? Number(reviewParam)
           : null;
       if (isFinalMode) {
-        window.location.replace(`${pageBase}/leaderboard`);
+        window.location.replace(`${pageBase}/second-pass`);
         return;
       }
       if (isFinalMode && submissionId) {
@@ -381,7 +381,7 @@ export function JudgingView({
       if (!response.ok) throw new Error(result.error);
       setTransitionState("success");
       await new Promise((resolve) => window.setTimeout(resolve, 900));
-      window.location.href = `${pageBase}/leaderboard`;
+      window.location.href = `${pageBase}/second-pass`;
     } catch (caught) {
       setTransitionState("idle");
       setTransitioning(false);
@@ -437,7 +437,7 @@ export function JudgingView({
                   ? "Inspect submitted score"
                   : inspectionMode
                     ? "Inspect judging session"
-                    : "Judging"}
+                    : "First pass judging"}
             </h1>
           </div>
           <div className="queue-progress">
@@ -620,8 +620,7 @@ export function JudgingView({
                       {finalMode ? (
                         <>
                           Score the team’s live presentation. You can return and
-                          edit this review from the Top{" "}
-                          {JUDGING_POLICY.finals.finalistCount} tab.
+                          edit this review from the Second pass tab.
                         </>
                       ) : editingReviewIndex !== null ? (
                         <>
@@ -661,9 +660,9 @@ export function JudgingView({
                   {finalMode && (
                     <a
                       className="back-to-dashboard"
-                      href={`${pageBase}/leaderboard`}
+                      href={`${pageBase}/second-pass`}
                     >
-                      ← Back to Top {JUDGING_POLICY.finals.finalistCount}
+                      ← Back to Second pass
                     </a>
                   )}
                   {!finalMode && editingReviewIndex !== null && (

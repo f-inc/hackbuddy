@@ -32,18 +32,12 @@ function repositoryDetails(value: string) {
   }
 }
 
-export function SubmissionDetails({
-  submission,
-}: {
-  submission: Submission;
-}) {
+export function SubmissionDetails({ submission }: { submission: Submission }) {
   const [showTeamPhoto, setShowTeamPhoto] = useState(false);
   const repositoryUrl = submission.repositoryUrl
     ? externalUrl(submission.repositoryUrl)
     : "";
-  const repository = repositoryUrl
-    ? repositoryDetails(repositoryUrl)
-    : null;
+  const repository = repositoryUrl ? repositoryDetails(repositoryUrl) : null;
   const isVideo =
     submission.demoType.startsWith("video/") ||
     Boolean(submission.demoUrl.match(/\.(mp4|webm|mov)(?:\?|$)/i));
@@ -113,11 +107,34 @@ export function SubmissionDetails({
             />
           ) : (
             <div className="media-placeholder">
-              <span>No media preview submitted</span>
+              <span>
+                {submission.demoUrl
+                  ? "Watch the demo using the link below"
+                  : "No media preview submitted"}
+              </span>
             </div>
           )}
 
           <div className="media-actions">
+            {submission.demoUrl &&
+              submission.demoUrl !== submission.demoVideoUrl && (
+                <a
+                  href={externalUrl(submission.demoUrl)}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Open uploaded demo video ↗
+                </a>
+              )}
+            {submission.demoVideoUrl && (
+              <a
+                href={externalUrl(submission.demoVideoUrl)}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Watch submitted video link ↗
+              </a>
+            )}
             {submission.previewImageUrl && (
               <a
                 href={submission.previewImageUrl}
@@ -133,8 +150,7 @@ export function SubmissionDetails({
         <section className="submission-story">
           <div className="story-block one-liner-block">
             <p>
-              {submission.oneLiner ||
-                "No one-line description was provided."}
+              {submission.oneLiner || "No one-line description was provided."}
             </p>
           </div>
           {submission.description &&

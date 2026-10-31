@@ -164,3 +164,32 @@ test("a published podium supports missing judges and an organizer override, whil
     /podium/,
   );
 });
+
+test("live winners change with partial and revised ballots without publishing or closing voting", async () => {
+  const { service } = fixture();
+  const start = await service.start("organizer", ["maya", "alex", "absent"]);
+  const [first, second, third, fourth] = start.finalists.map(
+    (entry) => entry.id,
+  );
+  await service.submitBallot("maya", [first, second, third]);
+  let live = await service.state("organizer");
+  assert.equal(live.publishedAt, "");
+  assert.equal(live.allComplete, false);
+  assert.deepEqual(
+    live.topThree.map((entry) => entry.id),
+    [first, second, third],
+  );
+  await service.submitBallot("maya", [fourth, third, second]);
+  live = await service.state("organizer");
+  assert.deepEqual(
+    live.topThree.map((entry) => entry.id),
+    [fourth, third, second],
+  );
+  assert.equal(live.topThree[0].votePoints, 3);
+  await service.submitBallot("alex", [fourth, third, second]);
+  live = await service.state("organizer");
+  assert.equal(live.topThree[0].votePoints, 6);
+  assert.equal(live.completedReviews, 2);
+  assert.equal(live.publishedAt, "");
+  assert.equal(live.allComplete, false);
+});

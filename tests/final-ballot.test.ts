@@ -90,7 +90,7 @@ test("live 3–2–1 totals count available ballots without waiting for absent j
   );
 });
 
-test("judge responses reveal their ballot without exposing live totals or other ballots", () => {
+test("judge responses expose live aggregate standings while keeping other ballots private", () => {
   const entry = {
     id: "a",
     projectName: "a",
@@ -112,11 +112,21 @@ test("judge responses reveal their ballot without exposing live totals or other 
   } as FinalsState;
   const judge = finalsForViewer(state, false);
   assert.deepEqual(judge.ownBallot, ballot);
-  assert.deepEqual(judge.standings, []);
-  assert.deepEqual(judge.topThree, []);
+  assert.equal(judge.standings?.[0].votePoints, 3);
+  assert.deepEqual(judge.standings?.[0].finalReviews, []);
+  assert.equal(judge.topThree[0].id, "a");
+  assert.deepEqual(judge.topThree[0].finalReviews, []);
+  assert.equal(judge.completedReviews, 1);
+  assert.equal(judge.requiredReviews, 2);
+  assert.equal(judge.allComplete, false);
   assert.equal(judge.submittedJudges, undefined);
-  assert.equal(judge.finalists[0].votePoints, undefined);
+  assert.equal(judge.finalists[0].votePoints, 3);
   assert.deepEqual(judge.finalists[0].finalReviews, []);
+  const spectator = finalsForViewer({ ...state, ownBallot: null }, false);
+  assert.equal(spectator.ownBallot, null);
+  assert.equal(spectator.completedReviews, 1);
+  assert.equal(spectator.topThree[0].votePoints, 3);
+  assert.deepEqual(spectator.topThree[0].finalReviews, []);
   assert.equal(finalsForViewer(state, true), state);
   const submission = {
     finalJudging: {

@@ -27,6 +27,17 @@ share a live view of queue progress, active sessions, and current scores.
 - Path-based event workspaces such as `/nighthack3/dashboard`
 - An admin-only hackathon selector with event creation and Airtable table mapping
 
+## Judging views
+
+Each event has separate sidebar destinations:
+
+- **Judging** (`/judging`): the preliminary judging queue.
+- **Second pass** (`/second-pass`): finalist review and podium voting; organizers manage the final judge roster, start the round, and publish results here.
+- **Top 7** (`/leaderboard`): the finalist showcase, available before and after publication, with a TV presentation mode.
+- **Winners** (`/winners`): the live top-three podium for every signed-in event viewer. Standings refresh every five seconds and remain provisional until publication. Individual ballots stay private; aggregate points, ties, and ballot progress are visible.
+
+Results and Projects judged remain available for score details and review history.
+
 ## Multiple hackathons
 
 HackBuddy uses an Airtable `Hackathons` table as its event registry. Each row
