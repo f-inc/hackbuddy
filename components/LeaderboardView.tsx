@@ -1,5 +1,6 @@
 "use client";
 
+import "./winner-presentation.css";
 import { FinalVotingPanel } from "@/components/FinalVotingPanel";
 import { formatNormalizedScore } from "@/domain/normalization";
 import Image from "next/image";
@@ -376,6 +377,31 @@ export function LeaderboardView({
       document.removeEventListener("keydown", leavePresentationOnEscape);
   }, [presenting]);
 
+  const advanceReveal = useCallback(() => {
+    if (revealStage >= 3) return;
+    const nextStage = revealStage + 1;
+    setRevealStage(nextStage);
+    if (nextStage === 3) launchConfetti();
+  }, [launchConfetti, revealStage]);
+
+  const rewindReveal = useCallback(() => {
+    if (ceremonyTimer.current) {
+      window.clearTimeout(ceremonyTimer.current);
+      ceremonyTimer.current = null;
+    }
+    setCelebrating(false);
+    setRevealStage((current) => Math.max(0, current - 1));
+  }, []);
+
+  function replayReveal() {
+    if (ceremonyTimer.current) {
+      window.clearTimeout(ceremonyTimer.current);
+      ceremonyTimer.current = null;
+    }
+    setCelebrating(false);
+    setRevealStage(0);
+  }
+
   useEffect(() => {
     if (!presenting || role !== "admin" || !ceremonyMode || !isWinners) {
       return;
@@ -392,27 +418,19 @@ export function LeaderboardView({
 
       if (event.key === "ArrowRight") {
         event.preventDefault();
-        if (revealStage >= 3) return;
-        const nextStage = revealStage + 1;
-        setRevealStage(nextStage);
-        if (nextStage === 3) launchConfetti();
+        advanceReveal();
         return;
       }
 
       if (event.key === "ArrowLeft") {
         event.preventDefault();
-        if (ceremonyTimer.current) {
-          window.clearTimeout(ceremonyTimer.current);
-          ceremonyTimer.current = null;
-        }
-        setCelebrating(false);
-        setRevealStage((current) => Math.max(0, current - 1));
+        rewindReveal();
       }
     }
 
     document.addEventListener("keydown", handleRevealKey);
     return () => document.removeEventListener("keydown", handleRevealKey);
-  }, [ceremonyMode, launchConfetti, presenting, revealStage, role, isWinners]);
+  }, [ceremonyMode, advanceReveal, rewindReveal, presenting, role, isWinners]);
 
   useEffect(() => {
     if (!selectedFinalist && !inspectingId) return;
@@ -474,20 +492,17 @@ export function LeaderboardView({
       return;
     }
 
-    if (
-      role === "admin" &&
-      finals &&
-      Boolean(finals.publishedAt) &&
-      isWinners
-    ) {
-      if (ceremonyTimer.current) {
-        window.clearTimeout(ceremonyTimer.current);
-        ceremonyTimer.current = null;
-      }
-      setCelebrating(false);
-      setCeremonyMode(true);
-      setRevealStage(0);
+    if (ceremonyTimer.current) {
+      window.clearTimeout(ceremonyTimer.current);
+      ceremonyTimer.current = null;
     }
+    const revealWinners =
+      role === "admin" &&
+      isWinners &&
+      finals?.topThree.length === JUDGING_POLICY.finals.winnerCount;
+    setCelebrating(false);
+    setCeremonyMode(revealWinners);
+    setRevealStage(revealWinners ? 0 : 3);
     setPresenting(true);
     try {
       await document.documentElement.requestFullscreen();
@@ -775,6 +790,46 @@ export function LeaderboardView({
           )}
         </div>
       </header>
+
+      {presenting && ceremonyMode && (
+        <section
+          className="tv-ceremony-controls"
+          aria-label="Winner reveal controls"
+        >
+          <div>
+            <p role="status" aria-live="polite">
+              {revealStage === 0
+                ? "Ready to reveal the podium"
+                : revealStage === 3
+                  ? "All winners revealed"
+                  : `${revealStage === 1 ? "Third" : "Second"} place revealed`}
+            </p>
+            <small>
+              Use ← and → to reveal each place. Esc exits presentation.
+            </small>
+          </div>
+          <div className="tv-ceremony-buttons">
+            <button
+              type="button"
+              onClick={rewindReveal}
+              disabled={revealStage === 0}
+            >
+              ← Back
+            </button>
+            {revealStage < 3 ? (
+              <button type="button" onClick={advanceReveal}>
+                Reveal{" "}
+                {revealStage === 0 ? "3rd" : revealStage === 1 ? "2nd" : "1st"}{" "}
+                place →
+              </button>
+            ) : (
+              <button type="button" onClick={replayReveal}>
+                Replay reveal
+              </button>
+            )}
+          </div>
+        </section>
+      )}
 
       {!presenting && <p className="finals-view-description">{description}</p>}
 

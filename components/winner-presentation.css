@@ -1,0 +1,62 @@
+.tv-ceremony-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0 0 20px;
+  color: #000;
+  font-family: "Instrument Sans", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.tv-ceremony-controls p {
+  margin: 0 0 5px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.tv-ceremony-controls small {
+  color: rgb(0 0 0 / 40%);
+  font-size: 14px;
+  letter-spacing: -0.04em;
+}
+
+.tv-ceremony-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tv-ceremony-buttons button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 100px;
+  padding: 10px 20px;
+  background: #f1f1f1;
+  color: #000;
+  font:
+    500 16px/1.2 "Instrument Sans",
+    sans-serif;
+  letter-spacing: -0.04em;
+  cursor: pointer;
+}
+
+.tv-ceremony-buttons button:hover {
+  background: #e7e7e7;
+}
+
+.tv-ceremony-buttons button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tv-ceremony-buttons button:focus-visible {
+  outline: 2px solid #333;
+  outline-offset: 3px;
+}
+
+@media (max-width: 800px) {
+  .tv-ceremony-controls {
+    flex-wrap: wrap;
+  }
+}
