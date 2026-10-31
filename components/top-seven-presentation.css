@@ -1,0 +1,188 @@
+/* Full-screen finalist showcase. Every team receives equal screen space. */
+.tv-showcase-label {
+  display: none;
+}
+
+.tv-leaderboard.is-presenting[data-finals-view="top-seven"] {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(15px, 2vh, 24px);
+  height: 100dvh;
+  min-height: 640px;
+  padding: clamp(24px, 3vh, 42px) clamp(24px, 4vw, 80px);
+  background: #fff;
+  color: #000;
+  font-family: "Instrument Sans", sans-serif;
+  letter-spacing: -0.02em;
+
+  & .tv-leaderboard-header {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  & .tv-leaderboard-title .brand-mark,
+  & .tv-leaderboard-actions {
+    display: none;
+  }
+
+  & .tv-leaderboard-title .eyebrow {
+    display: block;
+    margin-bottom: 8px;
+    color: rgb(0 0 0 / 40%);
+    font-size: clamp(14px, 1vw, 18px);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  & .tv-leaderboard-title h1 {
+    font-size: clamp(40px, 5.5vh, 72px);
+    line-height: 1;
+  }
+
+  & .tv-showcase-label {
+    display: grid;
+    justify-items: end;
+    gap: 8px;
+  }
+
+  & .tv-showcase-label > span {
+    padding: 10px 24px;
+    border-radius: 100px;
+    background: #333;
+    color: #fff;
+    font-size: clamp(18px, 1.3vw, 24px);
+    font-weight: 500;
+    letter-spacing: -0.04em;
+  }
+
+  & .tv-showcase-label small {
+    color: rgb(0 0 0 / 40%);
+    font-size: 14px;
+    letter-spacing: -0.04em;
+  }
+
+  & .tv-ranking {
+    flex: 1 0 0;
+    min-height: 0;
+    grid-auto-rows: minmax(0, 1fr);
+    gap: clamp(8px, 1vh, 15px);
+  }
+
+  & .tv-ranking li {
+    min-height: 0;
+    background: #f1f1f1;
+  }
+
+  & .tv-finalist-card.finalist-showcase-card {
+    height: 100%;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: clamp(24px, 3vw, 60px);
+    padding: 10px clamp(20px, 2vw, 40px);
+  }
+
+  & .tv-finalist-card.is-clickable:hover {
+    background: #e7e7e7;
+  }
+
+  & .tv-project strong,
+  & .tv-finalist-card.is-clickable:hover .tv-project strong {
+    color: #000;
+    font-size: clamp(24px, 3.3vh, 44px);
+    font-weight: 500;
+    letter-spacing: -0.04em;
+  }
+
+  & .tv-project span {
+    margin-top: 5px;
+    color: rgb(0 0 0 / 40%);
+    font-size: clamp(14px, 1.65vh, 22px);
+    line-height: 1.35;
+    letter-spacing: -0.02em;
+  }
+
+  & .tv-builders {
+    min-width: 0;
+    gap: clamp(15px, 1.3vw, 24px);
+  }
+
+  & .tv-team-photo {
+    width: clamp(48px, 7vh, 100px);
+    height: clamp(48px, 7vh, 100px);
+    border: 0;
+    border-radius: 15px;
+    background-color: #e7e7e7;
+  }
+
+  & .tv-team-photo.fallback {
+    color: rgb(0 0 0 / 40%);
+    font-family: "Instrument Serif", serif;
+    font-size: clamp(32px, 4vh, 56px);
+    font-weight: 400;
+  }
+
+  & .tv-builders-copy small {
+    color: rgb(0 0 0 / 40%);
+    font-size: clamp(11px, 1.15vh, 16px);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    text-transform: none;
+  }
+
+  & .tv-builders-copy strong {
+    margin-top: 5px;
+    color: #000;
+    font-size: clamp(16px, 2vh, 28px);
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -0.04em;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  & .tv-leaderboard-footer {
+    flex: 0 0 auto;
+    margin: 0;
+    color: rgb(0 0 0 / 40%);
+    font-size: clamp(12px, 1.2vh, 16px);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+  }
+
+  & .tv-leaderboard-footer > span:first-child {
+    color: #000;
+    font-weight: 500;
+  }
+}
+
+/* Small screens keep readable rows and scroll instead of compressing content. */
+@media (max-width: 760px) {
+  .tv-leaderboard.is-presenting[data-finals-view="top-seven"] {
+    height: auto;
+    min-height: 100dvh;
+
+    & .tv-ranking {
+      flex: none;
+      grid-auto-rows: auto;
+    }
+
+    & .tv-finalist-card.finalist-showcase-card {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 15px;
+      padding: 20px;
+    }
+
+    & .tv-builders-copy strong {
+      font-size: 18px;
+    }
+
+    & .tv-project strong,
+    & .tv-project span {
+      white-space: normal;
+    }
+
+    & .tv-showcase-label small {
+      display: none;
+    }
+  }
+}
