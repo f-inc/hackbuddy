@@ -624,7 +624,7 @@ export function JudgingView({
                             : `Review ${Math.min(
                                 submission.reviews.length + 1,
                                 JUDGING_POLICY.preliminary.requiredReviews,
-                              )} of {JUDGING_POLICY.preliminary.requiredReviews}`}
+                              )} of ${JUDGING_POLICY.preliminary.requiredReviews}`}
                       </span>
                       <h2>
                         {finalMode
