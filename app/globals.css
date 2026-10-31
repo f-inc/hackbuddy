@@ -4158,6 +4158,38 @@ td:first-child span {
   overflow: hidden;
 }
 
+.results-search {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+  font-weight: 600;
+}
+
+.results-search input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+}
+
+.results-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.results-review-actions h2 {
+  flex-basis: 100%;
+  font-size: 16px;
+}
+
 .results-table-card .section-header {
   display: flex;
   align-items: center;

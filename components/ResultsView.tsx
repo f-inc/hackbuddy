@@ -16,10 +16,12 @@ import {
   type NormalizationDiagnostics,
 } from "@/domain/normalization";
 import type { ResultEntry, Submission } from "@/lib/types";
+import type { PendingResultEntry } from "@/domain/results";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type ResultsResponse = {
   results: ResultEntry[];
+  pendingSubmissions: PendingResultEntry[];
   demoMode: boolean;
   normalization: NormalizationDiagnostics;
   scoringPolicy: ScoringPolicy;
@@ -51,6 +53,8 @@ export function ResultsView({
   const [name, setName] = useState("");
   const [role, setRole] = useState<"judge" | "admin">("judge");
   const [results, setResults] = useState<ResultEntry[]>([]);
+  const [pendingSubmissions, setPendingSubmissions] = useState<PendingResultEntry[]>([]);
+  const [search, setSearch] = useState("");
   const [normalization, setNormalization] =
     useState<NormalizationDiagnostics | null>(null);
   const [showRaw, setShowRaw] = useState(false);
@@ -80,6 +84,7 @@ export function ResultsView({
         const data = (await response.json()) as ResultsResponse;
         if (!response.ok) throw new Error(data.error);
         setResults(data.results);
+        setPendingSubmissions(data.pendingSubmissions);
         setNormalization(data.normalization);
         setScoringPolicy(data.scoringPolicy);
         setPublishedAt(data.publishedAt);
@@ -197,10 +202,24 @@ export function ResultsView({
     };
   }, [results]);
 
-  const displayedResults =
+  const query = search.trim().toLocaleLowerCase();
+  function matchesSearch(
+    result: Pick<ResultEntry, "projectName" | "teamName" | "submitterNames" | "track" | "oneLiner">,
+    judges = "",
+  ) {
+    return [
+      result.projectName, result.teamName, result.submitterNames,
+      result.track, result.oneLiner, judges,
+    ].some((value) => value.toLocaleLowerCase().includes(query));
+  }
+  const orderedResults =
     normalized && showRaw
       ? [...results].sort((a, b) => a.rawRank - b.rawRank)
       : results;
+  const displayedResults = orderedResults.filter((result) =>
+    matchesSearch(result, result.reviews.map((review) => review.judgeName).join(" ")),
+  );
+  const displayedPending = pendingSubmissions.filter((result) => matchesSearch(result));
 
   if (!name || loading) return <LoadingScreen />;
 
@@ -221,9 +240,9 @@ export function ResultsView({
       <main className="workspace-main results-main">
         <section className="page-heading results-heading">
           <div>
-            <span className="eyebrow">Completed reviews</span>
+            <span className="eyebrow">Submissions &amp; reviews</span>
             <h1>Results</h1>
-            <p>Every completed score, judge, team, and builder in one place.</p>
+            <p>Browse every submission, including projects awaiting reviews.</p>
           </div>
           <span className="results-live">
             <span />
@@ -368,6 +387,17 @@ export function ResultsView({
           </section>
         )}
 
+        <label className="results-search">
+          <span>Search results</span>
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search projects, teams, builders, tracks, or judges"
+          />
+        </label>
+        <p role="status">{displayedResults.length + displayedPending.length} of {results.length + pendingSubmissions.length} submissions</p>
+
         <section className="results-table-card card">
           <div className="section-header">
             <div>
@@ -392,7 +422,7 @@ export function ResultsView({
             )}
           </div>
 
-          {results.length ? (
+          {displayedResults.length ? (
             <div className="results-table-scroll">
               <table className="results-table">
                 <thead>
@@ -416,14 +446,14 @@ export function ResultsView({
                   </tr>
                 </thead>
                 <tbody>
-                  {displayedResults.map((result, index) => (
+                  {displayedResults.map((result) => (
                     <tr
                       aria-label={`Inspect ${result.projectName}`}
                       className="clickable-result-row"
                       key={result.id}
                       onClick={() => void inspectSubmission(result.id)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
+                        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
                           event.preventDefault();
                           void inspectSubmission(result.id);
                         }
@@ -431,7 +461,7 @@ export function ResultsView({
                       tabIndex={0}
                     >
                       <td>
-                        <span className="result-rank">{index + 1}</span>
+                        <span className="result-rank">{orderedResults.indexOf(result) + 1}</span>
                       </td>
                       <td>
                         <div className="result-project">
@@ -565,8 +595,74 @@ export function ResultsView({
           ) : (
             <div className="panel-empty">
               <span>—</span>
-              <h3>No completed scores yet</h3>
-              <p>Finished judging sessions will appear here automatically.</p>
+              <h3>{query ? "No matching scored projects" : "No completed scores yet"}</h3>
+              <p>{query ? "Try another search." : "Finished judging sessions will appear here automatically."}</p>
+            </div>
+          )}
+        </section>
+        <section className="results-table-card card">
+          <div className="section-header">
+            <div>
+              <h2>Awaiting reviews</h2>
+              <p>Open any submission to view its project details. Rankings appear when reviews are complete.</p>
+            </div>
+          </div>
+          {displayedPending.length ? (
+            <div className="results-table-scroll">
+              <table className="results-table">
+                <thead>
+                  <tr>
+                    <th>Project &amp; team</th>
+                    <th>Builders</th>
+                    <th>Status</th>
+                    <th>Reviews</th>
+                    <th>Submission</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedPending.map((submission) => (
+                    <tr
+                      key={submission.id}
+                      className="clickable-result-row"
+                      onClick={() => void inspectSubmission(submission.id)}
+                      onKeyDown={(event) => {
+                        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                          event.preventDefault();
+                          void inspectSubmission(submission.id);
+                        }
+                      }}
+                      tabIndex={0}
+                      aria-label={`Inspect ${submission.projectName}`}
+                    >
+                      <td>
+                        <div className="result-project">
+                          <strong>{submission.projectName}</strong>
+                          <span>{submission.teamName} · {submission.track}</span>
+                        </div>
+                      </td>
+                      <td>{submission.submitterNames || "Not provided"}</td>
+                      <td>{submission.status === "in progress" ? "Review in progress" : submission.reviewCount ? "Awaiting another review" : "Not reviewed"}</td>
+                      <td>{submission.reviewCount}/{JUDGING_POLICY.preliminary.requiredReviews}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="inspect-session"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void inspectSubmission(submission.id);
+                          }}
+                        >
+                          View submission
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="panel-empty">
+              <h3>{query ? "No matching pending submissions" : "No submissions awaiting reviews"}</h3>
             </div>
           )}
         </section>
@@ -601,7 +697,29 @@ export function ResultsView({
             </header>
             <div className="submission-inspection-body">
               {inspectedSubmission ? (
-                <SubmissionDetails submission={inspectedSubmission} />
+                <>
+                  {role === "admin" && (
+                    <section className="results-review-actions" aria-label="Edit submission scores">
+                      <h2>Judge scores</h2>
+                      {publishedAt ? (
+                        <p>Published results are locked.</p>
+                      ) : inspectedSubmission.status === "in progress" ? (
+                        <p>Release the active judging session from the dashboard before editing scores.</p>
+                      ) : inspectedSubmission.reviews.length ? inspectedSubmission.reviews.map((review, index) => (
+                          <a
+                            className="submission-inspection-judge-link"
+                            key={`${review.judgeName}-${index}`}
+                            href={`${pageBase}/judging?submission=${encodeURIComponent(inspectedSubmission.id)}&review=${index}`}
+                          >
+                            Edit {review.judgeName || "Unknown judge"}’s scores · {review.totalScore}/{RUBRIC_SCORE_MAX}
+                          </a>
+                        )) : (
+                          <p>No scores yet. This submission is awaiting its first review.</p>
+                        )}
+                    </section>
+                  )}
+                  <SubmissionDetails submission={inspectedSubmission} />
+                </>
               ) : inspectionError ? (
                 <div className="panel-empty">
                   <span>!</span>

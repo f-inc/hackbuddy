@@ -61,9 +61,9 @@ export async function getDashboard(judgeName: string) {
   return dashboard.execute(judgeName, state.scoringPolicy, state.publication);
 }
 
-export async function getResultsReport() {
+export async function getResultsReport(includePending = false) {
   const state = await eventScoringRepository.read();
-  return results.report(state.scoringPolicy, state.publication);
+  return results.report(state.scoringPolicy, state.publication, undefined, includePending);
 }
 
 export async function getCompletedResults() {
