@@ -3008,6 +3008,16 @@ td:first-child span {
   width: 100%;
 }
 
+.compact-submit .skip-submission-button {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.skip-submission-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .admin-inspection-card {
   overflow: hidden;
 }

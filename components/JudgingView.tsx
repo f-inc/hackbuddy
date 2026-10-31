@@ -75,6 +75,8 @@ export function JudgingView({
     "idle" | "saving" | "success" | "exiting"
   >("idle");
   const [releasing, setReleasing] = useState(false);
+  const [skipping, setSkipping] = useState(false);
+  const [skippedIds, setSkippedIds] = useState<string[]>([]);
 
   useEffect(() => {
     document.body.classList.add("judging-scroll-lock");
@@ -82,12 +84,14 @@ export function JudgingView({
   }, []);
 
   const claim = useCallback(
-    async (showFullPageLoader = false) => {
+    async (showFullPageLoader = false, skippedIds: string[] = []) => {
       if (showFullPageLoader) setLoading(true);
       setError("");
       try {
         const response = await fetch(`${apiBase}/queue/claim`, {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skippedIds }),
         });
         if (response.status === 401) {
           window.location.href = hackathon ? `/${hackathon}` : "/";
@@ -236,7 +240,40 @@ export function JudgingView({
     return () => window.clearInterval(interval);
   }, [apiBase, finalMode, name]);
 
+  async function skipCurrentSubmission() {
+    if (!submission || submitting || skipping) return;
+    setSkipping(true);
+    setError("");
+    try {
+      const response = await fetch(`${apiBase}/queue/skip`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: submission.id }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error);
+      const nextSkippedIds = [...new Set([...skippedIds, submission.id])];
+      setSkippedIds(nextSkippedIds);
+      // The reservation is released even if loading the next project fails.
+      setSubmission(null);
+      setProgress(0);
+      setPracticality(0);
+      setComplexity(0);
+      setNotes("");
+      await claim(false, nextSkippedIds);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not skip this submission.",
+      );
+    } finally {
+      setSkipping(false);
+    }
+  }
+
   async function submitScore() {
+    if (submitting || skipping) return;
     if (!submission || !progress || !practicality || !complexity) {
       setError("Choose a score for all three rubric categories.");
       return;
@@ -256,6 +293,7 @@ export function JudgingView({
           practicality,
           complexity,
           notes,
+          skippedIds,
         }),
       });
       const result = (await response.json()) as ClaimResponse & {
@@ -462,18 +500,41 @@ export function JudgingView({
         {error && <div className="error-banner page-error">{error}</div>}
 
         <div
-          aria-busy={transitioning}
+          aria-busy={transitioning || skipping}
           className={`project-transition-shell${transitioning ? " switching" : ""}`}
         >
           {!submission ? (
             <section className="empty-state card">
               <span className="success-icon">✓</span>
-              <h2>The queue is clear</h2>
+              <h2>
+                {skipping
+                  ? "Loading the next project…"
+                  : error
+                    ? "Could not load the next project"
+                    : skippedIds.length
+                      ? "No more projects in your queue"
+                      : "The queue is clear"}
+              </h2>
               <p>
-                There are no available submissions right now. You completed{" "}
-                {completedNow} {completedNow === 1 ? "review" : "reviews"} in
+                {skippedIds.length
+                  ? "Any projects you skipped remain available for other judges. "
+                  : "There are no available submissions right now. "}
+                You completed {completedNow} {completedNow === 1 ? "review" : "reviews"} in
                 this session.
               </p>
+              {!inspectionMode && !finalMode && (
+                <button
+                  className="secondary-button"
+                  disabled={skipping || loading}
+                  onClick={() => {
+                    setSkippedIds([]);
+                    void claim(true);
+                  }}
+                  type="button"
+                >
+                  {skippedIds.length ? "Revisit skipped submissions" : "Check queue"}
+                </button>
+              )}
               <a
                 className="empty-state-results-link"
                 href={`${pageBase}/results`}
@@ -630,12 +691,13 @@ export function JudgingView({
                       ) : (
                         <>
                           This project is reserved for <strong>{name}</strong>.
+                          {" "}Skipping discards unsaved scores and notes.
                         </>
                       )}
                     </p>
                     <button
                       className="primary-button"
-                      disabled={submitting}
+                      disabled={submitting || skipping}
                       onClick={
                         finalMode
                           ? submitFinalScore
@@ -656,6 +718,17 @@ export function JudgingView({
                             : "Submit score"}
                       {!submitting && <span>→</span>}
                     </button>
+                    {!inspectionMode && !finalMode && (
+                      <button
+                        className="secondary-button skip-submission-button"
+                        disabled={submitting || skipping}
+                        onClick={skipCurrentSubmission}
+                        type="button"
+                      >
+                        {skipping ? "Skipping…" : "Skip submission"}
+                        {!skipping && <span aria-hidden>→</span>}
+                      </button>
+                    )}
                   </footer>
                   {finalMode && (
                     <a

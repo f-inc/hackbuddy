@@ -11,6 +11,9 @@ share a live view of queue progress, active sessions, and current scores.
 - Two distinct judges required before a submission is completed
 - Judges cannot review the same submission twice
 - Newest submissions are claimed first
+- First-pass judges can skip a submission without saving a score, releasing it
+  for other judges. Skipped projects are deferred for the current page session;
+  judges can revisit them when the remaining queue is clear.
 - Queue states: `available`, `in progress`, and `completed`
 - Three required 1–10 rubric scores
 - Airtable remains the source of truth

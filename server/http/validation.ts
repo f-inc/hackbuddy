@@ -78,6 +78,21 @@ export function parseReviewEditRequest(value: unknown) {
   return { ...review, reviewIndex: Number(body.reviewIndex) };
 }
 
+export function parseSkippedIds(value: unknown): string[] {
+  const body = record(value, "The request must be an object.");
+  if (body.skippedIds === undefined) return [];
+  if (!Array.isArray(body.skippedIds)) {
+    throw new ValidationError("Skipped submission IDs must be an array.");
+  }
+  return [
+    ...new Set(
+      body.skippedIds.map((id) =>
+        requiredString(id, "Skipped submission IDs are invalid.", 100),
+      ),
+    ),
+  ];
+}
+
 export function parseSubmissionIdRequest(value: unknown) {
   const body = record(value, "The request must be an object.");
   return {

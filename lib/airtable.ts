@@ -47,9 +47,17 @@ export function getQueueStats() {
   return queue.getStats();
 }
 
-export async function claimNextSubmission(judgeName: string) {
+export async function claimNextSubmission(
+  judgeName: string,
+  skippedIds: string[] = [],
+) {
   await mutableScoring();
-  return queue.claimNext(judgeName);
+  return queue.claimNext(judgeName, skippedIds);
+}
+
+export async function skipSubmission(id: string, judgeName: string) {
+  await mutableScoring();
+  return queue.skip(id, judgeName);
 }
 
 export async function completeSubmission(
