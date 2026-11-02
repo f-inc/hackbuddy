@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "next dev",
@@ -14,7 +14,8 @@
     "migrate:two-review": "node scripts/migrate-two-review-ledger.mjs",
     "setup:finals": "node scripts/setup-finals-field.mjs",
     "setup:hackathons": "node scripts/setup-hackathons-table.mjs",
-    "setup:reviews": "node scripts/setup-reviews-table.mjs"
+    "setup:reviews": "node scripts/setup-reviews-table.mjs",
+    "test:studio:http": "node scripts/test-studio-http.mjs"
   },
   "dependencies": {
     "next": "16.4.3",
