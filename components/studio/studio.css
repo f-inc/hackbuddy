@@ -254,75 +254,140 @@
 .s-hero-preview {
   background: #f1f1f1;
   border-radius: 15px;
-  padding: 35px;
+  padding: 25px;
+  min-width: 0;
 }
-.s-preview-top {
+.s-demo-heading {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin-bottom: 25px;
+  align-items: center;
+  gap: 15px;
 }
-.s-preview-top .s-tag {
+.s-demo-heading .s-tag {
   background: #fff;
 }
-.s-hero-preview h2 {
-  font-size: 58px;
-}
-.s-preview-flow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 14px;
-  margin: 25px 0;
-  color: rgba(0, 0, 0, 0.4);
-}
-.s-preview-flow span {
-  color: #000;
-}
-.s-preview-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-  margin: 25px 0;
-}
-.s-preview-stats dt {
-  font-size: 12px;
-  color: var(--s-muted);
-}
-.s-preview-stats dd {
-  margin: 5px 0 0;
+.studio .s-judging-preview h2 {
   font-size: 36px;
-  line-height: 1.2;
-  font-weight: 500;
-  letter-spacing: -0.04em;
+  margin: 20px 0 6px;
 }
-.studio .s-preview-format {
-  margin: 25px 0 0;
+.studio .s-demo-project p {
+  margin: 8px 0 15px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.studio .s-demo-project .s-demo-builder {
   font-size: 12px;
-  letter-spacing: -0.04em;
+  margin: 0;
 }
-.s-preview-mini > div strong {
-  font-weight: 500;
+.s-demo-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 8px;
+  background: #000;
 }
-.s-preview-mini > div span {
-  font-size: 13px;
+.s-demo-video-caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin: 12px 0 20px;
+  font-size: 12px;
   color: var(--s-muted);
 }
-.s-preview-mini {
-  padding: 24px;
+.s-demo-video-caption a {
+  color: #000;
+  flex-shrink: 0;
+}
+.s-demo-review {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 20px;
   border-radius: 15px;
   background: #fff;
-  margin: 30px 0 0;
 }
-.s-preview-mini > span {
+.s-demo-criterion > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 3px;
+}
+.s-demo-criterion label {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+.s-demo-criterion output {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.s-demo-criterion output span {
+  color: var(--s-muted);
+  font-size: 12px;
+}
+.studio .s-demo-slider {
+  display: block;
+  width: 100%;
+  height: 24px;
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  accent-color: #333;
+  cursor: pointer;
+}
+.s-demo-review > button {
+  width: 100%;
+  margin-top: 5px;
+}
+.studio .s-demo-disclaimer {
+  text-align: center;
+  font-size: 11px;
+  margin: 15px 0 0;
+  line-height: 1.4;
+}
+.s-demo-receipt {
+  padding: 25px 20px;
+  min-height: 275px;
+  border-radius: 15px;
+  background: #fff;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+.s-demo-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #f1f1f1;
+}
+.studio .s-demo-receipt h3 {
+  font-size: 30px;
+}
+.studio .s-demo-receipt p {
+  margin: 0;
+  font-size: 14px;
+}
+.s-demo-score-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 15px;
+  margin-bottom: 8px;
   font-size: 12px;
   color: var(--s-muted);
 }
-.s-preview-mini > div {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 15px;
-  font-size: 16px;
+.s-demo-score-summary strong {
+  color: #000;
+  margin-left: 5px;
 }
 .s-feature-grid {
   display: grid;
@@ -1392,9 +1457,6 @@
   .s-hero-preview {
     padding: 25px;
   }
-  .s-hero-preview h2 {
-    font-size: 48px;
-  }
   .s-page-heading {
     align-items: flex-start;
   }
@@ -1486,9 +1548,6 @@
   .s-hero-preview {
     max-width: 440px;
     margin: 0 10px;
-  }
-  .s-hero-preview h2 {
-    font-size: 52px;
   }
   .s-feature-grid {
     grid-template-columns: 1fr;

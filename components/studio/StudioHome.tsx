@@ -10,6 +10,7 @@ import {
 } from "@/domain/studio/model";
 import { api, ErrorMessage, Field, formats, Frame, Empty } from "./shared";
 import { WorkspaceTeam } from "./WorkspaceTeam";
+import { JudgingPreview } from "./JudgingPreview";
 type Home = {
   events: (Omit<Event, "judgePassword"> & {
     projectCount: number;
@@ -134,58 +135,7 @@ export function StudioHome() {
                 No judge accounts to set up. Just a name and hackathon password.
               </p>
             </div>
-            <div
-              className="s-hero-preview"
-              aria-label="Sample hackathon judging setup"
-            >
-              <div className="s-preview-top">
-                <span className="s-tag">Sample hackathon</span>
-                <svg
-                  width="32"
-                  height="32"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M8 3h8v5a4 4 0 0 1-8 0V3Z" />
-                  <path d="M8 5H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 1v6m-4 3h8m-6-3h4" />
-                </svg>
-              </div>
-              <h2>Builders Weekend</h2>
-              <div className="s-preview-flow">
-                Submissions <span>→</span> Judging <span>→</span> Finals
-              </div>
-              <dl className="s-preview-stats">
-                <div>
-                  <dt>Project submissions</dt>
-                  <dd>8</dd>
-                </div>
-                <div>
-                  <dt>Invited judges</dt>
-                  <dd>3</dd>
-                </div>
-              </dl>
-              <div className="s-preview-mini">
-                <span>A rubric for working demos</span>
-                {defaultRules.criteria.map((criterion) => (
-                  <div key={criterion.id}>
-                    <strong>{criterion.name}</strong>
-                    <span>
-                      {criterion.min}–{criterion.max}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <p className="s-preview-format">
-                {defaultRules.reviews} reviews per project ·{" "}
-                {defaultRules.finalistCount} finalists ·{" "}
-                {defaultRules.winnerCount} winners
-              </p>
-            </div>
+            <JudgingPreview />
           </div>
           <ErrorMessage message={error} />
           <section className="s-feature-grid">
