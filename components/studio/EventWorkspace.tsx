@@ -3,21 +3,42 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { EventView } from "@/domain/studio/model";
-import { api, ErrorMessage, formats, Frame } from "./shared";
+import {
+  api,
+  ErrorMessage,
+  formats,
+  Frame,
+  flowSectionFromUrl,
+  setFlowUrl,
+} from "./shared";
 import { EventOverview } from "./EventOverview";
+import { EventFlow, type FlowSection } from "./EventFlow";
 import { EventSettings } from "./EventSettings";
 import { ProjectImport } from "./ProjectImport";
 import { JudgeRoster } from "./JudgeRoster";
 import { EventResults } from "./EventResults";
 export type RunAction = (data: Record<string, unknown>) => Promise<void>;
-const tabs = ["Overview", "Projects", "Judges", "Settings", "Results"];
+const tabs = [
+  "Dashboard",
+  "First pass judging",
+  "Top finalists",
+  "Second pass judging",
+  "Winners",
+];
+const management = ["Projects", "Judges", "Settings", "Results", "Activity"];
 export function EventWorkspace({ id }: { id: string }) {
   const router = useRouter(),
     [view, setView] = useState<EventView | null>(null),
-    [tab, setTab] = useState("Overview"),
+    [tab, setTab] = useState("Dashboard"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
+  useEffect(() => {
+    const sync = () => setTab(flowSectionFromUrl() || "Dashboard");
+    sync();
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, [id]);
   const load = useCallback(async () => {
     const v = await api<EventView>(`events/${id}`);
     if (v.actor.role !== "organizer")
@@ -38,7 +59,7 @@ export function EventWorkspace({ id }: { id: string }) {
       });
     const timer = setInterval(() => {
       if (!document.hidden) load().catch(() => {});
-    }, 20000);
+    }, 5000);
     return () => {
       alive = false;
       clearInterval(timer);
@@ -108,12 +129,13 @@ export function EventWorkspace({ id }: { id: string }) {
   const ready = view.readiness.every((item) => item.ok);
   const select = (next: string) => {
     setTab(next);
+    setFlowUrl(next);
     setError("");
     setNotice("");
   };
   const closeMenu = (target: HTMLElement) =>
     target.closest("details")?.removeAttribute("open");
-  const shownTabs = tab === "Activity" ? [...tabs, "Activity"] : tabs;
+  const shownTabs = management.includes(tab) ? [...tabs, tab] : tabs;
   return (
     <Frame
       className="s-workspace"
@@ -196,7 +218,7 @@ export function EventWorkspace({ id }: { id: string }) {
                 <p>{e.description || "No description added."}</p>
                 <p>{formats[e.rules.template]}</p>
                 <Link href={`/showcase/${e.slug}`} target="_blank">
-                  View showcase ↗
+                  Public project gallery ↗
                 </Link>
                 <button
                   onClick={(event) => {
@@ -246,14 +268,7 @@ export function EventWorkspace({ id }: { id: string }) {
                 disabled={busy}
                 onClick={() => fire({ action: "start" })}
               >
-                Open judging ↗
-              </button>
-            )}
-            {!["draft", "ready"].includes(e.stage) && tab !== "Results" && (
-              <button className="s-inverse" onClick={() => select("Results")}>
-                {["published", "archived"].includes(e.stage)
-                  ? "View results →"
-                  : "Round controls →"}
+                Open first pass ↗
               </button>
             )}
           </div>
@@ -263,18 +278,37 @@ export function EventWorkspace({ id }: { id: string }) {
             {shownTabs.map((t) => (
               <button
                 key={t}
-                id={`workspace-tab-${t}`}
+                id={`workspace-tab-${t.replaceAll(" ", "-")}`}
                 role="tab"
                 aria-selected={tab === t}
                 aria-controls="workspace-content"
                 className={tab === t ? "s-tab-active" : ""}
                 onClick={() => select(t)}
               >
-                {t}
+                {t === "Top finalists" ? `Top ${e.rules.finalistCount}` : t}
                 {t === "Projects" && <span>{view.projects.length}</span>}
               </button>
             ))}
           </div>
+          <details
+            className="s-workspace-menu s-manage-menu"
+            name="workspace-tools"
+          >
+            <summary className="s-button">Manage ▾</summary>
+            <div className="s-workspace-menu-body">
+              {management.map((item) => (
+                <button
+                  key={item}
+                  onClick={(event) => {
+                    select(item);
+                    closeMenu(event.currentTarget);
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </details>
           {notice && (
             <span className="s-workspace-feedback" role="status">
               {notice}
@@ -283,13 +317,23 @@ export function EventWorkspace({ id }: { id: string }) {
         </div>
         <ErrorMessage message={error} />
         <div
-          className={`s-workspace-pane${tab === "Overview" ? " s-overview-pane" : ""}`}
+          className={`s-workspace-pane${tab === "Dashboard" ? " s-overview-pane" : ""}`}
           role="tabpanel"
           id="workspace-content"
-          aria-labelledby={`workspace-tab-${tab}`}
+          aria-labelledby={`workspace-tab-${tab.replaceAll(" ", "-")}`}
           tabIndex={0}
         >
-          {tab === "Overview" && <EventOverview view={view} select={select} />}
+          {tab === "Dashboard" && <EventOverview view={view} select={select} />}
+          {tabs.includes(tab) && tab !== "Dashboard" && (
+            <EventFlow
+              key={tab}
+              view={view}
+              section={tab as FlowSection}
+              run={run}
+              busy={busy}
+              select={select}
+            />
+          )}
           {tab === "Projects" && (
             <ProjectImport view={view} run={run} busy={busy} />
           )}

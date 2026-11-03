@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { JudgePhaseGallery } from "./EventFlow";
+import { FlowPresentation } from "./FlowPresentation";
 import type {
   Draft,
   EventView,
@@ -9,6 +11,8 @@ import type {
 } from "@/domain/studio/model";
 import {
   api,
+  flowSectionFromUrl,
+  setFlowUrl,
   Empty,
   ErrorMessage,
   Field,
@@ -27,6 +31,29 @@ type Info = {
 };
 type Claim = { project: Project | null; draft: Draft | null };
 export function JudgeApp({ slug }: { slug: string }) {
+  const [screen, setScreen] = useState<string | null>(null);
+  const selectScreen = (section: string) => {
+    setScreen(section);
+    setFlowUrl(section);
+  };
+  useEffect(() => {
+    const sync = () => {
+      const requested = flowSectionFromUrl();
+      setScreen(
+        requested &&
+          [
+            "First pass judging",
+            "Top finalists",
+            "Second pass judging",
+            "Winners",
+          ].includes(requested)
+          ? requested
+          : null,
+      );
+    };
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
   const [info, setInfo] = useState<Info | null>(null),
     [view, setView] = useState<EventView | null>(null),
     [error, setError] = useState(""),
@@ -44,6 +71,18 @@ export function JudgeApp({ slug }: { slug: string }) {
         if (!alive) return;
         setName(new URLSearchParams(location.search).get("name") || "");
         setInfo(i);
+        const requested = new URLSearchParams(location.search).get("view");
+        setScreen(
+          requested === "first-pass"
+            ? "First pass judging"
+            : requested === "top-seven"
+              ? "Top finalists"
+              : requested === "second-pass"
+                ? "Second pass judging"
+                : requested === "winners"
+                  ? "Winners"
+                  : null,
+        );
         try {
           const s = await judgeApi<{ actor: StudioActor }>("session");
           if (s.actor.eventId === i.id) await load(i.id);
@@ -59,7 +98,7 @@ export function JudgeApp({ slug }: { slug: string }) {
     if (!view?.actor.judgeId || !info) return;
     const timer = setInterval(() => {
       if (!document.hidden) load(info.id).catch((e) => setError(e.message));
-    }, 20000);
+    }, 5000);
     return () => clearInterval(timer);
   }, [view?.actor.judgeId, info, load]);
   async function login(form: FormData) {
@@ -138,6 +177,13 @@ export function JudgeApp({ slug }: { slug: string }) {
       </Frame>
     );
   const e = view.event;
+  const currentScreen =
+    screen ||
+    (["published", "archived"].includes(e.stage)
+      ? "Winners"
+      : e.stage === "final"
+        ? "Second pass judging"
+        : "First pass judging");
   return (
     <Frame
       className="s-screen s-judge-screen"
@@ -161,22 +207,149 @@ export function JudgeApp({ slug }: { slug: string }) {
           <div>
             <span className="s-eyebrow">
               {e.name} ·{" "}
-              {e.stage === "final" ? "Final round" : "Project review"}
+              {currentScreen === "Top finalists"
+                ? `Top ${e.rules.finalistCount}`
+                : currentScreen}
             </span>
             <h1>
-              {e.stage === "final" && e.rules.template === "ranked-final"
-                ? "Your final ballot"
-                : "Review a project"}
+              {currentScreen === "Top finalists"
+                ? `Top ${e.rules.finalistCount}`
+                : currentScreen}
             </h1>
           </div>
-          <div className="s-personal-progress">
-            <strong>{view.reviews.length}</strong>
-            <span>reviews from you</span>
+          <div className="s-actions">
+            {["First pass judging", "Second pass judging"].includes(
+              currentScreen,
+            ) && (
+              <FlowPresentation
+                eventName={e.name}
+                title={currentScreen}
+                rows={(currentScreen === "Second pass judging"
+                  ? view.shortlist || []
+                  : view.projects
+                ).map((project) => ({ project }))}
+                caption="Project showcase · scores are private"
+              />
+            )}
+            <div className="s-personal-progress">
+              <strong>{view.reviews.length}</strong>
+              <span>reviews from you</span>
+            </div>
           </div>
+        </div>
+        <div className="s-judge-navigation">
+          <nav className="s-tabs" aria-label="Judging stages">
+            {[
+              "First pass judging",
+              "Top finalists",
+              "Second pass judging",
+              "Winners",
+            ].map((item) => (
+              <button
+                key={item}
+                className={currentScreen === item ? "s-tab-active" : ""}
+                aria-current={currentScreen === item ? "page" : undefined}
+                onClick={() => selectScreen(item)}
+              >
+                {item === "Top finalists"
+                  ? `Top ${e.rules.finalistCount}`
+                  : item}
+              </button>
+            ))}
+          </nav>
+          {(view.reviews.length > 0 || view.results.length > 0) && (
+            <details className="s-judge-history-menu">
+              <summary className="s-button">Your reviews</summary>
+              <div>
+                {" "}
+                {view.reviews.length > 0 && (
+                  <details className="s-history" name="judge-history">
+                    <summary>
+                      Your submitted reviews · {view.reviews.length}
+                    </summary>
+                    <div className="s-table-wrap">
+                      <table className="s-table">
+                        <thead>
+                          <tr>
+                            <th>Project</th>
+                            <th>Round</th>
+                            <th>Your scores</th>
+                            <th>Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {view.reviews.map((r) => (
+                            <tr key={r.id}>
+                              <td>
+                                {
+                                  view.projects.find(
+                                    (p) => p.id === r.projectId,
+                                  )?.name
+                                }
+                              </td>
+                              <td>{r.round}</td>
+                              <td>
+                                {e.rules.criteria
+                                  .map((c) => `${c.name}: ${r.scores[c.id]}`)
+                                  .join(" · ")}
+                              </td>
+                              <td>{r.notes || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                )}
+                {view.results.length > 0 && (
+                  <details className="s-history" name="judge-history">
+                    <summary>
+                      Shared aggregate scores · {view.results.length} projects
+                    </summary>
+                    {view.results.map((r) => (
+                      <div className="s-score-line" key={r.project.id}>
+                        <span>{r.project.name}</span>
+                        <strong>{r.score.toFixed(2)}</strong>
+                      </div>
+                    ))}
+                  </details>
+                )}
+              </div>
+            </details>
+          )}
         </div>
         <ErrorMessage message={error} />
         <div className="s-judge-body">
-          {["published", "archived"].includes(e.stage) ? (
+          {currentScreen === "Top finalists" || currentScreen === "Winners" ? (
+            <JudgePhaseGallery view={view} section={currentScreen} />
+          ) : currentScreen === "First pass judging" &&
+            ["final", "published", "archived"].includes(e.stage) ? (
+            <Empty
+              title="First pass complete"
+              detail="Your submitted reviews are available in Your reviews."
+            >
+              <button onClick={() => selectScreen("Second pass judging")}>
+                Second pass judging →
+              </button>
+            </Empty>
+          ) : currentScreen === "Second pass judging" &&
+            !["final", "published", "archived"].includes(e.stage) ? (
+            <Empty
+              title="Second pass has not started"
+              detail={`Your organizer will confirm the Top ${e.rules.finalistCount} and judging panel at the end of first-pass judging.`}
+            >
+              <button onClick={() => selectScreen("Top finalists")}>
+                View Top {e.rules.finalistCount} →
+              </button>
+            </Empty>
+          ) : currentScreen === "Second pass judging" &&
+            e.finalJudgeIds &&
+            !e.finalJudgeIds.includes(view.actor.judgeId || "") ? (
+            <Empty
+              title="Your second-pass panel"
+              detail="You are not on the selected second-pass roster. You can view the finalists and live winners."
+            />
+          ) : ["published", "archived"].includes(e.stage) ? (
             <Empty
               title="That’s a wrap."
               detail="Thank you for lending your perspective. Every review helped."
@@ -200,55 +373,6 @@ export function JudgeApp({ slug }: { slug: string }) {
               view={view}
               refresh={() => load(info.id)}
             />
-          )}
-          {view.reviews.length > 0 && (
-            <details className="s-history" name="judge-history">
-              <summary>Your submitted reviews · {view.reviews.length}</summary>
-              <div className="s-table-wrap">
-                <table className="s-table">
-                  <thead>
-                    <tr>
-                      <th>Project</th>
-                      <th>Round</th>
-                      <th>Your scores</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {view.reviews.map((r) => (
-                      <tr key={r.id}>
-                        <td>
-                          {
-                            view.projects.find((p) => p.id === r.projectId)
-                              ?.name
-                          }
-                        </td>
-                        <td>{r.round}</td>
-                        <td>
-                          {e.rules.criteria
-                            .map((c) => `${c.name}: ${r.scores[c.id]}`)
-                            .join(" · ")}
-                        </td>
-                        <td>{r.notes || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </details>
-          )}
-          {view.results.length > 0 && (
-            <details className="s-history" name="judge-history">
-              <summary>
-                Shared aggregate scores · {view.results.length} projects
-              </summary>
-              {view.results.map((r) => (
-                <div className="s-score-line" key={r.project.id}>
-                  <span>{r.project.name}</span>
-                  <strong>{r.score.toFixed(2)}</strong>
-                </div>
-              ))}
-            </details>
           )}
         </div>
       </main>
@@ -350,6 +474,10 @@ function ReviewDesk({
   }, [project, e.id]);
   async function submit() {
     if (!project) return;
+    if (e.rules.criteria.some((c) => scores[c.id] === undefined)) {
+      setError("Choose a score for every criterion.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -490,31 +618,53 @@ function ReviewDesk({
                 <p>{c.guidance}</p>
               </details>
             )}
-            <select
-              id={`score-${c.id}`}
-              required
-              value={scores[c.id] ?? ""}
-              onChange={(ev) =>
-                setScores((v) => {
-                  const next = { ...v };
-                  if (!ev.target.value) delete next[c.id];
-                  else next[c.id] = +ev.target.value;
-                  return next;
-                })
-              }
-            >
-              <option value="">
-                Choose a score · {c.min}–{c.max}
-              </option>
-              {Array.from(
-                { length: c.max - c.min + 1 },
-                (_, i) => i + c.min,
-              ).map((n) => (
-                <option key={n} value={n}>
-                  {n}
+            {c.max - c.min <= 9 ? (
+              <div className="s-number-scores" role="group" aria-label={c.name}>
+                {Array.from(
+                  { length: c.max - c.min + 1 },
+                  (_, i) => c.min + i,
+                ).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-label={`${c.name}: ${value} out of ${c.max}`}
+                    aria-pressed={scores[c.id] === value}
+                    className={scores[c.id] === value ? "s-selected" : ""}
+                    onClick={() =>
+                      setScores((values) => ({ ...values, [c.id]: value }))
+                    }
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <select
+                id={`score-${c.id}`}
+                required
+                value={scores[c.id] ?? ""}
+                onChange={(ev) =>
+                  setScores((v) => {
+                    const next = { ...v };
+                    if (!ev.target.value) delete next[c.id];
+                    else next[c.id] = +ev.target.value;
+                    return next;
+                  })
+                }
+              >
+                <option value="">
+                  Choose a score · {c.min}–{c.max}
                 </option>
-              ))}
-            </select>
+                {Array.from(
+                  { length: c.max - c.min + 1 },
+                  (_, i) => i + c.min,
+                ).map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         ))}
         <details className="s-review-notes">
@@ -540,7 +690,8 @@ function ReviewDesk({
           </button>
         </div>
         <p className="s-caption">
-          Your draft is saved as you go. Submitted reviews are final.
+          Your draft saves automatically. Organizers can correct submitted
+          scores.
         </p>
       </form>
     </div>

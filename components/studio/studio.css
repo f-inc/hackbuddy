@@ -3515,3 +3515,431 @@
     gap: 4px;
   }
 }
+
+/* Keep HackBuddy's four judging stages as the primary product navigation. */
+.s-workspace-nav {
+  align-items: center;
+  gap: 12px;
+}
+.s-manage-menu {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.s-manage-menu .s-workspace-menu-body {
+  right: 0;
+}
+.s-manage-menu summary.s-button {
+  min-height: 34px;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+.s-event-flow > .s-section-heading {
+  margin-bottom: 14px;
+}
+.s-event-flow > .s-progress {
+  margin: 8px 0 14px;
+}
+.s-event-flow > .s-caption {
+  font-size: 12px;
+  margin: 12px 0 0;
+}
+.s-event-flow .s-round-panel {
+  margin-bottom: 16px;
+}
+.s-phase-project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.s-phase-project-list > article {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: #f1f1f1;
+  border-radius: 15px;
+  min-width: 0;
+}
+.s-phase-project-list .s-project-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.s-phase-project-list article > div {
+  flex: 1;
+  min-width: 0;
+}
+.s-phase-project-list strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+}
+.s-phase-project-list article > div > span {
+  display: block;
+  font-size: 11px;
+  color: var(--s-muted);
+}
+.s-phase-project-list details {
+  font-size: 12px;
+  max-width: 50%;
+}
+.s-phase-project-list details p {
+  font-size: 13px;
+  margin: 8px 0;
+}
+.s-phase-project-list details button,
+.s-phase-project-list details a {
+  margin-top: 8px;
+  display: inline-block;
+  font-size: 12px;
+}
+.s-phase-project-list article:has(details[open]) {
+  align-items: flex-start;
+}
+.s-phase-winners {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.s-phase-winners article {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #f1f1f1;
+  padding: 20px;
+  border-radius: 15px;
+}
+.s-phase-winners article > div {
+  flex: 1;
+}
+.studio .s-phase-winners h3 {
+  font-size: 30px;
+  margin: 0 0 8px;
+}
+.s-phase-winners p {
+  margin: 0;
+  font-size: 14px;
+}
+.s-phase-winners article > div > span {
+  font-size: 12px;
+  color: var(--s-muted);
+}
+.s-winner-number {
+  font-family: "Instrument Serif", serif;
+  -webkit-text-stroke: 0.05em currentColor;
+  font-size: 42px;
+  width: 25px;
+}
+.s-final-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.s-final-roster label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.s-final-roster legend {
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+.s-final-roster small {
+  font-size: 11px;
+  color: var(--s-muted);
+}
+.studio .s-flow-tv {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+}
+.s-flow-tv .s-tv-controls {
+  max-width: calc(100vw - 40px);
+  flex-wrap: wrap;
+}
+.s-flow-tv .s-tv-controls button {
+  font-size: 12px;
+  padding: 8px 12px;
+  min-height: 32px;
+}
+.s-tv-score {
+  font-size: clamp(18px, 3vh, 40px);
+  font-weight: 500;
+}
+.s-submission-editor .s-tabs {
+  margin: 0 0 16px;
+}
+.s-submission-editor .s-tabs button {
+  padding: 8px 14px;
+  font-size: 13px;
+}
+.s-submission-editor > .s-field {
+  margin-bottom: 15px;
+}
+.s-submission-editor .s-form {
+  margin-top: 12px;
+}
+.s-flow-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.s-creation-flow p {
+  margin: 18px 0 !important;
+}
+.s-judge-navigation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.s-judge-navigation .s-tabs {
+  margin: 0;
+}
+.s-judge-navigation .s-tabs button {
+  padding: 9px 15px;
+  min-height: 36px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.s-judge-navigation .s-tab-active,
+.s-submission-editor .s-selected {
+  background: #fff;
+}
+.s-judge-history-menu {
+  position: relative;
+  margin-left: auto;
+  font-size: 12px;
+}
+.s-judge-history-menu > summary {
+  padding: 9px 14px;
+  min-height: 36px;
+  white-space: nowrap;
+  list-style: none;
+}
+.s-judge-history-menu > div {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(600px, calc(100vw - 64px));
+  max-height: 60svh;
+  overflow: auto;
+  padding: 15px;
+  background: #f1f1f1;
+  border-radius: 15px;
+  z-index: 20;
+}
+.studio .s-judge-history-menu[open] > summary {
+  margin-bottom: 0;
+}
+.s-judge-history-menu .s-history {
+  padding: 10px;
+}
+.s-judge-phase {
+  overflow: auto;
+  min-height: 0;
+}
+.s-judge-phase > .s-section-heading {
+  margin-bottom: 14px;
+}
+.s-judge-phase .s-caption {
+  max-width: none;
+}
+@media (max-height: 740px) and (min-width: 901px) {
+  .s-judge-screen .s-review-form {
+    gap: 8px;
+  }
+  .s-judge-screen .s-score-control {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+  }
+  .s-judge-screen .s-score-control .s-section-heading {
+    grid-column: 1;
+    margin: 0;
+  }
+  .s-judge-screen .s-score-control .s-criterion-guide {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    align-self: center;
+  }
+  .s-judge-screen .s-score-control .s-criterion-guide[open] {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+  .s-judge-screen .s-score-control select {
+    grid-column: 1 / -1;
+    min-height: 32px;
+  }
+  .s-judge-screen .s-ballot-layout > .s-panel {
+    padding: 16px;
+    gap: 8px;
+  }
+  .s-judge-screen .s-ballot-layout .s-field {
+    gap: 5px;
+    font-size: 13px;
+  }
+  .s-judge-screen .s-ballot-layout select {
+    min-height: 32px;
+    padding: 6px 10px;
+  }
+  .s-judge-screen .s-ballot-layout > form > button {
+    min-height: 36px;
+    padding: 10px 15px;
+    font-size: 13px;
+  }
+  .s-judge-screen .s-ballot-layout .s-project-card {
+    padding: 6px 10px;
+  }
+  .s-judge-screen .s-ballot-layout .s-project-card h3 {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    font-size: 13px;
+  }
+  .s-judge-screen .s-ballot-layout .s-project-card > small {
+    display: none;
+  }
+  .s-judge-screen .s-ballot-layout .s-project-card details {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+  }
+  .s-judge-screen .s-ballot-layout .s-project-card:has(details[open]) details {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+  .s-judge-screen .s-ballot-layout .s-project-icon {
+    width: 24px;
+    height: 24px;
+    grid-row: 1;
+  }
+  .s-judge-screen .s-ballot-layout .s-project-grid {
+    gap: 4px;
+  }
+  .s-phase-winners article {
+    padding: 15px;
+  }
+}
+@media (max-height: 639px) and (min-width: 901px) {
+  .s-phase-project-list {
+    gap: 4px;
+  }
+  .s-phase-project-list > article {
+    padding: 4px 12px;
+  }
+  .s-phase-project-list .s-project-icon {
+    width: 24px;
+    height: 24px;
+  }
+}
+@media (max-width: 900px) {
+  .s-judge-navigation {
+    flex-wrap: wrap;
+  }
+  .s-judge-navigation .s-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .s-phase-winners article {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .s-phase-project-list details {
+    max-width: 45%;
+  }
+  .s-judge-history-menu > div {
+    position: fixed;
+    left: 20px;
+    right: 20px;
+    top: 200px;
+    width: auto;
+  }
+  .s-manage-menu {
+    margin-left: 0;
+  }
+}
+.s-number-scores {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+  grid-column: 1 / -1;
+}
+.studio .s-number-scores button {
+  min-height: 34px;
+  padding: 7px 0;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.studio .s-number-scores .s-selected {
+  background: #333;
+  color: #fff;
+}
+.s-start-selection {
+  font-size: 13px;
+}
+.s-start-selection[open] > summary {
+  margin-bottom: 12px !important;
+}
+.s-selection-open > summary {
+  display: none;
+}
+@media (max-height: 639px) and (min-width: 901px) {
+  .s-phase-project-list article > div {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0 12px;
+  }
+}
+.s-phase-row-score {
+  font-size: 12px;
+  color: var(--s-muted);
+}
+@media (max-height: 639px) {
+  .studio.s-tv .s-tv-row {
+    padding: 5px 16px;
+    gap: 12px;
+  }
+  .studio.s-tv .s-tv-project h2 {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .studio.s-tv .s-tv-project p {
+    margin-top: 2px;
+  }
+  .studio.s-tv .s-tv-team .s-eyebrow {
+    display: none;
+  }
+  .studio.s-tv .s-tv-list:has(> .s-tv-row:nth-child(8)) .s-tv-project p {
+    display: none;
+  }
+}
+@media (max-height: 639px) and (min-width: 901px) {
+  .s-phase-winners article {
+    padding: 10px;
+  }
+  .studio .s-phase-winners h3 {
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
+  .s-phase-winners p {
+    font-size: 12px;
+  }
+}
+@media (max-height: 639px) and (min-width: 901px) {
+  .s-event-flow .s-round-panel {
+    margin-bottom: 10px;
+  }
+}

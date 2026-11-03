@@ -7,6 +7,8 @@ import {
   type EventView,
 } from "@/domain/studio/model";
 import { api, Empty, ErrorMessage, Field, ProjectIcon } from "./shared";
+import { SubmissionEditor } from "./SubmissionEditor";
+import type { Project } from "@/domain/studio/model";
 import type { RunAction } from "./EventWorkspace";
 type Preview = {
   added: number;
@@ -24,6 +26,7 @@ export function ProjectImport({
   busy: boolean;
 }) {
   const [page, setPage] = useState(0);
+  const [editing, setEditing] = useState<Project | null>(null);
   const [source, setSource] = useState<"csv" | "airtable" | "manual" | null>(
       null,
     ),
@@ -105,6 +108,15 @@ export function ProjectImport({
   );
   return (
     <section>
+      {editing && (
+        <SubmissionEditor
+          project={editing}
+          view={view}
+          run={run}
+          busy={busy}
+          close={() => setEditing(null)}
+        />
+      )}
       <div className="s-section-heading">
         <div>
           <h2>Projects</h2>
@@ -404,6 +416,7 @@ export function ProjectImport({
                     <td>{p.track || "—"}</td>
                     <td>{p.tools || "—"}</td>
                     <td>
+                      <button onClick={() => setEditing(p)}>Edit</button>
                       {editable && (
                         <details
                           className="s-judge-actions"

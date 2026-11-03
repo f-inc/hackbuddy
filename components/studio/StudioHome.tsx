@@ -43,7 +43,7 @@ export function StudioHome() {
     [step, setStep] = useState(0),
     [name, setName] = useState(""),
     [description, setDescription] = useState(""),
-    [format, setFormat] = useState<Event["rules"]["template"]>("ranked-final"),
+    [format] = useState<Event["rules"]["template"]>("ranked-final"),
     [password, setPassword] = useState("");
   useEffect(() => {
     api<Home>("events")
@@ -400,7 +400,7 @@ export function StudioHome() {
               {
                 [
                   "Name your hackathon.",
-                  "How will judging work?",
+                  "The HackBuddy judging flow.",
                   "Invite your judging panel.",
                 ][step]
               }
@@ -433,24 +433,24 @@ export function StudioHome() {
                 </>
               )}
               {step === 1 && (
-                <div className="s-format-options">
-                  {Object.entries(formats).map(([key, label]) => (
-                    <button
-                      type="button"
-                      key={key}
-                      className={format === key ? "s-selected" : ""}
-                      onClick={() => setFormat(key as typeof format)}
-                    >
-                      <strong>{label}</strong>
-                      <span>
-                        {key === "single"
-                          ? "Score projects against a custom rubric in one judging round."
-                          : key === "scored-final"
-                            ? "Shortlist projects, then score the finalists."
-                            : "Score submissions, then let judges rank their favorite finalists."}
-                      </span>
-                    </button>
-                  ))}
+                <div className="s-creation-flow">
+                  <div className="s-flow-steps">
+                    <span>First pass judging</span>
+                    <span>→ Top 7</span>
+                    <span>→ Second pass judging</span>
+                    <span>→ Winners</span>
+                  </div>
+                  <p>
+                    Two first-pass reviews per project, followed by a ranked
+                    vote for the top three winners. Every stage has a TV
+                    presentation.
+                  </p>
+                  <div className="s-note">
+                    Progress · Practicality · Technical Complexity
+                    <br />
+                    Three criteria, scored 1–10. You can edit the rubric and
+                    event settings later.
+                  </div>
                 </div>
               )}
               {step === 2 && (

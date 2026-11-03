@@ -19,6 +19,7 @@ export function EventSettings({
     rules: structuredClone(view.event.rules),
     sponsors: structuredClone(view.event.sponsors),
     password: "",
+    reason: "",
   }));
   const [pointText, setPointText] = useState(draft.rules.points.join(", "));
   const editable = ["draft", "ready"].includes(view.event.stage),
@@ -42,7 +43,7 @@ export function EventSettings({
       onSubmit={(e) => {
         e.preventDefault();
         run({
-          action: "update",
+          action: editable ? "update" : "configure",
           ...draft,
           rules: { ...draft.rules, points: pointText.split(",").map(Number) },
         })
@@ -56,16 +57,28 @@ export function EventSettings({
           <p>
             {editable
               ? "Configure the format and rubric before opening judging."
-              : "The judging configuration was frozen when the event opened."}
+              : "Edits are logged. Published results remain unchanged until a correction is published."}
           </p>
         </div>
-        {editable && (
-          <button className="s-inverse" disabled={busy}>
-            Save settings ↗
-          </button>
-        )}
+        <button className="s-inverse" disabled={busy}>
+          Save settings ↗
+        </button>
       </div>
-      <fieldset disabled={!editable || busy}>
+      {!editable && (
+        <details className="s-settings-section">
+          <summary>Change reason (required when saving)</summary>
+          <Field label="Reason for these changes">
+            <input
+              required
+              value={draft.reason}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, reason: e.target.value }))
+              }
+            />
+          </Field>
+        </details>
+      )}
+      <fieldset disabled={busy}>
         <details className="s-settings-section" name="workspace-settings">
           <summary>
             <h3>Hackathon details</h3>
@@ -510,7 +523,7 @@ export function EventSettings({
               checked={r.publicResults}
               onChange={(e) => change("publicResults", e.target.checked)}
             />
-            Show official results after publication
+            Show live winners and published results
           </label>
           {!editable && (
             <button

@@ -46,11 +46,11 @@ export function EventOverview({
           <strong>{view.judges.filter((j) => j.active).length}</strong>
           <span>judges</span>
         </button>
-        <button onClick={() => select("Results")}>
+        <button onClick={() => select("First pass judging")}>
           <strong>{view.stats.reviews}</strong>
           <span>reviews</span>
         </button>
-        <button onClick={() => select("Results")}>
+        <button onClick={() => select("First pass judging")}>
           <strong>
             {view.stats.complete}/{view.stats.required}
           </strong>
@@ -74,7 +74,7 @@ export function EventOverview({
                   ? `Revision ${view.publication.revision}`
                   : e.stage === "final"
                     ? "Final round"
-                    : "Preliminary"}
+                    : "First pass"}
             </span>
           </div>
           <div className="s-compact-panel-body">

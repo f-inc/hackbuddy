@@ -14,6 +14,29 @@ export async function api<T>(path: string, data?: unknown): Promise<T> {
     throw new Error(value.error || "Something went wrong. Try again.");
   return value as T;
 }
+export const flowRoutes: Record<string, string> = {
+  Dashboard: "dashboard",
+  "First pass judging": "first-pass",
+  "Top finalists": "top-seven",
+  "Second pass judging": "second-pass",
+  Winners: "winners",
+  Projects: "projects",
+  Judges: "judges",
+  Settings: "settings",
+  Results: "results",
+  Activity: "activity",
+};
+export function flowSectionFromUrl() {
+  const requested = new URLSearchParams(location.search).get("view");
+  return Object.keys(flowRoutes).find(
+    (section) => flowRoutes[section] === requested,
+  );
+}
+export function setFlowUrl(section: string) {
+  const next = new URL(location.href);
+  next.searchParams.set("view", flowRoutes[section] || "dashboard");
+  if (next.href !== location.href) history.pushState(null, "", next);
+}
 export const formats = {
   single: "One scored round",
   "scored-final": "Scores + scored final",

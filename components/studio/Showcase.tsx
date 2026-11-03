@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- Partner logos are organizer-owned external artwork. */
 import { useEffect, useState } from "react";
-import type { Award, Project, Publication } from "@/domain/studio/model";
+import type { Award, Project, Publication, Rank } from "@/domain/studio/model";
 import { api, Empty, ErrorMessage, Frame, ProjectIcon } from "./shared";
 type ShowcaseData = {
   event: {
@@ -10,11 +10,13 @@ type ShowcaseData = {
     description: string;
     image: string;
     stage: string;
+    finalistCount: number;
   };
   projects: Project[];
   finalists: Project[];
   sponsors: Award[];
   publication: Publication | null;
+  liveWinners: Rank[];
 };
 export function Showcase({ slug }: { slug: string }) {
   const [data, setData] = useState<ShowcaseData | null>(null),
@@ -57,7 +59,7 @@ export function Showcase({ slug }: { slug: string }) {
       view === "finalists"
         ? data.finalists.length
         : view === "winners"
-          ? data.publication?.winners.length || 0
+          ? data.publication?.winners.length || data.liveWinners?.length || 0
           : view === "all"
             ? data.projects.length
             : data.projects.filter((p) =>
@@ -91,7 +93,7 @@ export function Showcase({ slug }: { slug: string }) {
   const award = data.sponsors.find((a) => a.id === view),
     title =
       view === "finalists"
-        ? "Meet the finalists."
+        ? `Top ${data.event.finalistCount || 7}`
         : view === "winners"
           ? "Ideas worth celebrating."
           : award
@@ -101,7 +103,9 @@ export function Showcase({ slug }: { slug: string }) {
     view === "finalists"
       ? data.finalists
       : view === "winners"
-        ? data.publication?.winners.map((r) => r.project) || []
+        ? (data.publication?.winners || data.liveWinners || []).map(
+            (r) => r.project,
+          )
         : award
           ? data.projects.filter((p) => matchesAward(p, award))
           : data.projects;
@@ -149,10 +153,10 @@ export function Showcase({ slug }: { slug: string }) {
               setPage(0);
             }}
           >
-            Finalists
+            Top {data.event.finalistCount || 7}
           </button>
         )}
-        {data.publication && (
+        {(data.publication || data.liveWinners?.length > 0) && (
           <button
             className={view === "winners" ? "s-selected" : ""}
             onClick={() => {
@@ -189,7 +193,7 @@ export function Showcase({ slug }: { slug: string }) {
             <span className="s-eyebrow">{data.event.name}</span>
             <h1>
               {view === "finalists"
-                ? "The finalists."
+                ? `Top ${data.event.finalistCount || 7}`
                 : view === "winners"
                   ? "The winners."
                   : award
@@ -238,7 +242,9 @@ export function Showcase({ slug }: { slug: string }) {
             {view === "finalists"
               ? "Alphabetical · no ranking implied"
               : view === "winners"
-                ? `Official results · revision ${data.publication?.revision}`
+                ? data.publication
+                  ? `Official results · revision ${data.publication.revision}`
+                  : "Live · provisional winners"
                 : "Made together. Shared with everyone."}
           </span>
           <span>
@@ -293,6 +299,9 @@ export function Showcase({ slug }: { slug: string }) {
             Listed alphabetically. Finalists are presented equally, without rank
             or preliminary scores.
           </p>
+        )}
+        {!data.publication && view === "winners" && (
+          <p className="s-caption">Live · provisional until published</p>
         )}
         {data.publication && view === "winners" && (
           <p className="s-caption">

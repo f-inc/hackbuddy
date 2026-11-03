@@ -1,5 +1,11 @@
+import { JUDGING_POLICY } from "../judging-policy";
 export type Stage =
-  "draft" | "ready" | "judging" | "final" | "published" | "archived";
+  | "draft"
+  | "ready"
+  | "judging"
+  | "final"
+  | "published"
+  | "archived";
 export type Template = "single" | "scored-final" | "ranked-final";
 export type Criterion = {
   id: string;
@@ -46,6 +52,7 @@ export type Event = {
   rules: Rules;
   sponsors: Award[];
   finalists: string[];
+  finalJudgeIds?: string[];
   frozenRules: Rules | null;
   judgePassword: string;
   createdAt: string;
@@ -134,6 +141,8 @@ export type EventView = {
   judges: Judge[];
   results: Rank[];
   preliminary: Rank[];
+  shortlist: Project[];
+  liveWinners: Rank[];
   publication: Publication | null;
   publications: Publication[];
   reservations: Reservation[];
@@ -159,44 +168,25 @@ export type EventView = {
 export const defaultRules: Rules = {
   version: 1,
   template: "ranked-final",
-  criteria: [
-    {
-      id: "impact",
-      name: "Impact",
-      guidance:
-        "How meaningful is the problem, and how useful is the solution?",
-      min: 1,
-      max: 10,
-      weight: 1,
-    },
-    {
-      id: "execution",
-      name: "Execution",
-      guidance: "How complete, usable, and demonstrable is the project?",
-      min: 1,
-      max: 10,
-      weight: 1,
-    },
-    {
-      id: "originality",
-      name: "Originality",
-      guidance: "How thoughtful and original is the approach?",
-      min: 1,
-      max: 10,
-      weight: 1,
-    },
-  ],
+  criteria: JUDGING_POLICY.rubric.map((criterion) => ({
+    id: criterion.key,
+    name: criterion.label,
+    guidance: criterion.description,
+    min: JUDGING_POLICY.score.min,
+    max: JUDGING_POLICY.score.max,
+    weight: 1,
+  })),
   reviews: 2,
   finalReviews: 2,
   finalistCount: 7,
   winnerCount: 3,
   points: [3, 2, 1],
-  scoring: "average",
+  scoring: "normalized",
   visibility: "blind",
   publicGallery: true,
   publicResults: true,
   guests: true,
-  quorum: "all",
+  quorum: "one",
   reservationMinutes: 15,
 };
 export function fail(message: string): never {
@@ -355,8 +345,8 @@ export function rankProjects(
     }
   }
   const pooled = (c: Criterion) => {
-    const stats = [...new Set(reviews.map((r) => r.judgeId))].map((id) =>
-      judgeStats.get(`${id}:${c.id}`)!,
+    const stats = [...new Set(reviews.map((r) => r.judgeId))].map(
+      (id) => judgeStats.get(`${id}:${c.id}`)!,
     );
     const count = stats.reduce((s, v) => s + v.n, 0);
     return stats.reduce((s, v) => s + v.variance * v.n, 0) / (count || 1);

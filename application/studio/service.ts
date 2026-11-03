@@ -185,7 +185,21 @@ function rankings(e: Event) {
           );
   return { preliminary, results };
 }
+function shortlist(e: Event) {
+  if (e.finalists.length)
+    return projects(e).filter((p) => e.finalists.includes(p.id));
+  return rankings(e)
+    .preliminary.filter((r) => r.reviews >= rules(e).reviews)
+    .slice(0, rules(e).finalistCount)
+    .map((r) => r.project);
+}
 function eligible(e: Event, j: Judge) {
+  if (
+    round(e) === "final" &&
+    e.finalJudgeIds &&
+    !e.finalJudgeIds.includes(j.id)
+  )
+    return [];
   return projects(e).filter(
     (p) =>
       !j.conflicts.includes(p.id) &&
@@ -269,6 +283,22 @@ export function eventView(actor: StudioActor, id: string): EventView {
         ...v,
         project: admin ? v.project : publicProject(v.project),
       })),
+    shortlist: shortlist(e)
+      .map(publicProject)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    liveWinners: (admin || (r.publicResults && e.stage === "final")
+      ? ranked.results
+          .filter((v) =>
+            r.template === "ranked-final"
+              ? ballots(e).length > 0
+              : v.reviews > 0,
+          )
+          .slice(0, r.winnerCount)
+      : []
+    ).map((v) => ({
+      ...v,
+      project: admin ? v.project : publicProject(v.project),
+    })),
     preliminary: ranked.preliminary
       .filter((v) => visible(v.project.id, "preliminary"))
       .map((v) => ({
@@ -734,7 +764,177 @@ export function action(
       return { ok: true };
     }
     organizer(actor);
-    if (kind === "update") {
+    if (kind === "configure") {
+      const next = validateRules(input.rules);
+      const reason = required(input.reason, "Change reason", 2000);
+      for (const review of reviews(e)) validateScores(review.scores, next);
+      if (
+        e.finalists.length &&
+        (next.template !== rules(e).template ||
+          next.winnerCount !== rules(e).winnerCount ||
+          JSON.stringify(next.points) !== JSON.stringify(rules(e).points))
+      )
+        throw new StudioError(
+          "Reset the second pass before changing its voting format, winner count, or points.",
+        );
+      e.name = required(input.name, "Event name");
+      e.description = text(input.description, 5000);
+      e.image = url(input.image);
+      e.sponsors = awards(input.sponsors || e.sponsors);
+      e.rules = next;
+      if (e.frozenRules) e.frozenRules = structuredClone(next);
+      if (input.password) e.judgePassword = hashPassword(input.password);
+      save(e);
+      audit(e, actor, "Event configuration edited", reason);
+    } else if (kind === "edit-project") {
+      const old = projects(e).find((p) => p.id === input.projectId);
+      if (!old) throw new StudioError("Project not found.", 404);
+      const row = object(input.project);
+      const next: Project = {
+        ...old,
+        name: required(row.name, "Project name"),
+        team: text(row.team, 500),
+        description: text(row.description, 5000),
+        track: text(row.track, 100),
+        tools: text(row.tools, 1000),
+        demo: url(row.demo),
+        repository: url(row.repository),
+        image: url(row.image),
+        email: text(row.email, 300),
+      };
+      put("project", next.id, e.id, next);
+      audit(
+        e,
+        actor,
+        "Project edited",
+        JSON.stringify({ before: old, after: next }),
+      );
+    } else if (kind === "final-roster") {
+      if (e.stage !== "final")
+        throw new StudioError(
+          "Edit the voting panel while the second pass is open.",
+        );
+      const ids = Array.isArray(input.judgeIds)
+        ? input.judgeIds.map(String)
+        : [];
+      const reason = required(input.reason, "Roster change reason");
+      if (
+        !ids.length ||
+        new Set(ids).size !== ids.length ||
+        ids.some((id) => !judges(e).some((j) => j.id === id && j.active))
+      )
+        throw new StudioError("Choose active second-pass judges.");
+      e.finalJudgeIds = ids;
+      if (
+        !judges(e).some(
+          (j) =>
+            j.active &&
+            eligible(e, j).length >=
+              Math.min(rules(e).winnerCount, e.finalists.length),
+        )
+      )
+        throw new StudioError(
+          "Choose at least one eligible second-pass judge.",
+        );
+      save(e);
+      audit(e, actor, "Second-pass roster edited", reason);
+    } else if (kind === "edit-ballot") {
+      if (
+        !["final", "published", "archived"].includes(e.stage) ||
+        rules(e).template !== "ranked-final"
+      )
+        throw new StudioError("Second-pass ballots are not available.");
+      const j = judges(e).find((j) => j.id === input.judgeId && j.active);
+      if (!j) throw new StudioError("Judge not found.", 404);
+      const reason = required(input.reason, "Correction reason");
+      const picks = Array.isArray(input.picks) ? input.picks.map(String) : [];
+      const count = Math.min(rules(e).winnerCount, e.finalists.length);
+      if (
+        picks.length !== count ||
+        new Set(picks).size !== count ||
+        picks.some(
+          (id) =>
+            !eligible({ ...e, stage: "final" }, j).some((p) => p.id === id),
+        )
+      )
+        throw new StudioError(`Choose ${count} different eligible finalists.`);
+      const old = get<Ballot>("ballot", `${e.id}:${j.id}`);
+      const next = { judgeId: j.id, picks, submittedAt: now() };
+      put("ballot", `${e.id}:${j.id}`, e.id, next);
+      audit(
+        e,
+        actor,
+        "Final ballot corrected",
+        JSON.stringify({ reason, before: old || null, after: next }),
+      );
+    } else if (kind === "edit-review") {
+      const old = reviews(e).find((r) => r.id === input.reviewId);
+      if (!old) throw new StudioError("Review not found.", 404);
+      const reason = required(input.reason, "Change reason", 2000);
+      const next = {
+        ...old,
+        scores: validateScores(input.scores, rules(e)),
+        notes: text(input.notes, 10000),
+      };
+      database()
+        .prepare(
+          "UPDATE studio_reviews SET data=? WHERE event_id=? AND round=? AND project_id=? AND judge_id=?",
+        )
+        .run(JSON.stringify(next), e.id, old.round, old.projectId, old.judgeId);
+      audit(
+        e,
+        actor,
+        "Submitted score edited",
+        JSON.stringify({ reason, before: old, after: next }),
+      );
+    } else if (kind === "select-finalists") {
+      if (e.stage !== "judging")
+        throw new StudioError("Edit Top 7 before starting the second pass.");
+      const pool = rankings(e).preliminary.filter(
+        (r) => r.reviews >= rules(e).reviews,
+      );
+      const ids = Array.isArray(input.finalistIds)
+        ? input.finalistIds.map(String)
+        : [];
+      const count = Math.min(rules(e).finalistCount, pool.length);
+      if (
+        !count ||
+        ids.length !== count ||
+        new Set(ids).size !== count ||
+        ids.some((id) => !pool.some((r) => r.project.id === id))
+      )
+        throw new StudioError(
+          `Choose ${count} different projects with complete first-pass reviews.`,
+        );
+      const reason = required(input.reason, "Selection reason");
+      e.finalists = ids;
+      save(e);
+      audit(e, actor, "Top finalists edited", reason);
+    } else if (kind === "reset-final") {
+      if (e.stage !== "final")
+        throw new StudioError("Only an unpublished second pass can be reset.");
+      const reason = required(input.reason, "Reset reason");
+      database()
+        .prepare(
+          "DELETE FROM studio_records WHERE kind='draft' AND scope=? AND id LIKE ?",
+        )
+        .run(e.id, `${e.id}:final:%`);
+      database()
+        .prepare(
+          "DELETE FROM studio_reviews WHERE event_id=? AND round='final'",
+        )
+        .run(e.id);
+      database()
+        .prepare("DELETE FROM studio_reservations WHERE event_id=?")
+        .run(e.id);
+      for (const b of list<Ballot>("ballot", e.id))
+        remove("ballot", `${e.id}:${b.judgeId}`);
+      e.finalists = [];
+      delete e.finalJudgeIds;
+      e.stage = "judging";
+      save(e);
+      audit(e, actor, "Second pass reset", reason);
+    } else if (kind === "update") {
       editable(e);
       e.name = required(input.name, "Event name");
       e.description = text(input.description, 5000);
@@ -827,18 +1027,21 @@ export function action(
     } else if (kind === "start-final") {
       if (e.stage !== "judging" || rules(e).template === "single")
         throw new StudioError("Finals cannot start in this stage.");
-      const ranked = rankings(e).preliminary;
-      if (ranked.some((p) => p.reviews < rules(e).reviews))
+      const ranked = rankings(e).preliminary.filter(
+        (p) => p.reviews >= rules(e).reviews,
+      );
+      const minimum = Math.min(rules(e).winnerCount, projects(e).length);
+      if (ranked.length < minimum)
         throw new StudioError(
-          "Every project needs its required preliminary reviews.",
+          `At least ${minimum} projects need their required first-pass reviews.`,
         );
       const count = Math.min(rules(e).finalistCount, ranked.length);
       const chosen = Array.isArray(input.finalistIds)
         ? input.finalistIds.map(String)
-        : [];
+        : e.finalists;
       if (chosen.length) {
         if (
-          !text(input.reason) ||
+          (!text(input.reason) && !e.finalists.length) ||
           chosen.length !== count ||
           new Set(chosen).size !== count ||
           chosen.some((p) => !ranked.some((r) => r.project.id === p))
@@ -857,6 +1060,27 @@ export function action(
           );
         e.finalists = ranked.slice(0, count).map((v) => v.project.id);
       }
+      if (Array.isArray(input.judgeIds)) {
+        const ids = input.judgeIds.map(String);
+        if (
+          !ids.length ||
+          new Set(ids).size !== ids.length ||
+          ids.some((id) => !judges(e).some((j) => j.id === id && j.active))
+        )
+          throw new StudioError("Choose an active second-pass judge roster.");
+        e.finalJudgeIds = ids;
+      }
+      if (
+        !judges(e).some(
+          (j) =>
+            j.active &&
+            eligible({ ...e, stage: "final" }, j).length >=
+              Math.min(rules(e).winnerCount, e.finalists.length),
+        )
+      )
+        throw new StudioError(
+          "Choose at least one judge eligible to vote on the finalists.",
+        );
       e.stage = "final";
       save(e);
       database()
@@ -1007,14 +1231,25 @@ export function publicShowcase(slug: string) {
       description: e.description,
       image: e.image,
       stage: e.stage,
+      finalistCount: rules(e).finalistCount,
     },
     projects: projects(e)
       .map(publicProject)
       .sort((a, b) => a.name.localeCompare(b.name)),
-    finalists: projects(e)
-      .filter((p) => e.finalists.includes(p.id))
+    finalists: shortlist(e)
       .map(publicProject)
       .sort((a, b) => a.name.localeCompare(b.name)),
+    liveWinners:
+      e.rules.publicResults && e.stage === "final"
+        ? rankings(e)
+            .results.filter((r) =>
+              rules(e).template === "ranked-final"
+                ? ballots(e).length > 0
+                : r.reviews > 0,
+            )
+            .slice(0, rules(e).winnerCount)
+            .map((r) => ({ ...r, project: publicProject(r.project) }))
+        : [],
     sponsors: e.sponsors,
     publication: e.rules.publicResults && p ? cleanPublication(p) : null,
   };

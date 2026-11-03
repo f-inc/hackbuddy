@@ -34,6 +34,34 @@ function setup(
     rules: {
       ...m.defaultRules,
       template: "single",
+      scoring: "average",
+      quorum: "all",
+      criteria: [
+        {
+          id: "impact",
+          name: "Impact",
+          guidance: "",
+          min: 1,
+          max: 10,
+          weight: 1,
+        },
+        {
+          id: "execution",
+          name: "Execution",
+          guidance: "",
+          min: 1,
+          max: 10,
+          weight: 1,
+        },
+        {
+          id: "originality",
+          name: "Originality",
+          guidance: "",
+          min: 1,
+          max: 10,
+          weight: 1,
+        },
+      ],
       reviews: 1,
       finalistCount: 2,
       winnerCount: 1,
@@ -177,6 +205,7 @@ test("custom bounds, weights and required review counts drive the entire workflo
 test("weighted average rescales different criterion ranges before weighting", () => {
   const r = {
     ...m.defaultRules,
+    scoring: "average",
     criteria: [
       { id: "a", name: "A", guidance: "", min: 1, max: 5, weight: 3 },
       { id: "b", name: "B", guidance: "", min: 0, max: 100, weight: 1 },
@@ -598,4 +627,274 @@ test("ranked-final coverage and aggregate access follow eligible submitted ballo
     () => s.action(x.actor, x.id, { action: "publish" }),
     /required final ballots/,
   );
+});
+
+test("default HackBuddy rubric and flow preserve the original judging policy", () => {
+  assert.equal(m.defaultRules.template, "ranked-final");
+  assert.deepEqual(
+    m.defaultRules.criteria.map((c) => c.name),
+    ["Progress", "Practicality", "Technical Complexity"],
+  );
+  assert.equal(m.defaultRules.scoring, "normalized");
+  assert.equal(m.defaultRules.finalistCount, 7);
+  assert.equal(m.defaultRules.reviews, 2);
+  assert.deepEqual(m.defaultRules.points, [3, 2, 1]);
+  assert.equal(m.defaultRules.quorum, "one");
+});
+test("organizers edit live submissions and scores with an audit trail while published snapshots stay unchanged", () => {
+  const x = setup();
+  start(x);
+  const j = judge(x);
+  complete(x, j);
+  let v = s.eventView(x.actor, x.id),
+    p = v.projects.find((p) => p.name === "Alpha"),
+    review = v.reviews.find((r) => r.projectId === p.id);
+  v = s.action(x.actor, x.id, { action: "publish" });
+  const snapshot = JSON.stringify(v.publication);
+  s.action(x.actor, x.id, {
+    action: "edit-project",
+    projectId: p.id,
+    project: { ...p, name: "Alpha edited", demo: "https://example.com/demo" },
+  });
+  const correction = {
+    action: "edit-review",
+    reviewId: review.id,
+    scores: { impact: 2, execution: 2, originality: 2 },
+    notes: "Corrected note",
+    reason: "Organizer verified the original score",
+  };
+  assert.throws(() => s.action(j, x.id, correction), /Organizer/);
+  v = s.action(x.actor, x.id, correction);
+  assert.equal(v.projects.find((row) => row.id === p.id).name, "Alpha edited");
+  assert.deepEqual(
+    v.reviews.find((r) => r.id === review.id).scores,
+    correction.scores,
+  );
+  assert.equal(JSON.stringify(v.publication), snapshot);
+  assert.ok(
+    v.audit.some(
+      (a) =>
+        a.action === "Submitted score edited" &&
+        a.detail.includes('"impact":10') &&
+        a.detail.includes('"impact":2'),
+    ),
+  );
+  const foreign = setup();
+  assert.throws(() => s.action(foreign.actor, x.id, correction), /not found/);
+  assert.throws(
+    () =>
+      s.action(x.actor, x.id, {
+        ...correction,
+        scores: { impact: 100, execution: 2, originality: 2 },
+      }),
+    /between/,
+  );
+});
+test("live configuration changes validate stored scores and preserve stage and publications", () => {
+  const x = setup();
+  start(x);
+  const j = judge(x);
+  complete(x, j);
+  let v = s.eventView(x.actor, x.id),
+    rules = {
+      ...v.event.rules,
+      criteria: v.event.rules.criteria.map((c) => ({
+        ...c,
+        name: c.name + " renamed",
+      })),
+    };
+  v = s.action(x.actor, x.id, {
+    action: "configure",
+    ...v.event,
+    rules,
+    reason: "Update rubric labels",
+  });
+  assert.equal(v.event.stage, "judging");
+  assert.equal(v.reviews.length, 2);
+  assert.equal(v.event.frozenRules.criteria[0].name, "Impact renamed");
+  assert.throws(
+    () =>
+      s.action(x.actor, x.id, {
+        action: "configure",
+        ...v.event,
+        rules: { ...rules, criteria: [{ ...rules.criteria[0], id: "new" }] },
+        reason: "Invalid criterion replacement",
+      }),
+    /whole number/,
+  );
+  assert.throws(
+    () =>
+      s.action(x.actor, x.id, {
+        action: "configure",
+        ...v.event,
+        rules,
+        reason: "",
+      }),
+    /reason/,
+  );
+});
+test("second-pass roster controls votes and quorum; corrections and reset retain first-pass scores", () => {
+  const x = setup({ template: "ranked-final" });
+  start(x);
+  const a = judge(x),
+    b = judge(x, "Final panel");
+  complete(x, a);
+  let v = s.action(x.actor, x.id, {
+    action: "start-final",
+    judgeIds: [b.judgeId],
+  });
+  assert.deepEqual(v.event.finalJudgeIds, [b.judgeId]);
+  assert.equal(v.stats.required, 1);
+  const picks = [v.event.finalists[0]];
+  assert.throws(
+    () => s.action(a, x.id, { action: "ballot", picks }),
+    /eligible/,
+  );
+  s.action(b, x.id, { action: "ballot", picks });
+  v = s.action(x.actor, x.id, {
+    action: "edit-ballot",
+    judgeId: b.judgeId,
+    picks: [v.event.finalists[1]],
+    reason: "Judge asked to correct the selection",
+  });
+  assert.equal(v.ballots[0].picks[0], v.event.finalists[1]);
+  v = s.action(x.actor, x.id, {
+    action: "final-roster",
+    judgeIds: [a.judgeId],
+    reason: "Panel reassignment",
+  });
+  assert.equal(v.ballots.length, 0);
+  assert.equal(v.stats.required, 1);
+  v = s.action(x.actor, x.id, {
+    action: "reset-final",
+    reason: "Reconfirm the panel",
+  });
+  assert.equal(v.event.stage, "judging");
+  assert.equal(v.ballots.length, 0);
+  assert.equal(v.reviews.length, 2);
+  assert.equal(v.event.finalists.length, 0);
+});
+test("Top finalists are alphabetical without ranks or preliminary scores in judge and public views", () => {
+  const x = setup({ template: "ranked-final" });
+  start(x);
+  const j = judge(x);
+  complete(x, j);
+  const owner = s.eventView(x.actor, x.id),
+    ids = owner.preliminary.map((r) => r.project.id).reverse();
+  s.action(x.actor, x.id, {
+    action: "select-finalists",
+    finalistIds: ids,
+    reason: "Confirm the selected cohort",
+  });
+  const v = s.eventView(j, x.id),
+    pub = s.publicShowcase(x.slug);
+  assert.deepEqual(
+    v.shortlist.map((p) => p.name),
+    ["Alpha", "Beta"],
+  );
+  assert.deepEqual(
+    pub.finalists.map((p) => p.name),
+    ["Alpha", "Beta"],
+  );
+  assert.equal(v.preliminary.length, 0);
+  assert.equal(JSON.stringify(v.shortlist).includes("score"), false);
+  assert.equal(v.shortlist[0].email, "");
+});
+
+test("default normalized first-pass scores match the original HackBuddy normalizer", () => {
+  const { createNormalizer } = require("../domain/normalization.ts");
+  const projects = [
+    { id: "a", name: "Alpha" },
+    { id: "b", name: "Beta" },
+    { id: "c", name: "Gamma" },
+  ];
+  const reviews = [];
+  for (const [judgeId, values] of [
+    ["one", [3, 7, 10]],
+    ["two", [4, 6, 9]],
+  ])
+    for (let i = 0; i < 3; i++)
+      reviews.push({
+        projectId: projects[i].id,
+        judgeId,
+        scores: {
+          progress: values[i],
+          practicality: values[i] - 1,
+          complexity: values[i],
+        },
+      });
+  const groups = projects.map((p) =>
+    reviews
+      .filter((r) => r.projectId === p.id)
+      .map((r) => ({
+        judgeName: r.judgeId,
+        progressScore: r.scores.progress,
+        practicalityScore: r.scores.practicality,
+        complexityScore: r.scores.complexity,
+      })),
+  );
+  const original = createNormalizer(groups);
+  for (const row of m.rankProjects(projects, reviews, m.defaultRules))
+    assert.ok(
+      Math.abs(
+        row.score -
+          original.score(
+            groups[projects.findIndex((p) => p.id === row.project.id)],
+          ),
+      ) < 1e-12,
+    );
+});
+
+test("live winners expose only public aggregate results; original optional archiving needs one ballot", () => {
+  const x = setup({ template: "ranked-final", quorum: m.defaultRules.quorum });
+  start(x);
+  const a = judge(x),
+    b = judge(x, "Other selected judge");
+  complete(x, a);
+  let v = s.action(x.actor, x.id, {
+    action: "start-final",
+    judgeIds: [a.judgeId, b.judgeId],
+  });
+  s.action(a, x.id, { action: "ballot", picks: [v.event.finalists[0]] });
+  let pub = s.publicShowcase(x.slug);
+  assert.equal(pub.publication, null);
+  assert.equal(pub.liveWinners.length, 1);
+  const encoded = JSON.stringify(pub);
+  assert.equal(encoded.includes("judgeId"), false);
+  assert.equal(encoded.includes("Private reasoning"), false);
+  assert.equal(encoded.includes("private@example.com"), false);
+  s.action(x.actor, x.id, {
+    action: "visibility",
+    visibility: "blind",
+    publicGallery: true,
+    publicResults: false,
+  });
+  assert.deepEqual(s.publicShowcase(x.slug).liveWinners, []);
+  v = s.action(x.actor, x.id, { action: "publish" });
+  assert.equal(v.event.stage, "published");
+  assert.equal(v.ballots.length, 1);
+});
+
+test("resetting a scored second pass clears saved final drafts and keeps first-pass reviews", () => {
+  const x = setup({ template: "scored-final", finalReviews: 1 });
+  start(x);
+  const j = judge(x);
+  complete(x, j);
+  s.action(x.actor, x.id, { action: "start-final" });
+  const claim = s.action(j, x.id, { action: "claim" });
+  s.action(j, x.id, {
+    action: "draft",
+    projectId: claim.project.id,
+    scores: { impact: 4 },
+    notes: "Unsubmitted second-pass draft",
+  });
+  const key = `${x.id}:final:${j.judgeId}:${claim.project.id}`;
+  assert.ok(db.get("draft", key));
+  const v = s.action(x.actor, x.id, {
+    action: "reset-final",
+    reason: "Restart second-pass judging",
+  });
+  assert.equal(db.get("draft", key), undefined);
+  assert.equal(v.reviews.length, 2);
+  assert.equal(v.event.stage, "judging");
 });
