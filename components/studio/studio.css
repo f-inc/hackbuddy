@@ -263,9 +263,6 @@
   justify-content: space-between;
   gap: 15px;
 }
-.s-demo-project-heading .s-tag {
-  background: #fff;
-}
 .studio .s-judging-preview h2 {
   font-size: 32px;
   margin: 0;
@@ -1918,4 +1915,62 @@
 .s-demo-criterion > .s-demo-slider-control {
   display: block;
   margin-bottom: 0;
+}
+
+.s-demo-preview-heading {
+  margin-bottom: 12px;
+}
+.s-demo-preview-heading .s-tag {
+  background: #fff;
+}
+.s-demo-submission-card {
+  padding: 12px;
+  background: #fff;
+  border-radius: 15px;
+  min-width: 0;
+}
+.s-demo-submission-card .s-demo-project {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 14px;
+}
+.studio .s-demo-submission-card .s-demo-builder {
+  margin: 0;
+  text-align: right;
+  font-size: 11px;
+}
+.studio .s-demo-submission-card .s-demo-project > p:not(.s-demo-builder) {
+  grid-column: 1/-1;
+  margin: 0;
+}
+.s-demo-submission-card .s-demo-review {
+  padding: 0;
+  background: transparent;
+}
+.s-demo-submission-card .s-demo-receipt {
+  min-height: 194px;
+  padding: 12px 0;
+}
+@media (min-width: 901px) {
+  .s-landing .s-demo-video {
+    height: clamp(120px, calc(24svh - 12px), 198px);
+    margin: 10px 0;
+  }
+  .s-landing .s-demo-submission-card .s-demo-review {
+    padding: 0;
+  }
+}
+@media (max-width: 700px) {
+  .s-demo-submission-card .s-demo-project {
+    grid-template-columns: 1fr;
+  }
+  .studio .s-demo-submission-card .s-demo-builder {
+    text-align: left;
+  }
+}
+@media (min-width: 901px) and (max-height: 680px) {
+  .s-landing .s-demo-video {
+    height: clamp(100px, calc(22svh - 18px), 132px);
+  }
 }

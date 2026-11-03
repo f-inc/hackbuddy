@@ -20,121 +20,128 @@ export function JudgingPreview() {
       className="s-hero-preview s-judging-preview"
       aria-label="Interactive sample project review"
     >
-      <div className="s-demo-project">
-        <div className="s-demo-project-heading">
-          <h2>WorldGym</h2>
-          <span className="s-tag">Try judging</span>
-        </div>
-        <p className="s-demo-builder">
-          By Ritik Bompilwar ·{" "}
-          <a
-            href="https://www.youtube.com/watch?v=3elKnbDIqeo"
-            target="_blank"
-            rel="noreferrer"
-          >
-            YouTube ↗
-          </a>
-        </p>
-        <p>Turn any video into a simulation for RL training.</p>
+      <div className="s-demo-preview-heading">
+        <span className="s-tag">Try Judging</span>
       </div>
-      <iframe
-        className="s-demo-video"
-        src="https://www.youtube-nocookie.com/embed/3elKnbDIqeo"
-        title="WorldGym Baseball — project demo by Ritik Bompilwar"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        referrerPolicy="strict-origin-when-cross-origin"
-        allowFullScreen
-      />
-      {submitted ? (
-        <div className="s-demo-receipt" role="status" aria-live="polite">
-          <span className="s-demo-check" aria-hidden="true">
-            ✓
-          </span>
-          <h3>Review submitted.</h3>
-          <p>
-            Your score:{" "}
-            <strong>
-              {total} / {criteria.reduce((sum, c) => sum + c.max, 0)}
-            </strong>
-          </p>
-          <div className="s-demo-score-summary">
-            {criteria.map((c) => (
-              <span key={c.id}>
-                {c.name} <strong>{submitted[c.id]}</strong>
-              </span>
-            ))}
+      <section
+        className="s-demo-submission-card"
+        aria-label="WorldGym submission"
+      >
+        <div className="s-demo-project">
+          <div className="s-demo-project-heading">
+            <h2>WorldGym</h2>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setSubmitted(null);
-              setScores(initialScores());
+          <p className="s-demo-builder">
+            By Ritik Bompilwar ·{" "}
+            <a
+              href="https://www.youtube.com/watch?v=3elKnbDIqeo"
+              target="_blank"
+              rel="noreferrer"
+            >
+              YouTube ↗
+            </a>
+          </p>
+          <p>Turn any video into a simulation for RL training.</p>
+        </div>
+        <iframe
+          className="s-demo-video"
+          src="https://www.youtube-nocookie.com/embed/3elKnbDIqeo"
+          title="WorldGym Baseball — project demo by Ritik Bompilwar"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+        />
+        {submitted ? (
+          <div className="s-demo-receipt" role="status" aria-live="polite">
+            <span className="s-demo-check" aria-hidden="true">
+              ✓
+            </span>
+            <h3>Review submitted.</h3>
+            <p>
+              Your score:{" "}
+              <strong>
+                {total} / {criteria.reduce((sum, c) => sum + c.max, 0)}
+              </strong>
+            </p>
+            <div className="s-demo-score-summary">
+              {criteria.map((c) => (
+                <span key={c.id}>
+                  {c.name} <strong>{submitted[c.id]}</strong>
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSubmitted(null);
+                setScores(initialScores());
+              }}
+            >
+              Score it again ↻
+            </button>
+          </div>
+        ) : (
+          <form
+            className="s-demo-review"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setShowHint(false);
+              setSubmitted({ ...scores });
             }}
           >
-            Score it again ↻
-          </button>
-        </div>
-      ) : (
-        <form
-          className="s-demo-review"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setShowHint(false);
-            setSubmitted({ ...scores });
-          }}
-        >
-          {criteria.map((c, index) => (
-            <div className="s-demo-criterion" key={c.id}>
-              <div>
-                <label htmlFor={`${id}-${c.id}`}>{c.name}</label>
-                <output htmlFor={`${id}-${c.id}`} aria-live="off">
-                  {scores[c.id]}
-                  <span> / {c.max}</span>
-                </output>
+            {criteria.map((c, index) => (
+              <div className="s-demo-criterion" key={c.id}>
+                <div>
+                  <label htmlFor={`${id}-${c.id}`}>{c.name}</label>
+                  <output htmlFor={`${id}-${c.id}`} aria-live="off">
+                    {scores[c.id]}
+                    <span> / {c.max}</span>
+                  </output>
+                </div>
+                <div
+                  className={`s-demo-slider-control${showHint ? " s-demo-slider-hinting" : ""}`}
+                  style={
+                    {
+                      "--hint-start": `${((scores[c.id] - c.min) / (c.max - c.min)) * 100}%`,
+                      "--hint-delay": `${0.6 + index * 0.3}s`,
+                    } as CSSProperties
+                  }
+                >
+                  <input
+                    id={`${id}-${c.id}`}
+                    className="s-demo-slider"
+                    type="range"
+                    min={c.min}
+                    max={c.max}
+                    step={1}
+                    value={scores[c.id]}
+                    onPointerDown={() => setShowHint(false)}
+                    onFocus={() => setShowHint(false)}
+                    aria-valuetext={`${scores[c.id]} out of ${c.max}`}
+                    onChange={(event) => {
+                      setShowHint(false);
+                      setScores((previous) => ({
+                        ...previous,
+                        [c.id]: Number(event.target.value),
+                      }));
+                    }}
+                  />
+                  {showHint && (
+                    <span className="s-demo-slider-hint" aria-hidden="true">
+                      <span className="s-demo-slider-hint-track" />
+                      <span className="s-demo-slider-hint-fill" />
+                      <span className="s-demo-slider-hint-thumb" />
+                    </span>
+                  )}
+                </div>
               </div>
-              <div
-                className={`s-demo-slider-control${showHint ? " s-demo-slider-hinting" : ""}`}
-                style={
-                  {
-                    "--hint-start": `${((scores[c.id] - c.min) / (c.max - c.min)) * 100}%`,
-                    "--hint-delay": `${0.6 + index * 0.3}s`,
-                  } as CSSProperties
-                }
-              >
-                <input
-                  id={`${id}-${c.id}`}
-                  className="s-demo-slider"
-                  type="range"
-                  min={c.min}
-                  max={c.max}
-                  step={1}
-                  value={scores[c.id]}
-                  onPointerDown={() => setShowHint(false)}
-                  onFocus={() => setShowHint(false)}
-                  aria-valuetext={`${scores[c.id]} out of ${c.max}`}
-                  onChange={(event) => {
-                    setShowHint(false);
-                    setScores((previous) => ({
-                      ...previous,
-                      [c.id]: Number(event.target.value),
-                    }));
-                  }}
-                />
-                {showHint && (
-                  <span className="s-demo-slider-hint" aria-hidden="true">
-                    <span className="s-demo-slider-hint-track" />
-                    <span className="s-demo-slider-hint-fill" />
-                    <span className="s-demo-slider-hint-thumb" />
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-          <button className="s-inverse" type="submit">
-            Submit review ↗
-          </button>
-        </form>
-      )}
+            ))}
+            <button className="s-inverse" type="submit">
+              Submit review ↗
+            </button>
+          </form>
+        )}
+      </section>
       <p className="s-demo-disclaimer">
         Practice review · No live scores affected.
       </p>
