@@ -23,6 +23,16 @@ export function Showcase({ slug }: { slug: string }) {
     [tv, setTv] = useState(false),
     [page, setPage] = useState(0),
     [query, setQuery] = useState("");
+  const [gallerySize, setGallerySize] = useState(4);
+  useEffect(() => {
+    const compact = window.matchMedia(
+      "(min-width: 901px) and (max-height: 839px)",
+    );
+    const resize = () => setGallerySize(compact.matches ? 2 : 4);
+    resize();
+    compact.addEventListener("change", resize);
+    return () => compact.removeEventListener("change", resize);
+  }, []);
   useEffect(() => {
     const qs = new URLSearchParams(location.search);
     api<ShowcaseData>(`public/${slug}`)
@@ -100,10 +110,12 @@ export function Showcase({ slug }: { slug: string }) {
       .toLowerCase()
       .includes(query.toLowerCase()),
   );
-  const currentPage = page % Math.max(1, Math.ceil(list.length / 8));
-  const displayed = tv
-    ? list.slice(currentPage * 8, (currentPage + 1) * 8)
-    : list;
+  const pageSize = tv ? 8 : gallerySize;
+  const currentPage = page % Math.max(1, Math.ceil(list.length / pageSize));
+  const displayed = list.slice(
+    currentPage * pageSize,
+    (currentPage + 1) * pageSize,
+  );
   async function present() {
     setQuery("");
     setPage(0);
@@ -239,6 +251,7 @@ export function Showcase({ slug }: { slug: string }) {
     );
   return (
     <Frame
+      className="s-screen s-showcase-screen"
       label={data.event.name}
       actions={
         <span className="s-tag">
@@ -246,19 +259,20 @@ export function Showcase({ slug }: { slug: string }) {
         </span>
       }
     >
-      <main className="s-container">
+      <main className="s-container s-screen-main">
         <div className="s-showcase-hero">
           <div>
-            <span className="s-eyebrow">{data.event.name}</span>
             <h1>{title}</h1>
-            <p>
-              {award
-                ? award.prize ||
-                  `Projects ${award.sponsor ? `with ${award.sponsor}` : "in this collection"}.`
-                : data.event.description}
-            </p>
+            <details className="s-inline-help">
+              <summary>About this {award ? "award" : "hackathon"}</summary>
+              <p>
+                {award
+                  ? award.prize ||
+                    `Projects ${award.sponsor ? `with ${award.sponsor}` : "in this collection"}.`
+                  : data.event.description}
+              </p>
+            </details>
           </div>
-          <span className="s-showcase-flower">✳</span>
         </div>
         <div className="s-section-heading s-showcase-controls">{controls}</div>
         <ErrorMessage message={error} />
@@ -268,7 +282,10 @@ export function Showcase({ slug }: { slug: string }) {
             aria-label="Search showcase"
             placeholder="Find an idea, a team, a spark…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(0);
+            }}
           />
         )}
         {view === "finalists" && (
@@ -284,67 +301,100 @@ export function Showcase({ slug }: { slug: string }) {
             revision {data.publication.revision}
           </p>
         )}
-        {list.length ? (
-          <div
-            className={
-              view === "winners"
-                ? "s-winner-grid"
-                : "s-project-grid s-gallery-grid"
-            }
-          >
-            {list.map((p, i) => (
-              <article className="s-gallery-card" key={p.id}>
-                <div className="s-gallery-art">
-                  <ProjectIcon name={p.name} image={p.image} />
-                  {view === "winners" ? (
-                    <span className="s-place-badge">
-                      {i + 1}
-                      {["st", "nd", "rd"][i] || "th"} place
-                    </span>
-                  ) : (
-                    p.track && <span className="s-tag">{p.track}</span>
-                  )}
-                </div>
-                <div className="s-gallery-copy">
-                  <h2>{p.name}</h2>
-                  <p>{p.description}</p>
-                  <div className="s-gallery-team">
-                    <span className="s-eyebrow">Built by</span>
-                    <strong>{p.team || "An independent team"}</strong>
-                  </div>
-                  <div className="s-actions">
-                    {p.demo && (
-                      <a
-                        className="s-button"
-                        href={p.demo}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        See the demo ↗
-                      </a>
-                    )}
-                    {p.repository && (
-                      <a href={p.repository} target="_blank" rel="noreferrer">
-                        Source ↗
-                      </a>
+        <div className="s-screen-body">
+          {list.length ? (
+            <div
+              className={
+                view === "winners"
+                  ? "s-winner-grid"
+                  : "s-project-grid s-gallery-grid"
+              }
+            >
+              {displayed.map((p, i) => (
+                <article className="s-gallery-card" key={p.id}>
+                  <div className="s-gallery-art">
+                    <ProjectIcon name={p.name} image={p.image} />
+                    {view === "winners" ? (
+                      <span className="s-place-badge">
+                        {currentPage * pageSize + i + 1}
+                        {["st", "nd", "rd"][currentPage * pageSize + i] ||
+                          "th"}{" "}
+                        place
+                      </span>
+                    ) : (
+                      p.track && <span className="s-tag">{p.track}</span>
                     )}
                   </div>
-                </div>
-              </article>
-            ))}
+                  <div className="s-gallery-copy">
+                    <h2>{p.name}</h2>
+                    <details
+                      className="s-gallery-description"
+                      name="showcase-project"
+                    >
+                      <summary>About the project</summary>
+                      <p>{p.description}</p>
+                    </details>
+                    <div className="s-gallery-team">
+                      <span className="s-eyebrow">Built by</span>
+                      <strong>{p.team || "An independent team"}</strong>
+                    </div>
+                    <div className="s-actions">
+                      {p.demo && (
+                        <a
+                          className="s-button"
+                          href={p.demo}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          See the demo ↗
+                        </a>
+                      )}
+                      {p.repository && (
+                        <a href={p.repository} target="_blank" rel="noreferrer">
+                          Source ↗
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <Empty
+              title="The stage is getting ready."
+              detail={
+                view === "winners"
+                  ? "Official winners will appear after publication."
+                  : "Projects will appear here as they are added or selected."
+              }
+            />
+          )}
+        </div>
+        {list.length > pageSize && (
+          <div className="s-pagination">
+            <span>
+              Page {currentPage + 1} of {Math.ceil(list.length / pageSize)} ·{" "}
+              {list.length} projects
+            </span>
+            <div className="s-actions">
+              <button
+                disabled={currentPage === 0}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                ← Previous
+              </button>
+              <button
+                disabled={(currentPage + 1) * pageSize >= list.length}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                Next →
+              </button>
+            </div>
           </div>
-        ) : (
-          <Empty
-            title="The stage is getting ready."
-            detail={
-              view === "winners"
-                ? "Official winners will appear after publication."
-                : "Projects will appear here as they are added or selected."
-            }
-          />
         )}
         {data.sponsors.length > 0 && (
-          <div className="s-partners">
+          <details className="s-partners">
+            <summary>Partners & sponsors</summary>
             <span className="s-eyebrow">
               With a little help from our friends
             </span>
@@ -358,7 +408,7 @@ export function Showcase({ slug }: { slug: string }) {
                   </span>
                 ))}
             </div>
-          </div>
+          </details>
         )}
       </main>
     </Frame>

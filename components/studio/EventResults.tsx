@@ -353,35 +353,37 @@ export function EventResults({
                 ? "This creates a new, immutable revision. Earlier results remain in the event history."
                 : "Use this to resolve a tie or record a deliberation decision. The reason becomes part of the publication record."}
             </p>
-            {Array.from({ length: count }, (_, i) => (
-              <Field
-                key={i}
-                label={
-                  dialog === "start-final"
-                    ? `Finalist ${i + 1}`
-                    : `Winner · place ${i + 1}`
-                }
-              >
-                <select
-                  value={selection[i] || ""}
-                  required
-                  onChange={(ev) =>
-                    setSelection((v) =>
-                      Array.from({ length: count }, (_, j) =>
-                        j === i ? ev.target.value : v[j] || "",
-                      ),
-                    )
+            <div className="s-decision-grid">
+              {Array.from({ length: count }, (_, i) => (
+                <Field
+                  key={i}
+                  label={
+                    dialog === "start-final"
+                      ? `Finalist ${i + 1}`
+                      : `Winner · place ${i + 1}`
                   }
                 >
-                  <option value="">Choose a project</option>
-                  {pool.map((v) => (
-                    <option key={v.project.id} value={v.project.id}>
-                      {v.project.name} · {v.score.toFixed(2)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            ))}
+                  <select
+                    value={selection[i] || ""}
+                    required
+                    onChange={(ev) =>
+                      setSelection((v) =>
+                        Array.from({ length: count }, (_, j) =>
+                          j === i ? ev.target.value : v[j] || "",
+                        ),
+                      )
+                    }
+                  >
+                    <option value="">Choose a project</option>
+                    {pool.map((v) => (
+                      <option key={v.project.id} value={v.project.id}>
+                        {v.project.name} · {v.score.toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ))}
+            </div>
             <Field label="Decision reason">
               <textarea
                 required

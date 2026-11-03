@@ -22,6 +22,18 @@ type Home = {
 export function StudioHome() {
   const router = useRouter();
   const [teamOpen, setTeamOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(4);
+  useEffect(() => {
+    const compact = window.matchMedia(
+      "(min-width: 901px) and (max-height: 639px)",
+    );
+    const resize = () => setPageSize(compact.matches ? 2 : 4);
+    resize();
+    compact.addEventListener("change", resize);
+    return () => compact.removeEventListener("change", resize);
+  }, []);
+  const [query, setQuery] = useState("");
   const [home, setHome] = useState<Home | null>(null),
     [loading, setLoading] = useState(true),
     [mode, setMode] = useState<"login" | "signup" | null>(null),
@@ -222,33 +234,42 @@ export function StudioHome() {
         )}
       </Frame>
     );
+  const filtered = home.events.filter((event) =>
+    `${event.name} ${event.description}`
+      .toLowerCase()
+      .includes(query.toLowerCase()),
+  );
+  const currentPage = Math.min(
+    page,
+    Math.max(0, Math.ceil(filtered.length / pageSize) - 1),
+  );
   return (
     <Frame
+      className="s-screen s-home"
       label={home.workspace.name}
       actions={
         <>
-          <span className="s-muted">{home.actor.name}</span>
           <button onClick={() => setTeamOpen(true)}>Organizers</button>
-          <button
-            onClick={async () => {
-              await api("session", { action: "logout" });
-              setHome(null);
-            }}
-          >
-            Sign out
-          </button>
+          <details className="s-account-menu">
+            <summary className="s-button">{home.actor.name} ▾</summary>
+            <div>
+              <button
+                onClick={async () => {
+                  await api("session", { action: "logout" });
+                  setHome(null);
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          </details>
         </>
       }
     >
-      <main className="s-container">
+      <main className="s-container s-screen-main">
         <div className="s-page-heading">
           <div>
-            <span className="s-eyebrow">Your hackathons</span>
-            <h1>Ready for the next build?</h1>
-            <p>
-              Set up judging, review projects, and take your finalists to demo
-              night.
-            </p>
+            <h1>Your hackathons</h1>
           </div>
           <button
             className="s-inverse"
@@ -262,10 +283,13 @@ export function StudioHome() {
           </button>
         </div>
         {home.actor.demo && (
-          <div className="s-note">
-            You’re exploring an isolated sample workspace. Changes here are
-            yours to try. Create a workspace to run your own hackathons.
-          </div>
+          <details className="s-inline-help">
+            <summary>About this demo workspace</summary>
+            <p>
+              Explore with sample data. Your changes stay in this workspace.
+              Create your own workspace when you’re ready to run a hackathon.
+            </p>
+          </details>
         )}
         <ErrorMessage message={error} />
         {!home.events.length ? (
@@ -278,33 +302,76 @@ export function StudioHome() {
             </button>
           </Empty>
         ) : (
-          <div className="s-event-grid">
-            {home.events.map((e) => (
-              <Link
-                href={`/studio/${e.id}`}
-                className="s-event-card"
-                key={e.id}
-              >
-                <div className="s-card-top">
-                  <span className={`s-tag s-stage-${e.stage}`}>{e.stage}</span>
-                  <span>↗</span>
+          <>
+            <input
+              className="s-search"
+              aria-label="Search hackathons"
+              placeholder="Find a hackathon…"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(0);
+              }}
+            />
+            <div className="s-screen-body">
+              <div className="s-event-grid">
+                {filtered
+                  .slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+                  .map((e) => (
+                    <Link
+                      href={`/studio/${e.id}`}
+                      className="s-event-card"
+                      key={e.id}
+                    >
+                      <div className="s-card-top">
+                        <span className={`s-tag s-stage-${e.stage}`}>
+                          {e.stage}
+                        </span>
+                        <span>↗</span>
+                      </div>
+                      <h2>{e.name}</h2>
+                      <p>{e.description || formats[e.rules.template]}</p>
+                      <div className="s-event-meta">
+                        <span>
+                          {e.projectCount}{" "}
+                          {e.projectCount === 1 ? "project" : "projects"}
+                        </span>
+                        <span>
+                          {e.judgeCount}{" "}
+                          {e.judgeCount === 1 ? "judge" : "judges"}
+                        </span>
+                        <span>{formats[e.rules.template]}</span>
+                      </div>
+                    </Link>
+                  ))}
+              </div>
+              {!filtered.length && (
+                <p className="s-muted">No matching hackathons.</p>
+              )}
+            </div>
+            {filtered.length > pageSize && (
+              <div className="s-pagination">
+                <span>
+                  Page {currentPage + 1} of{" "}
+                  {Math.ceil(filtered.length / pageSize)}
+                </span>
+                <div className="s-actions">
+                  <button
+                    disabled={currentPage === 0}
+                    onClick={() => setPage(currentPage - 1)}
+                  >
+                    ← Previous
+                  </button>
+                  <button
+                    disabled={(currentPage + 1) * pageSize >= filtered.length}
+                    onClick={() => setPage(currentPage + 1)}
+                  >
+                    Next →
+                  </button>
                 </div>
-                <div className="s-event-art">✳</div>
-                <h2>{e.name}</h2>
-                <p>{e.description || formats[e.rules.template]}</p>
-                <div className="s-event-meta">
-                  <span>
-                    {e.projectCount}{" "}
-                    {e.projectCount === 1 ? "project" : "projects"}
-                  </span>
-                  <span>
-                    {e.judgeCount} {e.judgeCount === 1 ? "judge" : "judges"}
-                  </span>
-                  <span>{formats[e.rules.template]}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
+              </div>
+            )}
+          </>
         )}
       </main>
       {teamOpen && (

@@ -40,7 +40,7 @@ export function WorkspaceTeam({
         aria-label="Workspace organizers"
       >
         <div className="s-section-heading">
-          <h2>A shared effort.</h2>
+          <h2>Organizers</h2>
           <button onClick={close} aria-label="Close">
             ×
           </button>
@@ -69,32 +69,34 @@ export function WorkspaceTeam({
           </div>
         ))}
         {data?.owner && (
-          <form
-            className="s-form"
-            action={async (form) => {
-              await update(Object.fromEntries(form));
-            }}
-          >
-            <h3>Invite an organizer.</h3>
-            <Field label="Name">
-              <input name="name" required />
-            </Field>
-            <Field
-              label="Initial password"
-              hint="Share the workspace address, their name, and this password directly."
+          <details className="s-team-invite">
+            <summary className="s-button">+ Add organizer</summary>
+            <form
+              className="s-form"
+              action={async (form) => {
+                await update(Object.fromEntries(form));
+              }}
             >
-              <input
-                name="password"
-                type="password"
-                minLength={6}
-                required
-                autoComplete="new-password"
-              />
-            </Field>
-            <button className="s-inverse" disabled={busy}>
-              Add organizer ↗
-            </button>
-          </form>
+              <Field label="Name">
+                <input name="name" required />
+              </Field>
+              <Field
+                label="Initial password"
+                hint="Share the workspace address, their name, and this password directly."
+              >
+                <input
+                  name="password"
+                  type="password"
+                  minLength={6}
+                  required
+                  autoComplete="new-password"
+                />
+              </Field>
+              <button className="s-inverse" disabled={busy}>
+                Add organizer ↗
+              </button>
+            </form>
+          </details>
         )}
       </section>
     </div>

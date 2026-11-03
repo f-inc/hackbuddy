@@ -76,7 +76,7 @@ export function JudgeApp({ slug }: { slug: string }) {
   }
   if (loading)
     return (
-      <Frame label="Judge’s desk">
+      <Frame className="s-screen s-judge-screen" label="Judge’s desk">
         <main className="s-container s-loading">Finding your event…</main>
       </Frame>
     );
@@ -90,15 +90,12 @@ export function JudgeApp({ slug }: { slug: string }) {
     );
   if (!view)
     return (
-      <Frame label="Judge’s desk">
+      <Frame className="s-screen s-judge-screen" label="Judge’s desk">
         <main className="s-judge-login">
           <div>
             <span className="s-eyebrow">You’re invited to judge</span>
             <h1>{info.name}</h1>
             <p>{info.description}</p>
-            <div className="s-note">
-              A fresh perspective makes all the difference.
-            </div>
           </div>
           <form className="s-panel s-form" action={login}>
             <h2>Take your seat.</h2>
@@ -143,6 +140,7 @@ export function JudgeApp({ slug }: { slug: string }) {
   const e = view.event;
   return (
     <Frame
+      className="s-screen s-judge-screen"
       label="Judge’s desk"
       actions={
         <>
@@ -165,12 +163,11 @@ export function JudgeApp({ slug }: { slug: string }) {
               {e.name} ·{" "}
               {e.stage === "final" ? "Final round" : "Project review"}
             </span>
-            <h1>A fresh perspective.</h1>
-            <p>
+            <h1>
               {e.stage === "final" && e.rules.template === "ranked-final"
-                ? "Take a closer look. Choose the ideas that should take the stage."
-                : "Take your time. Every idea deserves a thoughtful review."}
-            </p>
+                ? "Your final ballot"
+                : "Review a project"}
+            </h1>
           </div>
           <div className="s-personal-progress">
             <strong>{view.reviews.length}</strong>
@@ -178,77 +175,82 @@ export function JudgeApp({ slug }: { slug: string }) {
           </div>
         </div>
         <ErrorMessage message={error} />
-        {["published", "archived"].includes(e.stage) ? (
-          <Empty
-            title="That’s a wrap."
-            detail="Thank you for lending your perspective. Every review helped."
-          >
-            {e.rules.publicGallery && (
-              <Link className="s-button s-inverse" href={`/showcase/${slug}`}>
-                See the celebration ↗
-              </Link>
-            )}
-          </Empty>
-        ) : e.stage === "ready" ? (
-          <Empty
-            title="The room is almost ready."
-            detail="Your organizer will open judging shortly. This page updates automatically."
-          />
-        ) : e.stage === "final" && e.rules.template === "ranked-final" ? (
-          <BallotForm view={view} refresh={() => load(info.id)} />
-        ) : (
-          <ReviewDesk
-            key={`${e.id}:${e.stage}:${view.actor.judgeId}`}
-            view={view}
-            refresh={() => load(info.id)}
-          />
-        )}
-        {view.reviews.length > 0 && (
-          <details className="s-history">
-            <summary>Your submitted reviews · {view.reviews.length}</summary>
-            <div className="s-table-wrap">
-              <table className="s-table">
-                <thead>
-                  <tr>
-                    <th>Project</th>
-                    <th>Round</th>
-                    <th>Your scores</th>
-                    <th>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.reviews.map((r) => (
-                    <tr key={r.id}>
-                      <td>
-                        {view.projects.find((p) => p.id === r.projectId)?.name}
-                      </td>
-                      <td>{r.round}</td>
-                      <td>
-                        {e.rules.criteria
-                          .map((c) => `${c.name}: ${r.scores[c.id]}`)
-                          .join(" · ")}
-                      </td>
-                      <td>{r.notes || "—"}</td>
+        <div className="s-judge-body">
+          {["published", "archived"].includes(e.stage) ? (
+            <Empty
+              title="That’s a wrap."
+              detail="Thank you for lending your perspective. Every review helped."
+            >
+              {e.rules.publicGallery && (
+                <Link className="s-button s-inverse" href={`/showcase/${slug}`}>
+                  See the celebration ↗
+                </Link>
+              )}
+            </Empty>
+          ) : e.stage === "ready" ? (
+            <Empty
+              title="The room is almost ready."
+              detail="Your organizer will open judging shortly. This page updates automatically."
+            />
+          ) : e.stage === "final" && e.rules.template === "ranked-final" ? (
+            <BallotForm view={view} refresh={() => load(info.id)} />
+          ) : (
+            <ReviewDesk
+              key={`${e.id}:${e.stage}:${view.actor.judgeId}`}
+              view={view}
+              refresh={() => load(info.id)}
+            />
+          )}
+          {view.reviews.length > 0 && (
+            <details className="s-history" name="judge-history">
+              <summary>Your submitted reviews · {view.reviews.length}</summary>
+              <div className="s-table-wrap">
+                <table className="s-table">
+                  <thead>
+                    <tr>
+                      <th>Project</th>
+                      <th>Round</th>
+                      <th>Your scores</th>
+                      <th>Notes</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        )}
-        {view.results.length > 0 && (
-          <details className="s-history">
-            <summary>
-              Shared aggregate scores · {view.results.length} projects
-            </summary>
-            {view.results.map((r) => (
-              <div className="s-score-line" key={r.project.id}>
-                <span>{r.project.name}</span>
-                <strong>{r.score.toFixed(2)}</strong>
+                  </thead>
+                  <tbody>
+                    {view.reviews.map((r) => (
+                      <tr key={r.id}>
+                        <td>
+                          {
+                            view.projects.find((p) => p.id === r.projectId)
+                              ?.name
+                          }
+                        </td>
+                        <td>{r.round}</td>
+                        <td>
+                          {e.rules.criteria
+                            .map((c) => `${c.name}: ${r.scores[c.id]}`)
+                            .join(" · ")}
+                        </td>
+                        <td>{r.notes || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </details>
-        )}
+            </details>
+          )}
+          {view.results.length > 0 && (
+            <details className="s-history" name="judge-history">
+              <summary>
+                Shared aggregate scores · {view.results.length} projects
+              </summary>
+              {view.results.map((r) => (
+                <div className="s-score-line" key={r.project.id}>
+                  <span>{r.project.name}</span>
+                  <strong>{r.score.toFixed(2)}</strong>
+                </div>
+              ))}
+            </details>
+          )}
+        </div>
       </main>
     </Frame>
   );
@@ -422,7 +424,6 @@ function ReviewDesk({
           <ProjectIcon name={project.name} image={project.image} />
           {project.track && <span className="s-tag">{project.track}</span>}
         </div>
-        <span className="s-eyebrow">Meet the project</span>
         <h2>{project.name}</h2>
         <p className="s-lead">
           {project.description ||
@@ -460,9 +461,6 @@ function ReviewDesk({
             </a>
           )}
         </div>
-        <div className="s-panel-foot">
-          Assigned for balanced coverage, respecting your tracks and conflicts.
-        </div>
       </article>
       <form
         className="s-review-form s-form"
@@ -473,8 +471,7 @@ function ReviewDesk({
       >
         <div className="s-section-heading">
           <div>
-            <span className="s-eyebrow">Your perspective</span>
-            <h2>Give it some thought.</h2>
+            <h2>Score this project</h2>
           </div>
           <span className="s-caption" role="status">
             {status}
@@ -487,7 +484,12 @@ function ReviewDesk({
               <label htmlFor={`score-${c.id}`}>{c.name}</label>
               <span className="s-muted">{c.weight}× weight</span>
             </div>
-            <p>{c.guidance}</p>
+            {c.guidance && (
+              <details className="s-criterion-guide" name="criterion-guide">
+                <summary>Scoring guide</summary>
+                <p>{c.guidance}</p>
+              </details>
+            )}
             <select
               id={`score-${c.id}`}
               required
@@ -515,17 +517,20 @@ function ReviewDesk({
             </select>
           </div>
         ))}
-        <Field
-          label="Private notes"
-          hint="For your review record and the organizer. Not shown in the public gallery."
-        >
-          <textarea
-            value={notes}
-            onChange={(ev) => setNotes(ev.target.value)}
-            placeholder="What stood out? What could go further?"
-            maxLength={10000}
-          />
-        </Field>
+        <details className="s-review-notes">
+          <summary>Private notes{notes ? " · added" : " (optional)"}</summary>
+          <Field
+            label="Private notes"
+            hint="For your review record and the organizer. Not shown in the public gallery."
+          >
+            <textarea
+              value={notes}
+              onChange={(ev) => setNotes(ev.target.value)}
+              placeholder="What stood out? What could go further?"
+              maxLength={10000}
+            />
+          </Field>
+        </details>
         <div className="s-actions">
           <button className="s-inverse" disabled={busy}>
             {busy ? "Saving…" : "Submit & next project →"}
@@ -575,8 +580,17 @@ function BallotForm({
               <article className="s-project-card" key={p.id}>
                 <ProjectIcon name={p.name} image={p.image} />
                 <h3>{p.name}</h3>
-                <p>{p.description}</p>
                 <small>{p.team}</small>
+                <details name="ballot-project">
+                  <summary>Project details</summary>
+                  <p>Built by {p.team || "an independent team"}</p>
+                  <p>{p.description}</p>
+                  {p.demo && (
+                    <a href={p.demo} target="_blank" rel="noreferrer">
+                      Demo ↗
+                    </a>
+                  )}
+                </details>
               </article>
             ))}
         </div>
@@ -596,16 +610,11 @@ function BallotForm({
             .finally(() => setBusy(false));
         }}
       >
-        <span className="s-eyebrow">The final word</span>
-        <h2>
-          Your favorites,
-          <br />
-          in order.
-        </h2>
-        <p>
-          Choose {count} different projects. You can update your ballot until
-          the organizer publishes.
-        </p>
+        <h2>Rank your favorites</h2>
+        <details className="s-ballot-help">
+          <summary>Choose {count} different projects</summary>
+          <p>You can update your ballot until the organizer publishes.</p>
+        </details>
         <ErrorMessage message={error} />
         {ps.length < count && (
           <div className="s-note">
@@ -616,7 +625,7 @@ function BallotForm({
         {Array.from({ length: count }, (_, i) => (
           <Field
             key={i}
-            label={`Choice ${i + 1} · ${view.event.rules.points[i]} points`}
+            label={`Choice ${i + 1} · ${view.event.rules.points[i]} ${view.event.rules.points[i] === 1 ? "point" : "points"}`}
           >
             <select
               value={picks[i] || ""}
@@ -639,14 +648,17 @@ function BallotForm({
             </select>
           </Field>
         ))}
-        <button className="s-inverse" disabled={busy || ps.length < count}>
+        <button
+          className="s-inverse"
+          aria-live="polite"
+          disabled={busy || ps.length < count}
+        >
           {busy
             ? "Saving…"
             : saved
               ? "Ballot saved ✓"
               : "Submit final ballot ↗"}
         </button>
-        {saved && <p role="status">Your perspective is in. Thank you.</p>}
         <Progress value={picks.filter(Boolean).length} max={count} />
       </form>
     </div>
