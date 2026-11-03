@@ -21,7 +21,7 @@ export const formats = {
 };
 export function Frame({
   children,
-  label = "Event studio",
+  label = "Hackathon studio",
   actions,
 }: {
   children: ReactNode;
@@ -39,7 +39,7 @@ export function Frame({
       </header>
       {children}
       <footer className="s-footer">
-        <span>Good ideas deserve a good stage.</span>
+        <span>From first demo to final decision.</span>
         <Link href="/hackathons">Original hackathon workspace ↗</Link>
       </footer>
     </div>

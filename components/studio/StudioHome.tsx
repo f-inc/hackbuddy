@@ -105,16 +105,16 @@ export function StudioHome() {
           <div className="s-hero">
             <div className="s-hero-copy">
               <span className="s-eyebrow">
-                Made for the people who make things happen
+                For hackathon organizers & judging teams
               </span>
               <h1>
-                A home for your
+                Hackathon judging,
                 <br />
-                next big idea.
+                without the chaos.
               </h1>
               <p>
-                Run a hackathon, demo day, or community challenge. Bring the
-                projects. Set the rules. Give every idea its moment.
+                Bring in team submissions, assign judges, score working demos,
+                and announce the finalists—all in one place.
               </p>
               <div className="s-actions">
                 <button
@@ -124,41 +124,67 @@ export function StudioHome() {
                     setError("");
                   }}
                 >
-                  Create your workspace ↗
+                  Set up your hackathon ↗
                 </button>
                 <button onClick={demo} disabled={busy}>
-                  Explore a sample event
+                  Try a demo hackathon
                 </button>
               </div>
               <p className="s-caption">
-                No Airtable setup. Judges join with a name and event password.
+                No judge accounts to set up. Just a name and hackathon password.
               </p>
             </div>
-            <div className="s-hero-preview">
+            <div
+              className="s-hero-preview"
+              aria-label="Sample hackathon judging setup"
+            >
               <div className="s-preview-top">
-                <span className="s-tag">Your next event</span>
-                <span>✳</span>
+                <span className="s-tag">Sample hackathon</span>
+                <svg
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M8 3h8v5a4 4 0 0 1-8 0V3Z" />
+                  <path d="M8 5H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 1v6m-4 3h8m-6-3h4" />
+                </svg>
               </div>
-              <h2>
-                Make room
-                <br />
-                for possibility.
-              </h2>
+              <h2>Builders Weekend</h2>
               <div className="s-preview-flow">
-                Projects <span>→</span> Judging <span>→</span> A celebration
+                Submissions <span>→</span> Judging <span>→</span> Finals
               </div>
+              <dl className="s-preview-stats">
+                <div>
+                  <dt>Project submissions</dt>
+                  <dd>8</dd>
+                </div>
+                <div>
+                  <dt>Invited judges</dt>
+                  <dd>3</dd>
+                </div>
+              </dl>
               <div className="s-preview-mini">
-                <span>One event. Your rules.</span>
-                <div>
-                  Custom rubrics <span>↗</span>
-                </div>
-                <div>
-                  A fair judging queue <span>↗</span>
-                </div>
-                <div>
-                  A stage worth sharing <span>↗</span>
-                </div>
+                <span>A rubric for working demos</span>
+                {defaultRules.criteria.map((criterion) => (
+                  <div key={criterion.id}>
+                    <strong>{criterion.name}</strong>
+                    <span>
+                      {criterion.min}–{criterion.max}
+                    </span>
+                  </div>
+                ))}
               </div>
+              <p className="s-preview-format">
+                {defaultRules.reviews} reviews per project ·{" "}
+                {defaultRules.finalistCount} finalists ·{" "}
+                {defaultRules.winnerCount} winners
+              </p>
             </div>
           </div>
           <ErrorMessage message={error} />
@@ -166,18 +192,18 @@ export function StudioHome() {
             {[
               [
                 "01",
-                "Make it yours.",
-                "Choose a format, shape your rubric, and bring in projects from a spreadsheet or Airtable.",
+                "Bring in the teams.",
+                "Import team names, project descriptions, demo links, and repositories from your submission sheet.",
               ],
               [
                 "02",
-                "Keep things moving.",
-                "Invite judges, balance review coverage, and let everyone pick up where they left off.",
+                "Give every build a fair shot.",
+                "Set your rubric, invite judges, and balance project reviews. Scores and notes save as they go.",
               ],
               [
                 "03",
-                "Share the moment.",
-                "Publish the winners, present on a big screen, and keep a permanent record of the event.",
+                "Make demo night count.",
+                "Present unranked finalists on TV, collect final ballots, and publish the winners for everyone to see.",
               ],
             ].map(([n, title, detail]) => (
               <article key={n}>
@@ -198,7 +224,9 @@ export function StudioHome() {
             >
               <div className="s-section-heading">
                 <h2>
-                  {mode === "signup" ? "A fresh start." : "Welcome back."}
+                  {mode === "signup"
+                    ? "Set up your hackathon."
+                    : "Welcome back."}
                 </h2>
                 <button onClick={() => setMode(null)} aria-label="Close">
                   ×
@@ -206,15 +234,15 @@ export function StudioHome() {
               </div>
               <p>
                 {mode === "signup"
-                  ? "Create a private workspace for your events."
-                  : "Sign in to your organizer workspace."}
+                  ? "Create your organizer workspace, then set up your hackathon."
+                  : "Sign in to manage your hackathons."}
               </p>
               <form action={auth} className="s-form">
                 {mode === "signup" && (
                   <Field label="Workspace name">
                     <input
                       name="workspace"
-                      placeholder="Your community or organization"
+                      placeholder="Your club, community, or organization"
                       required
                     />
                   </Field>
@@ -289,9 +317,12 @@ export function StudioHome() {
       <main className="s-container">
         <div className="s-page-heading">
           <div>
-            <span className="s-eyebrow">Your workspace</span>
-            <h1>Good things start here.</h1>
-            <p>Every event, from the first idea to the final applause.</p>
+            <span className="s-eyebrow">Your hackathons</span>
+            <h1>Ready for the next build?</h1>
+            <p>
+              Set up judging, review projects, and take your finalists to demo
+              night.
+            </p>
           </div>
           <button
             className="s-inverse"
@@ -301,22 +332,24 @@ export function StudioHome() {
               setError("");
             }}
           >
-            + Create an event
+            + Create a hackathon
           </button>
         </div>
         {home.actor.demo && (
           <div className="s-note">
             You’re exploring an isolated sample workspace. Changes here are
-            yours to try. Create a workspace to keep your own events.
+            yours to try. Create a workspace to run your own hackathons.
           </div>
         )}
         <ErrorMessage message={error} />
         {!home.events.length ? (
           <Empty
-            title="Your first event awaits."
-            detail="Start with a format. Make it your own."
+            title="Your first hackathon starts here."
+            detail="Choose your judging format, import submissions, and invite your panel."
           >
-            <button onClick={() => setCreate(true)}>Create an event ↗</button>
+            <button onClick={() => setCreate(true)}>
+              Create a hackathon ↗
+            </button>
           </Empty>
         ) : (
           <div className="s-event-grid">
@@ -360,11 +393,11 @@ export function StudioHome() {
             className="s-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Create event"
+            aria-label="Create hackathon"
           >
             <div className="s-section-heading">
               <span className="s-eyebrow">
-                Create an event · {step + 1} of 3
+                Create a hackathon · {step + 1} of 3
               </span>
               <button onClick={() => setCreate(false)} aria-label="Close">
                 ×
@@ -373,9 +406,9 @@ export function StudioHome() {
             <h2>
               {
                 [
-                  "What’s the occasion?",
-                  "Choose your format.",
-                  "Open the door.",
+                  "Name your hackathon.",
+                  "How will judging work?",
+                  "Invite your judging panel.",
                 ][step]
               }
             </h2>
@@ -389,7 +422,7 @@ export function StudioHome() {
             >
               {step === 0 && (
                 <>
-                  <Field label="Event name">
+                  <Field label="Hackathon name">
                     <input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -418,10 +451,10 @@ export function StudioHome() {
                       <strong>{label}</strong>
                       <span>
                         {key === "single"
-                          ? "A simple, complete rubric-based competition."
+                          ? "Score projects against a custom rubric in one judging round."
                           : key === "scored-final"
                             ? "Shortlist projects, then score the finalists."
-                            : "Score projects, then rank your favorite finalists."}
+                            : "Score submissions, then let judges rank their favorite finalists."}
                       </span>
                     </button>
                   ))}
@@ -430,8 +463,8 @@ export function StudioHome() {
               {step === 2 && (
                 <>
                   <p>
-                    Judges use their name and this shared event password. You
-                    can restrict access to an invited roster in settings.
+                    Judges use their name and this shared hackathon password.
+                    You can restrict access to an invited roster in settings.
                   </p>
                   <Field label="Judge password">
                     <input
@@ -461,7 +494,7 @@ export function StudioHome() {
                     ? "Creating…"
                     : step < 2
                       ? "Continue →"
-                      : "Create event ↗"}
+                      : "Create hackathon ↗"}
                 </button>
               </div>
             </form>
