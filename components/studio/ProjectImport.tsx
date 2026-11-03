@@ -13,6 +13,7 @@ type Preview = {
   updated: number;
   rows: Record<string, unknown>[];
 };
+const PAGE_SIZE = 4;
 export function ProjectImport({
   view,
   run,
@@ -22,6 +23,7 @@ export function ProjectImport({
   run: RunAction;
   busy: boolean;
 }) {
+  const [page, setPage] = useState(0);
   const [source, setSource] = useState<"csv" | "airtable" | "manual" | null>(
       null,
     ),
@@ -105,8 +107,7 @@ export function ProjectImport({
     <section>
       <div className="s-section-heading">
         <div>
-          <h2>Bring the ideas.</h2>
-          <p>A spreadsheet, an Airtable, or one project at a time.</p>
+          <h2>Projects</h2>
         </div>
         <div className="s-actions">
           <a
@@ -352,7 +353,10 @@ export function ProjectImport({
         aria-label="Search projects"
         placeholder="Search projects, teams, tracks…"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setPage(0);
+        }}
       />
       {filtered.length ? (
         <div className="s-table-wrap">
@@ -367,40 +371,88 @@ export function ProjectImport({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <div className="s-project-cell">
-                      <ProjectIcon name={p.name} image={p.image} />
-                      <div>
-                        <strong>{p.name}</strong>
-                        <small>{p.description}</small>
+              {filtered
+                .slice(
+                  Math.min(
+                    page,
+                    Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1),
+                  ) * PAGE_SIZE,
+                  (Math.min(
+                    page,
+                    Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1),
+                  ) +
+                    1) *
+                    PAGE_SIZE,
+                )
+                .map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <div className="s-project-cell">
+                        <ProjectIcon name={p.name} image={p.image} />
+                        <div>
+                          <strong>{p.name}</strong>
+                          {p.description && (
+                            <details className="s-project-description">
+                              <summary>Details</summary>
+                              <p>{p.description}</p>
+                            </details>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td>{p.team || "—"}</td>
-                  <td>{p.track || "—"}</td>
-                  <td>{p.tools || "—"}</td>
-                  <td>
-                    {editable && (
-                      <button
-                        aria-label={`Remove ${p.name}`}
-                        disabled={busy}
-                        onClick={() =>
-                          run({
-                            action: "remove-project",
-                            projectId: p.id,
-                          }).catch(() => {})
-                        }
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>{p.team || "—"}</td>
+                    <td>{p.track || "—"}</td>
+                    <td>{p.tools || "—"}</td>
+                    <td>
+                      {editable && (
+                        <details
+                          className="s-judge-actions"
+                          name="project-actions"
+                        >
+                          <summary>Actions</summary>
+                          <button
+                            aria-label={`Remove ${p.name}`}
+                            disabled={busy}
+                            onClick={() =>
+                              run({
+                                action: "remove-project",
+                                projectId: p.id,
+                              }).catch(() => {})
+                            }
+                          >
+                            Remove
+                          </button>
+                        </details>
+                      )}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
+          {filtered.length > PAGE_SIZE && (
+            <div className="s-list-pagination">
+              <span>
+                Page{" "}
+                {Math.min(page + 1, Math.ceil(filtered.length / PAGE_SIZE))} of{" "}
+                {Math.ceil(filtered.length / PAGE_SIZE)} · {filtered.length}{" "}
+                projects
+              </span>
+              <div className="s-actions">
+                <button
+                  disabled={page <= 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                >
+                  ← Previous
+                </button>
+                <button
+                  disabled={page >= Math.ceil(filtered.length / PAGE_SIZE) - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <Empty

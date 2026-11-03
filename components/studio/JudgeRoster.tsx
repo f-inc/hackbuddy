@@ -22,8 +22,8 @@ export function JudgeRoster({
     <section>
       <div className="s-section-heading">
         <div>
-          <h2>Good people. Good judgment.</h2>
-          <p>Names and an event password. No account setup for judges.</p>
+          <h2>Judges</h2>
+          <p>Invite your panel and manage access.</p>
         </div>
         {!closed && (
           <button
@@ -36,13 +36,19 @@ export function JudgeRoster({
           </button>
         )}
       </div>
-      <div className="s-note">
-        {view.event.rules.guests
-          ? "Anyone with your event password can join. Turn off open judge access in settings to require an invitation."
-          : "Only the active names below can sign in. Share the event password separately."}{" "}
-        A judge’s name is their sign-in identity; use distinct names within this
-        event.
-      </div>
+      <details className="s-roster-policy">
+        <summary>
+          Judge access ·{" "}
+          {view.event.rules.guests ? "Open with password" : "Invitation only"}
+        </summary>
+        <p>
+          {view.event.rules.guests
+            ? "Anyone with your event password can join. Turn off open judge access in settings to require an invitation."
+            : "Only the active names below can sign in. Share the event password separately."}{" "}
+          A judge’s name is their sign-in identity; use distinct names within
+          this event.
+        </p>
+      </details>
       {editing && (
         <form
           className="s-import-panel s-form"
@@ -168,47 +174,50 @@ export function JudgeRoster({
                     </span>
                   </td>
                   <td>
-                    <div className="s-actions">
-                      <button
-                        onClick={() =>
-                          navigator.clipboard
-                            .writeText(
-                              `${location.origin}/events/${view.event.slug}?name=${encodeURIComponent(j.name)}`,
-                            )
-                            .then(() =>
-                              setCopied(
-                                `Invitation link copied for ${j.name}. Share the password separately.`,
-                              ),
-                            )
-                            .catch(() =>
-                              setCopied(
+                    <details className="s-judge-actions" name="judge-actions">
+                      <summary>Actions</summary>
+                      <div className="s-actions">
+                        <button
+                          onClick={() =>
+                            navigator.clipboard
+                              .writeText(
                                 `${location.origin}/events/${view.event.slug}?name=${encodeURIComponent(j.name)}`,
-                              ),
-                            )
-                        }
-                      >
-                        Copy invite ↗
-                      </button>
-                      {!closed && (
-                        <>
-                          <button onClick={() => setEditing({ ...j })}>
-                            Edit
-                          </button>
-                          <button
-                            disabled={busy}
-                            onClick={() =>
-                              run({
-                                action: "judge",
-                                ...j,
-                                active: !j.active,
-                              }).catch(() => {})
-                            }
-                          >
-                            {j.active ? "Revoke" : "Restore"}
-                          </button>
-                        </>
-                      )}
-                    </div>
+                              )
+                              .then(() =>
+                                setCopied(
+                                  `Invitation link copied for ${j.name}. Share the password separately.`,
+                                ),
+                              )
+                              .catch(() =>
+                                setCopied(
+                                  `${location.origin}/events/${view.event.slug}?name=${encodeURIComponent(j.name)}`,
+                                ),
+                              )
+                          }
+                        >
+                          Copy invite ↗
+                        </button>
+                        {!closed && (
+                          <>
+                            <button onClick={() => setEditing({ ...j })}>
+                              Edit
+                            </button>
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                run({
+                                  action: "judge",
+                                  ...j,
+                                  active: !j.active,
+                                }).catch(() => {})
+                              }
+                            >
+                              {j.active ? "Revoke" : "Restore"}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </details>
                   </td>
                 </tr>
               ))}

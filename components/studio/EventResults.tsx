@@ -2,8 +2,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { EventView, Rank } from "@/domain/studio/model";
-import { ErrorMessage, Field, Progress } from "./shared";
+import { Empty, ErrorMessage, Field, Progress } from "./shared";
 import type { RunAction } from "./EventWorkspace";
+const PAGE_SIZE = 4;
 export function EventResults({
   view,
   run,
@@ -54,44 +55,61 @@ export function EventResults({
   );
   const snapshot =
     view.publications.find((p) => p.revision === revision) || view.publication;
+  if (["draft", "ready"].includes(e.stage))
+    return (
+      <section>
+        <div className="s-section-heading">
+          <h2>Results</h2>
+        </div>
+        <Empty
+          title="No reviews yet."
+          detail="Open judging to collect scores and see the results here."
+        />
+      </section>
+    );
   return (
     <section>
       <div className="s-section-heading">
-        <div>
-          <h2>Let the ideas speak.</h2>
-          <p>
-            {e.rules.scoring === "average"
-              ? "Weighted rubric scores, scaled to 100. Final ballots use your configured points."
-              : "Judge-normalized scores. Raw scores remain available in exports."}
-          </p>
+        <div className="s-results-title">
+          <h2>Results</h2>
+          <details className="s-scoring-help">
+            <summary>How scores work</summary>
+            <p>
+              {e.rules.scoring === "average"
+                ? "Weighted rubric scores, scaled to 100. Final ballots use your configured points."
+                : "Judge-normalized scores. Raw scores remain available in exports."}
+            </p>
+          </details>
         </div>
-        <div className="s-actions">
-          <a
-            className="s-button"
-            href={`/api/studio/events/${e.id}/export?kind=results`}
-          >
-            Export results ↓
-          </a>
-          <a
-            className="s-button"
-            href={`/api/studio/events/${e.id}/export?kind=reviews`}
-          >
-            Export reviews ↓
-          </a>
-        </div>
+        <details className="s-result-exports">
+          <summary className="s-button">Export ↓</summary>
+          <div className="s-actions">
+            <a
+              className="s-button"
+              href={`/api/studio/events/${e.id}/export?kind=results`}
+            >
+              Export results ↓
+            </a>
+            <a
+              className="s-button"
+              href={`/api/studio/events/${e.id}/export?kind=reviews`}
+            >
+              Export reviews ↓
+            </a>
+          </div>
+        </details>
       </div>
       <div className="s-round-panel">
         <div>
-          <span className="s-eyebrow">Round controls</span>
           <h3>
             {
               {
-                draft: "First, set the stage.",
-                ready: "Ready when you are.",
-                judging: "The first impressions.",
-                final: "A closer look.",
-                published: "The moment is official.",
-                archived: "A chapter worth keeping.",
+                draft: "Setup in progress",
+                ready: "Ready to open judging",
+                judging: "Preliminary judging",
+                final: "Final judging",
+                published: "Results published",
+                archived: "Hackathon archived",
               }[e.stage]
             }
           </h3>
@@ -112,9 +130,19 @@ export function EventResults({
               >
                 Select finalists & open final ↗
               </button>
-              <button onClick={() => open("start-final")}>
-                Resolve finalist tie / override
-              </button>
+              <details className="s-result-decisions">
+                <summary>More options</summary>
+                <button
+                  onClick={(event) => {
+                    open("start-final");
+                    event.currentTarget
+                      .closest("details")
+                      ?.removeAttribute("open");
+                  }}
+                >
+                  Resolve finalist tie / override
+                </button>
+              </details>
             </>
           )}
           {((e.stage === "judging" && e.rules.template === "single") ||
@@ -127,9 +155,19 @@ export function EventResults({
               >
                 Publish official results ↗
               </button>
-              <button onClick={() => open("publish")}>
-                Resolve ties / select winners
-              </button>
+              <details className="s-result-decisions">
+                <summary>More options</summary>
+                <button
+                  onClick={(event) => {
+                    open("publish");
+                    event.currentTarget
+                      .closest("details")
+                      ?.removeAttribute("open");
+                  }}
+                >
+                  Resolve ties / select winners
+                </button>
+              </details>
             </>
           )}
           {view.publication && (
@@ -141,9 +179,19 @@ export function EventResults({
               >
                 See the celebration ↗
               </Link>
-              <button onClick={() => open("revise")}>
-                Correct published results
-              </button>
+              <details className="s-result-decisions">
+                <summary>More options</summary>
+                <button
+                  onClick={(event) => {
+                    open("revise");
+                    event.currentTarget
+                      .closest("details")
+                      ?.removeAttribute("open");
+                  }}
+                >
+                  Correct published results
+                </button>
+              </details>
             </>
           )}
         </div>
@@ -208,54 +256,65 @@ export function EventResults({
           </Link>
         </div>
       )}
-      <Ranking rows={ranked} />
-      <div className="s-section">
-        <h3>At their desks.</h3>
-        <p>
-          Reservations renew while judges are active. Releasing a reservation
-          preserves the draft.
-        </p>
-        {view.reservations.length ? (
-          <div className="s-table-wrap">
-            <table className="s-table">
-              <thead>
-                <tr>
-                  <th>Project</th>
-                  <th>Judge</th>
-                  <th>Expires</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {view.reservations.map((r) => (
-                  <tr key={`${r.round}:${r.projectId}`}>
-                    <td>
-                      {view.projects.find((p) => p.id === r.projectId)?.name}
-                    </td>
-                    <td>{view.judges.find((j) => j.id === r.judgeId)?.name}</td>
-                    <td>{new Date(r.expiresAt).toLocaleTimeString()}</td>
-                    <td>
-                      <button
-                        disabled={busy}
-                        onClick={() =>
-                          run({
-                            action: "release",
-                            projectId: r.projectId,
-                          }).catch(() => {})
-                        }
-                      >
-                        Release
-                      </button>
-                    </td>
+      {view.publication ? (
+        <details className="s-standings-disclosure">
+          <summary>All standings</summary>
+          <Ranking rows={ranked} />
+        </details>
+      ) : (
+        <Ranking rows={ranked} />
+      )}
+      {view.reservations.length > 0 && (
+        <details className="s-reservations-disclosure">
+          <summary>Active reservations · {view.reservations.length}</summary>
+          <p>
+            Reservations renew while judges are active. Releasing a reservation
+            preserves the draft.
+          </p>
+          {view.reservations.length ? (
+            <div className="s-table-wrap">
+              <table className="s-table">
+                <thead>
+                  <tr>
+                    <th>Project</th>
+                    <th>Judge</th>
+                    <th>Expires</th>
+                    <th />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="s-note">No active reservations.</div>
-        )}
-      </div>
+                </thead>
+                <tbody>
+                  {view.reservations.map((r) => (
+                    <tr key={`${r.round}:${r.projectId}`}>
+                      <td>
+                        {view.projects.find((p) => p.id === r.projectId)?.name}
+                      </td>
+                      <td>
+                        {view.judges.find((j) => j.id === r.judgeId)?.name}
+                      </td>
+                      <td>{new Date(r.expiresAt).toLocaleTimeString()}</td>
+                      <td>
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            run({
+                              action: "release",
+                              projectId: r.projectId,
+                            }).catch(() => {})
+                          }
+                        >
+                          Release
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="s-note">No active reservations.</div>
+          )}
+        </details>
+      )}
       {dialog && (
         <div className="s-modal-backdrop">
           <form
@@ -346,6 +405,11 @@ export function EventResults({
   );
 }
 function Ranking({ rows }: { rows: Rank[] }) {
+  const [page, setPage] = useState(0);
+  const currentPage = Math.min(
+    page,
+    Math.max(0, Math.ceil(rows.length / PAGE_SIZE) - 1),
+  );
   return (
     <div className="s-table-wrap">
       <table className="s-table">
@@ -360,26 +424,49 @@ function Ranking({ rows }: { rows: Rank[] }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={r.project.id}>
-              <td className="s-muted">{i + 1}</td>
-              <td>
-                <strong>{r.project.name}</strong>
-              </td>
-              <td>{r.project.team || "—"}</td>
-              <td>{r.score.toFixed(2)}</td>
-              <td>{r.reviews}</td>
-              <td>
-                {r.reviews === 0 ? (
-                  <span className="s-tag">Awaiting scores</span>
-                ) : (
-                  r.tied && <span className="s-tag">Tied</span>
-                )}
-              </td>
-            </tr>
-          ))}
+          {rows
+            .slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
+            .map((r, i) => (
+              <tr key={r.project.id}>
+                <td className="s-muted">{currentPage * PAGE_SIZE + i + 1}</td>
+                <td>
+                  <strong>{r.project.name}</strong>
+                </td>
+                <td>{r.project.team || "—"}</td>
+                <td>{r.score.toFixed(2)}</td>
+                <td>{r.reviews}</td>
+                <td>
+                  {r.reviews === 0 ? (
+                    <span className="s-tag">Awaiting scores</span>
+                  ) : (
+                    r.tied && <span className="s-tag">Tied</span>
+                  )}
+                </td>
+              </tr>
+            ))}
         </tbody>
       </table>
+      {rows.length > PAGE_SIZE && (
+        <div className="s-list-pagination">
+          <span>
+            Page {currentPage + 1} of {Math.ceil(rows.length / PAGE_SIZE)}
+          </span>
+          <div className="s-actions">
+            <button
+              disabled={currentPage === 0}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              ← Previous
+            </button>
+            <button
+              disabled={(currentPage + 1) * PAGE_SIZE >= rows.length}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
       {!rows.length && (
         <p className="s-note">
           Scores will appear as projects enter this round.

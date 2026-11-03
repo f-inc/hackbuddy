@@ -35,6 +35,10 @@ export function EventSettings({
   return (
     <form
       className="s-settings"
+      onInvalidCapture={(event) => {
+        const section = (event.target as HTMLElement).closest("details");
+        if (section) section.open = true;
+      }}
       onSubmit={(e) => {
         e.preventDefault();
         run({
@@ -48,10 +52,10 @@ export function EventSettings({
     >
       <div className="s-section-heading">
         <div>
-          <h2>Your event. Your rules.</h2>
+          <h2>Judging settings</h2>
           <p>
             {editable
-              ? "Make it fit the way your community creates."
+              ? "Configure the format and rubric before opening judging."
               : "The judging configuration was frozen when the event opened."}
           </p>
         </div>
@@ -62,12 +66,17 @@ export function EventSettings({
         )}
       </div>
       <fieldset disabled={!editable || busy}>
-        <section className="s-settings-section">
-          <div>
-            <h3>The essentials.</h3>
-            <p>The name and story behind your event.</p>
-          </div>
+        <details className="s-settings-section" name="workspace-settings">
+          <summary>
+            <h3>Hackathon details</h3>
+            <span className="s-disclosure-arrow" aria-hidden="true">
+              +
+            </span>
+          </summary>
           <div className="s-form">
+            <p className="s-settings-context">
+              The name and story behind your event.
+            </p>
             <Field label="Event name">
               <input
                 value={draft.name}
@@ -110,13 +119,18 @@ export function EventSettings({
               />
             </Field>
           </div>
-        </section>
-        <section className="s-settings-section">
-          <div>
-            <h3>A format that fits.</h3>
-            <p>Start simple or give your finalists another moment.</p>
-          </div>
+        </details>
+        <details className="s-settings-section" name="workspace-settings">
+          <summary>
+            <h3>Judging format</h3>
+            <span className="s-disclosure-arrow" aria-hidden="true">
+              +
+            </span>
+          </summary>
           <div className="s-form">
+            <p className="s-settings-context">
+              Start simple or give your finalists another moment.
+            </p>
             <Field label="Judging format">
               <select
                 value={r.template}
@@ -234,16 +248,19 @@ export function EventSettings({
               </select>
             </Field>
           </div>
-        </section>
-        <section className="s-settings-section">
-          <div>
-            <h3>What matters here?</h3>
-            <p>
+        </details>
+        <details className="s-settings-section" name="workspace-settings">
+          <summary>
+            <h3>Scoring rubric</h3>
+            <span className="s-disclosure-arrow" aria-hidden="true">
+              +
+            </span>
+          </summary>
+          <div className="s-form">
+            <p className="s-settings-context">
               Every criterion has its own guidance, scale, and weight. Ties
               require an organizer decision with a recorded reason.
             </p>
-          </div>
-          <div className="s-form">
             {r.criteria.map((c, i) => (
               <div key={c.id} className="s-criterion-edit">
                 <div className="s-section-heading">
@@ -340,16 +357,19 @@ export function EventSettings({
               + Add a criterion
             </button>
           </div>
-        </section>
-        <section className="s-settings-section">
-          <div>
-            <h3>The right people.</h3>
-            <p>
+        </details>
+        <details className="s-settings-section" name="workspace-settings">
+          <summary>
+            <h3>Judge access</h3>
+            <span className="s-disclosure-arrow" aria-hidden="true">
+              +
+            </span>
+          </summary>
+          <div className="s-form">
+            <p className="s-settings-context">
               Keep judge access simple. Use the roster when you want a closed
               group.
             </p>
-          </div>
-          <div className="s-form">
             <label className="s-toggle">
               <input
                 type="checkbox"
@@ -373,15 +393,18 @@ export function EventSettings({
               />
             </Field>
           </div>
-        </section>
-        <section className="s-settings-section">
-          <div>
-            <h3>Partners & collections.</h3>
-            <p>
+        </details>
+        <details className="s-settings-section" name="workspace-settings">
+          <summary>
+            <h3>Partners & awards</h3>
+            <span className="s-disclosure-arrow" aria-hidden="true">
+              +
+            </span>
+          </summary>
+          <div className="s-form">
+            <p className="s-settings-context">
               Give a sponsor, a tool, or a track its own place in the showcase.
             </p>
-          </div>
-          <div className="s-form">
             {draft.sponsors.map((a, i) => (
               <div className="s-criterion-edit" key={a.id}>
                 <div className="s-section-heading">
@@ -447,17 +470,20 @@ export function EventSettings({
               + Add a collection
             </button>
           </div>
-        </section>
+        </details>
       </fieldset>
-      <section className="s-settings-section">
-        <div>
-          <h3>Who sees what.</h3>
-          <p>
+      <details className="s-settings-section" name="workspace-settings">
+        <summary>
+          <h3>Visibility</h3>
+          <span className="s-disclosure-arrow" aria-hidden="true">
+            +
+          </span>
+        </summary>
+        <div className="s-form">
+          <p className="s-settings-context">
             Visibility can change during the event. Notes and contact details
             stay private.
           </p>
-        </div>
-        <div className="s-form">
           <Field label="Scores visible to judges">
             <select
               value={r.visibility}
@@ -503,15 +529,7 @@ export function EventSettings({
             </button>
           )}
         </div>
-      </section>
-      {editable && (
-        <div className="s-sticky-save">
-          <span>Settings freeze when judging opens.</span>
-          <button className="s-inverse" disabled={busy}>
-            {busy ? "Saving…" : "Save event settings ↗"}
-          </button>
-        </div>
-      )}
+      </details>
     </form>
   );
 }
