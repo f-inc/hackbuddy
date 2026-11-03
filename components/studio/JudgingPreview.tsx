@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState } from "react";
+import { useId, useState, type CSSProperties } from "react";
 import { defaultRules } from "@/domain/studio/model";
 
 const criteria = defaultRules.criteria;
@@ -7,6 +7,7 @@ const initialScores = () => Object.fromEntries(criteria.map((c) => [c.id, 5]));
 
 export function JudgingPreview() {
   const id = useId();
+  const [showHint, setShowHint] = useState(true);
   const [scores, setScores] = useState<Record<string, number>>(initialScores);
   const [submitted, setSubmitted] = useState<Record<string, number> | null>(
     null,
@@ -78,10 +79,11 @@ export function JudgingPreview() {
           className="s-demo-review"
           onSubmit={(event) => {
             event.preventDefault();
+            setShowHint(false);
             setSubmitted({ ...scores });
           }}
         >
-          {criteria.map((c) => (
+          {criteria.map((c, index) => (
             <div className="s-demo-criterion" key={c.id}>
               <div>
                 <label htmlFor={`${id}-${c.id}`}>{c.name}</label>
@@ -90,22 +92,42 @@ export function JudgingPreview() {
                   <span> / {c.max}</span>
                 </output>
               </div>
-              <input
-                id={`${id}-${c.id}`}
-                className="s-demo-slider"
-                type="range"
-                min={c.min}
-                max={c.max}
-                step={1}
-                value={scores[c.id]}
-                aria-valuetext={`${scores[c.id]} out of ${c.max}`}
-                onChange={(event) =>
-                  setScores((previous) => ({
-                    ...previous,
-                    [c.id]: Number(event.target.value),
-                  }))
+              <div
+                className={`s-demo-slider-control${showHint ? " s-demo-slider-hinting" : ""}`}
+                style={
+                  {
+                    "--hint-start": `${((scores[c.id] - c.min) / (c.max - c.min)) * 100}%`,
+                    "--hint-delay": `${0.6 + index * 0.3}s`,
+                  } as CSSProperties
                 }
-              />
+              >
+                <input
+                  id={`${id}-${c.id}`}
+                  className="s-demo-slider"
+                  type="range"
+                  min={c.min}
+                  max={c.max}
+                  step={1}
+                  value={scores[c.id]}
+                  onPointerDown={() => setShowHint(false)}
+                  onFocus={() => setShowHint(false)}
+                  aria-valuetext={`${scores[c.id]} out of ${c.max}`}
+                  onChange={(event) => {
+                    setShowHint(false);
+                    setScores((previous) => ({
+                      ...previous,
+                      [c.id]: Number(event.target.value),
+                    }));
+                  }}
+                />
+                {showHint && (
+                  <span className="s-demo-slider-hint" aria-hidden="true">
+                    <span className="s-demo-slider-hint-track" />
+                    <span className="s-demo-slider-hint-fill" />
+                    <span className="s-demo-slider-hint-thumb" />
+                  </span>
+                )}
+              </div>
             </div>
           ))}
           <button className="s-inverse" type="submit">

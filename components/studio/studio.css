@@ -1827,3 +1827,95 @@
     min-height: 203px;
   }
 }
+
+/* Demonstrate the drag gesture without modifying the practice scores. */
+.s-demo-slider-control {
+  position: relative;
+  height: 24px;
+}
+.s-demo-slider-hinting .s-demo-slider {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+}
+.s-demo-slider-hint {
+  position: absolute;
+  inset: 0 8px;
+  pointer-events: none;
+}
+.s-demo-slider-hint-track,
+.s-demo-slider-hint-fill {
+  position: absolute;
+  top: 10px;
+  height: 4px;
+  border-radius: 100px;
+  left: 0;
+}
+.s-demo-slider-hint-track {
+  width: 100%;
+  background: #e7e7e7;
+}
+.s-demo-slider-hint-fill {
+  width: var(--hint-start);
+  background: #333;
+  animation: s-demo-hint-fill 3.8s ease-in-out var(--hint-delay) 2 both;
+}
+.s-demo-slider-hint-thumb {
+  position: absolute;
+  top: 5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #333;
+  left: var(--hint-start);
+  transform: translateX(-50%);
+  animation: s-demo-hint-thumb 3.8s ease-in-out var(--hint-delay) 2 both;
+}
+@keyframes s-demo-hint-thumb {
+  0%,
+  55%,
+  100% {
+    left: var(--hint-start);
+  }
+  16% {
+    left: calc(var(--hint-start) + 12%);
+  }
+  34% {
+    left: calc(var(--hint-start) - 8%);
+  }
+  45% {
+    left: calc(var(--hint-start) + 3%);
+  }
+}
+@keyframes s-demo-hint-fill {
+  0%,
+  55%,
+  100% {
+    width: var(--hint-start);
+  }
+  16% {
+    width: calc(var(--hint-start) + 12%);
+  }
+  34% {
+    width: calc(var(--hint-start) - 8%);
+  }
+  45% {
+    width: calc(var(--hint-start) + 3%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .s-demo-slider-hint {
+    display: none;
+  }
+  .s-demo-slider-hinting .s-demo-slider {
+    opacity: 1;
+  }
+  .s-demo-slider-hint-fill,
+  .s-demo-slider-hint-thumb {
+    animation: none;
+  }
+}
+.s-demo-criterion > .s-demo-slider-control {
+  display: block;
+  margin-bottom: 0;
+}
