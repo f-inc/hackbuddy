@@ -91,6 +91,7 @@ export function StudioHome() {
   if (!home)
     return (
       <Frame
+        className="s-landing"
         actions={
           <button
             onClick={() => {
@@ -102,7 +103,7 @@ export function StudioHome() {
           </button>
         }
       >
-        <main className="s-container">
+        <main className="s-container s-landing-main">
           <div className="s-hero">
             <div className="s-hero-copy">
               <span className="s-eyebrow">
@@ -138,31 +139,6 @@ export function StudioHome() {
             <JudgingPreview />
           </div>
           <ErrorMessage message={error} />
-          <section className="s-feature-grid">
-            {[
-              [
-                "01",
-                "Bring in the teams.",
-                "Import team names, project descriptions, demo links, and repositories from your submission sheet.",
-              ],
-              [
-                "02",
-                "Give every build a fair shot.",
-                "Set your rubric, invite judges, and balance project reviews. Scores and notes save as they go.",
-              ],
-              [
-                "03",
-                "Make demo night count.",
-                "Present unranked finalists on TV, collect final ballots, and publish the winners for everyone to see.",
-              ],
-            ].map(([n, title, detail]) => (
-              <article key={n}>
-                <span className="s-eyebrow">{n}</span>
-                <h3>{title}</h3>
-                <p>{detail}</p>
-              </article>
-            ))}
-          </section>
         </main>
         {mode && (
           <div className="s-modal-backdrop">

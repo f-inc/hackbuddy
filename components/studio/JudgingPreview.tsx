@@ -19,13 +19,21 @@ export function JudgingPreview() {
       className="s-hero-preview s-judging-preview"
       aria-label="Interactive sample project review"
     >
-      <div className="s-demo-heading">
-        <span className="s-tag">Try judging a project</span>
-        <span className="s-caption">Sample submission</span>
-      </div>
       <div className="s-demo-project">
-        <h2>WorldGym</h2>
-        <p className="s-demo-builder">Built by Ritik Bompilwar</p>
+        <div className="s-demo-project-heading">
+          <h2>WorldGym</h2>
+          <span className="s-tag">Try judging</span>
+        </div>
+        <p className="s-demo-builder">
+          By Ritik Bompilwar ·{" "}
+          <a
+            href="https://www.youtube.com/watch?v=3elKnbDIqeo"
+            target="_blank"
+            rel="noreferrer"
+          >
+            YouTube ↗
+          </a>
+        </p>
         <p>Turn any video into a simulation for RL training.</p>
       </div>
       <iframe
@@ -36,16 +44,6 @@ export function JudgingPreview() {
         referrerPolicy="strict-origin-when-cross-origin"
         allowFullScreen
       />
-      <div className="s-demo-video-caption">
-        <span>Watch the demo. Give it a score.</span>
-        <a
-          href="https://www.youtube.com/watch?v=3elKnbDIqeo"
-          target="_blank"
-          rel="noreferrer"
-        >
-          YouTube ↗
-        </a>
-      </div>
       {submitted ? (
         <div className="s-demo-receipt" role="status" aria-live="polite">
           <span className="s-demo-check" aria-hidden="true">
@@ -116,7 +114,7 @@ export function JudgingPreview() {
         </form>
       )}
       <p className="s-demo-disclaimer">
-        Just a practice review. Live hackathon results stay untouched.
+        Practice review · No live scores affected.
       </p>
     </article>
   );

@@ -257,54 +257,45 @@
   padding: 25px;
   min-width: 0;
 }
-.s-demo-heading {
+.s-demo-project-heading {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   gap: 15px;
 }
-.s-demo-heading .s-tag {
+.s-demo-project-heading .s-tag {
   background: #fff;
 }
 .studio .s-judging-preview h2 {
-  font-size: 36px;
-  margin: 20px 0 6px;
+  font-size: 32px;
+  margin: 0;
 }
 .studio .s-demo-project p {
-  margin: 8px 0 15px;
-  font-size: 14px;
-  line-height: 1.5;
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
 }
 .studio .s-demo-project .s-demo-builder {
   font-size: 12px;
-  margin: 0;
+  margin: 5px 0 0;
+}
+.s-demo-builder a {
+  color: #000;
 }
 .s-demo-video {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 16/9;
   border: 0;
   border-radius: 8px;
   background: #000;
-}
-.s-demo-video-caption {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 15px;
-  margin: 12px 0 20px;
-  font-size: 12px;
-  color: var(--s-muted);
-}
-.s-demo-video-caption a {
-  color: #000;
-  flex-shrink: 0;
+  margin: 14px 0;
 }
 .s-demo-review {
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  padding: 20px;
+  gap: 8px;
+  padding: 14px;
   border-radius: 15px;
   background: #fff;
 }
@@ -345,12 +336,12 @@
 .studio .s-demo-disclaimer {
   text-align: center;
   font-size: 11px;
-  margin: 15px 0 0;
+  margin: 10px 0 0;
   line-height: 1.4;
 }
 .s-demo-receipt {
-  padding: 25px 20px;
-  min-height: 275px;
+  padding: 16px;
+  min-height: 216px;
   border-radius: 15px;
   background: #fff;
   text-align: center;
@@ -358,7 +349,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 .s-demo-check {
   display: flex;
@@ -1758,4 +1749,81 @@
 .s-team-row small {
   display: block;
   margin-top: 5px;
+}
+
+/* Keep the landing demo and its submit action in the initial desktop viewport. */
+@media (min-width: 901px) {
+  .studio.s-landing {
+    min-height: 100svh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+  }
+  .s-landing > .s-header {
+    width: 100%;
+    padding: 15px 40px;
+  }
+  .s-landing > .s-footer {
+    width: 100%;
+    padding: 12px 40px;
+  }
+  .s-landing .s-landing-main {
+    width: 100%;
+    padding: 12px 40px;
+    display: grid;
+    align-content: center;
+  }
+  .s-landing .s-hero {
+    min-height: 0;
+    padding: 0;
+    gap: clamp(30px, 5vw, 75px);
+  }
+  .s-landing .s-hero h1 {
+    font-size: clamp(40px, 4.45vw, 64px);
+    margin: 20px 0;
+  }
+  .s-landing .s-hero-copy > p {
+    margin: 20px 0;
+    font-size: 18px;
+  }
+  .s-landing .s-hero-copy > .s-caption {
+    font-size: 12px;
+  }
+  .s-landing .s-judging-preview {
+    padding: 16px;
+  }
+  .s-landing .s-demo-video {
+    height: clamp(132px, 24svh, 210px);
+    aspect-ratio: auto;
+  }
+  .s-landing .s-demo-review > button {
+    min-height: 38px;
+    padding: 9px 18px;
+    margin-top: 2px;
+  }
+  .s-landing .s-demo-receipt button {
+    min-height: 38px;
+    padding: 9px 18px;
+  }
+}
+@media (min-width: 901px) and (max-height: 680px) {
+  .s-landing > .s-header {
+    padding-block: 10px;
+  }
+  .s-landing > .s-footer {
+    padding-block: 8px;
+  }
+  .s-landing .s-landing-main {
+    padding-block: 8px;
+  }
+  .s-landing .s-demo-video {
+    margin-block: 10px;
+    height: clamp(110px, 22svh, 150px);
+  }
+  .s-landing .s-demo-review {
+    gap: 5px;
+    padding: 12px;
+  }
+  .s-landing .s-demo-receipt {
+    min-height: 203px;
+  }
 }

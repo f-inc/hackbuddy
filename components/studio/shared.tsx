@@ -22,14 +22,16 @@ export const formats = {
 export function Frame({
   children,
   label = "Hackathon studio",
+  className = "",
   actions,
 }: {
   children: ReactNode;
   label?: string;
+  className?: string;
   actions?: ReactNode;
 }) {
   return (
-    <div className="studio">
+    <div className={`studio ${className}`}>
       <header className="s-header">
         <Link href="/studio" className="s-brand">
           <span className="s-mark">h.</span> HackBuddy{" "}
