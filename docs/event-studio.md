@@ -4,7 +4,7 @@ The `generalize-event-studio` branch introduces a complete event journey alongsi
 
 ## Try it
 
-Use Node 22.13+ (Node 24 recommended), install the existing dependencies, and run `npm run dev`. Visit http://localhost:3000/studio. Each sample button press creates an isolated workspace with a configurable draft, a blank demo day, and a completed event with published winners and an unranked finalist presentation. Sample judge password: `judges`.
+Use Node 22.13+ (Node 24 recommended), install the existing dependencies, and run `npm run dev`. Visit http://localhost:3010/studio. Each sample button press creates an isolated workspace with a configurable draft, a blank demo day, and a completed event with published winners and an unranked finalist presentation. Sample judge password: `judges`.
 
 For a quick full competition: create a new event with **One scored round**, set reviews per project and winner count to 1, add a project, mark ready, open judging, open the judge link, sign in with a name and the event password, submit a review, and return to the organizer's Results tab to publish. Organizer and judge cookies are separate, so both desks work in the same browser. Public showcase links need neither cookie nor password.
 

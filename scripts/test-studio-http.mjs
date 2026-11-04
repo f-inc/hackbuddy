@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-const base = process.env.STUDIO_TEST_URL || "http://127.0.0.1:3000";
+const base = process.env.STUDIO_TEST_URL || "http://127.0.0.1:3010";
 const jars = { owner: "", judge: "", outsider: "" };
 async function request(path, data, identity = "owner", status = 200) {
   const res = await fetch(`${base}/api/studio/${path}`, {
