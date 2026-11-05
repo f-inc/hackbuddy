@@ -14,12 +14,13 @@ jobs:
       - run: npx tsc --noEmit --incremental false
       - run: npm run lint
       - run: npm run build
-      - name: Verify real studio HTTP workflow
+      - name: Verify unified HackBuddy HTTP workflow
         env:
-          AUTH_SECRET: studio-ci-only-secret-not-for-deployment
-          HACKBUDDY_STUDIO_DB: /tmp/hackbuddy-ci.sqlite
+          AUTH_SECRET: hackbuddy-ci-only-secret-not-for-deployment
+          ADMIN_PASSWORD: ci-admin-password
+          JUDGE_PASSWORD: ci-judge-password
         run: |
-          npm run start -- --hostname 127.0.0.1 > /tmp/hackbuddy-server.log 2>&1 &
+          npm run start -- --hostname 127.0.0.1 --port 3010 > /tmp/hackbuddy-server.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" || true' EXIT
-          node scripts/test-studio-http.mjs
+          node scripts/test-http.mjs
