@@ -156,7 +156,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3010](http://localhost:3010).
 
 If Airtable variables are omitted, the app uses sample submissions so the UI
 can be previewed. `JUDGE_PASSWORD` and `ADMIN_PASSWORD` are still required and
@@ -337,3 +337,10 @@ a permanent snapshot can be published. A historical comparison report remains a
 simulation and does not set the event's scoring policy or official results.
 `DEMO_SCORING_POLICY=normalized-v1` opts local preview data into normalization;
 the default preview policy is raw, just like an existing event.
+
+## Local development ports
+
+- The development server for **hackbuddy** uses **http://localhost:3010**.
+- Run `npm run dev` in the normal checkout; its development script sets port **3010** explicitly. Do not use localhost:3000 or silently increment ports.
+- Reuse an existing server for this checkout. If the assigned port is occupied by an unrelated process, inspect ownership rather than stopping another project's server.
+- Port changes must update the development script, README, environment examples, and local integration/callback URLs together. Keep real credentials in ignored local environment files; never commit them or change production URLs for local development.
