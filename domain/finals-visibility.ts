@@ -1,10 +1,7 @@
 import type { FinalsState } from "./results";
 import type { Submission } from "./submission";
 
-export function finalsForViewer(
-  state: FinalsState,
-  admin: boolean,
-): FinalsState {
+export function finalsForViewer(state: FinalsState, admin: boolean): FinalsState {
   if (admin) return state;
   const clean = (entry: FinalsState["finalists"][number]) => ({
     ...entry,
@@ -19,13 +16,14 @@ export function finalsForViewer(
   };
 }
 
-export function submissionForViewer(
-  submission: Submission,
-  admin: boolean,
-): Submission {
-  if (admin || !submission.finalJudging) return submission;
+export function submissionForViewer(submission: Submission, admin: boolean): Submission {
+  if (admin) return submission;
+  if (!submission.finalJudging)
+    return { ...submission, contactEmail: "", importedFields: undefined };
   return {
     ...submission,
+    contactEmail: "",
+    importedFields: undefined,
     finalJudging: { ...submission.finalJudging, reviews: [] },
   };
 }

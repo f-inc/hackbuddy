@@ -20,10 +20,7 @@ import {
 } from "@/server/http/errors";
 import { AirtableClient, type AirtableRecord } from "./client";
 import { airtableStatus, submissionField as field } from "./field-config";
-import {
-  AirtableReviewRepository,
-  type StoredReview,
-} from "./review-repository";
+import { AirtableReviewRepository, type StoredReview } from "./review-repository";
 
 function text(value: unknown) {
   return typeof value === "string" ? value : "";
@@ -43,10 +40,7 @@ function attachment(value: unknown) {
   return {
     url: "url" in first && typeof first.url === "string" ? first.url : "",
     type: "type" in first && typeof first.type === "string" ? first.type : "",
-    filename:
-      "filename" in first && typeof first.filename === "string"
-        ? first.filename
-        : "",
+    filename: "filename" in first && typeof first.filename === "string" ? first.filename : "",
   };
 }
 
@@ -56,10 +50,7 @@ function normalizeStatus(value: unknown): QueueStatus {
   return "available";
 }
 
-function parseFinalState(
-  value: unknown,
-  reviews: SubmissionReview[],
-): FinalJudgingState | null {
+function parseFinalState(value: unknown, reviews: SubmissionReview[]): FinalJudgingState | null {
   if (typeof value !== "string" || !value.trim()) return null;
   let parsed: unknown;
   try {
@@ -80,9 +71,7 @@ function parseFinalState(
   }
   return {
     startedAt: parsed.startedAt,
-    judges: parsed.judges
-      .map((judge) => judge.trim().toLowerCase())
-      .filter(Boolean),
+    judges: parsed.judges.map((judge) => judge.trim().toLowerCase()).filter(Boolean),
     reviews,
   };
 }
@@ -92,19 +81,14 @@ function reviewsForPhase(storedReviews: StoredReview[], phase: ReviewPhase) {
   for (const stored of storedReviews) {
     if (stored.phase !== phase) continue;
     const existing = byJudge.get(stored.review.judgeName);
-    if (
-      !existing ||
-      stored.review.completedAt.localeCompare(existing.completedAt) >= 0
-    ) {
+    if (!existing || stored.review.completedAt.localeCompare(existing.completedAt) >= 0) {
       byJudge.set(stored.review.judgeName, stored.review);
     }
   }
-  return [...byJudge.values()].sort((a, b) =>
-    a.completedAt.localeCompare(b.completedAt),
-  );
+  return [...byJudge.values()].sort((a, b) => a.completedAt.localeCompare(b.completedAt));
 }
 
-function mapSubmission(
+export function mapAirtableSubmission(
   record: AirtableRecord,
   storedReviews: StoredReview[],
 ): Submission {
@@ -112,20 +96,13 @@ function mapSubmission(
   const teamName = text(values[field.teamName]) || "Unnamed team";
   const preview = attachment(values[field.preview]);
   const teamPhoto = attachment(values[field.teamPhoto]);
-  const uploadedDemo = attachment(
-    values[field.demoUrl] ?? values["Video Demo"] ?? values.Demo,
-  );
-  const demo = uploadedDemo.url
-    ? uploadedDemo
-    : attachment(values[field.demoVideoUrl]);
+  const uploadedDemo = attachment(values[field.demoUrl] ?? values["Video Demo"] ?? values.Demo);
+  const demo = uploadedDemo.url ? uploadedDemo : attachment(values[field.demoVideoUrl]);
   const reviews = reviewsForPhase(storedReviews, "preliminary");
   const finalReviews = reviewsForPhase(storedReviews, "final");
   const rawStatus = normalizeStatus(values[field.status]);
   const aggregate = aggregateReviews(reviews);
-  const status = statusForReviewCount(
-    reviews.length,
-    rawStatus === "in progress",
-  );
+  const status = statusForReviewCount(reviews.length, rawStatus === "in progress");
 
   return {
     id: record.id,
@@ -190,20 +167,13 @@ export class AirtableSubmissionRepository implements SubmissionRepository {
 
   constructor(baseId: string, tableName: string, reviewsTableName: string) {
     this.submissions = new AirtableClient(baseId, tableName);
-    this.reviews = new AirtableReviewRepository(
-      new AirtableClient(baseId, reviewsTableName),
-    );
+    this.reviews = new AirtableReviewRepository(new AirtableClient(baseId, reviewsTableName));
   }
 
   async list() {
-    const [records, reviews] = await Promise.all([
-      this.submissions.list(),
-      this.reviews.list(),
-    ]);
+    const [records, reviews] = await Promise.all([this.submissions.list(), this.reviews.list()]);
     const grouped = groupReviews(reviews);
-    return records.map((record) =>
-      mapSubmission(record, grouped.get(record.id) ?? []),
-    );
+    return records.map((record) => mapAirtableSubmission(record, grouped.get(record.id) ?? []));
   }
 
   async findById(id: string) {
@@ -215,7 +185,7 @@ export class AirtableSubmissionRepository implements SubmissionRepository {
       throw error;
     }
     const reviews = await this.reviews.list({ submissionId: id });
-    return mapSubmission(record, reviews);
+    return mapAirtableSubmission(record, reviews);
   }
 
   async tryClaim(id: string, judgeName: string) {
@@ -229,18 +199,14 @@ export class AirtableSubmissionRepository implements SubmissionRepository {
     const verified = await this.submissions.get(id);
     if (verified.fields[field.claimToken] !== claimToken) return null;
     const reviews = await this.reviews.list({ submissionId: id });
-    return mapSubmission(verified, reviews);
+    return mapAirtableSubmission(verified, reviews);
   }
 
   async saveReview(id: string, phase: ReviewPhase, review: SubmissionReview) {
     await this.reviews.upsert(id, phase, review);
   }
 
-  async savePreliminaryProjection(
-    id: string,
-    reviews: SubmissionReview[],
-    completedAt: string,
-  ) {
+  async savePreliminaryProjection(id: string, reviews: SubmissionReview[], completedAt: string) {
     const aggregate = aggregateReviews(reviews);
     const status = statusForReviewCount(reviews.length);
     await this.submissions.update(id, {
@@ -274,9 +240,7 @@ export class AirtableSubmissionRepository implements SubmissionRepository {
   async release(id: string) {
     const current = await this.submissions.get(id);
     if (current.fields[field.status] !== airtableStatus["in progress"]) {
-      throw new ConflictError(
-        "Only an active judging session can be released.",
-      );
+      throw new ConflictError("Only an active judging session can be released.");
     }
     await this.submissions.update(id, {
       [field.status]: airtableStatus.available,
@@ -292,9 +256,7 @@ export function airtableRepositoryFromContext() {
   const tableName = currentAirtableTable();
   const reviewsTableName = currentAirtableReviewsTable();
   if (!baseId || !tableName || !reviewsTableName) {
-    throw new ConfigurationError(
-      "The Airtable submission and review tables are not configured.",
-    );
+    throw new ConfigurationError("The Airtable submission and review tables are not configured.");
   }
   return new AirtableSubmissionRepository(baseId, tableName, reviewsTableName);
 }

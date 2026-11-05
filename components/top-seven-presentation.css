@@ -186,3 +186,13 @@
     }
   }
 }
+
+/* Larger configurable shortlists retain the original seven-row TV layout. */
+.tv-page-button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 4px 10px;
+  cursor: pointer;
+}

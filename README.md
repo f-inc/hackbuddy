@@ -1,22 +1,30 @@
 # HackBuddy Judging
 
-A minimal Next.js judging queue for hackathons. Tally writes submissions to
-Airtable, judges claim the newest submission, score one project at a time, and
-share a live view of queue progress, active sessions, and current scores.
+A minimal Next.js judging queue for hackathons. Participants submit through
+HackBuddy's own form, judges score one project at a time, then select finalists
+and vote for winners using the original HackBuddy screens.
+
+New events use Supabase. Create them in `/hackathons` and share `/<event>/submit`.
+Configure judges per project, 5–20 finalists, 1–5 or 1–10 scoring, and optional
+sponsors and optional award/tool/track collections in the event editor. Drafts autosave and
+recover after refresh. See [persistence and setup](docs/persistence.md).
+
+The Airtable setup below is retained for historical event access and legacy tools;
+new events do not require Airtable. There is one application, with no studio section.
 
 ## What it does
 
 - Separate judge and administrator passwords with lowercase names and signed sessions
 - One active submission per judge
-- Two distinct judges required before a submission is completed
+- Configurable distinct judges per project (two by default)
 - Judges cannot review the same submission twice
 - Newest submissions are claimed first
 - First-pass judges can skip a submission without saving a score, releasing it
   for other judges. Skipped projects are deferred for the current page session;
   judges can revisit them when the remaining queue is clear.
 - Queue states: `available`, `in progress`, and `completed`
-- Three required 1–10 rubric scores
-- Airtable remains the source of truth
+- Three required rubric scores, with a 1–5 or 1–10 scale
+- Supabase is the source of truth for new events; existing Airtable events retain their original records
 - Shared dashboard with queue progress, current scores, and active sessions
 - Personal Projects judged tab with searchable preliminary/final review history,
   saved scores and notes, project results, and a read-only grading workspace
@@ -28,7 +36,7 @@ share a live view of queue progress, active sessions, and current scores.
   judging queue
 - Built-in preview data when Airtable credentials are absent
 - Path-based event workspaces such as `/nighthack3/dashboard`
-- An admin-only hackathon selector with event creation and Airtable table mapping
+- An admin-only hackathon selector with event creation and settings
 
 ## Judging views
 
@@ -43,7 +51,7 @@ Results and Projects judged remain available for score details and review histor
 
 ## Multiple hackathons
 
-HackBuddy uses an Airtable `Hackathons` table as its event registry. Each row
+Historical events use an Airtable `Hackathons` table as their event registry. Each row
 maps a display name and URL slug to an existing submissions base and table:
 
 | Field | Airtable type |
@@ -78,13 +86,9 @@ subsequently updated. Existing `Reviews` and `Final Judging` JSON is left in
 place for rollback, but the application reads and writes review scores only
 through the dedicated review table.
 
-The Airtable token needs `schema.bases:read` so the admin editor can list the
-bases and tables it can access, `schema.bases:write` so setup and event
-creation can provision the dedicated reviews table, and the normal record
-read/write scopes used while judging.
-After setup, administrators sign in at `/` and land on `/hackathons`, where
-they can create events, choose their Airtable base and table, and open an event
-workspace.
+Legacy Airtable setup scripts need `schema.bases:read`, `schema.bases:write`,
+and the record read/write scopes used by those historical events. The normal
+Hackathons editor creates Supabase events and does not ask for Airtable mappings.
 
 Judges must use an event link such as `/nighthack3`. Their signed session is
 bound to that event and login sends them to `/nighthack3/dashboard`; judges
@@ -159,7 +163,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3010](http://localhost:3010).
 
 If Airtable variables are omitted, the app uses sample submissions so the UI
 can be previewed. `JUDGE_PASSWORD` and `ADMIN_PASSWORD` are still required and
@@ -302,9 +306,8 @@ directory per run so parallel checkouts cannot pick up stale test files.
 
 ## Publishing and preserving official results
 
-Before deploying, run `npm run setup:hackathons` with the normal Airtable
-configuration to add two registry fields (the worktree does not run this against
-live Airtable automatically):
+For an unmigrated Airtable installation only, `npm run setup:hackathons` adds
+two registry fields. Supabase events do not require this legacy setup:
 
 | Field | Airtable type | Meaning |
 | --- | --- | --- |
@@ -340,3 +343,30 @@ a permanent snapshot can be published. A historical comparison report remains a
 simulation and does not set the event's scoring policy or official results.
 `DEMO_SCORING_POLICY=normalized-v1` opts local preview data into normalization;
 the default preview policy is raw, just like an existing event.
+
+## Release all active first-pass reservations
+
+From the project directory, preview the configured event's active reservations:
+
+```bash
+node scripts/release-all-judges.mjs
+```
+
+To target another event, add `--base=BASE_ID --table="Submissions table name"`.
+The script loads credentials and field overrides from `.env.local`. Verify the
+printed base, table, and reservation list before using the same command with
+`--apply`. The default is read-only.
+
+Applying releases only active first-pass reservations, preserving saved scores,
+notes, and review history. Judges should pause judging during the release and
+reload afterward; unfinished scores and notes cannot be submitted after their
+reservation is released. Changed reservations are skipped on a fresh check,
+but Airtable does not support an atomic conditional update. Failures are listed
+per submission and cause a nonzero exit status.
+
+## Local development ports
+
+- The development server for **hackbuddy** uses **http://localhost:3010**.
+- Run `npm run dev` in the normal checkout; its development script sets port **3010** explicitly. Do not use localhost:3000 or silently increment ports.
+- Reuse an existing server for this checkout. If the assigned port is occupied by an unrelated process, inspect ownership rather than stopping another project's server.
+- Port changes must update the development script, README, environment examples, and local integration/callback URLs together. Keep real credentials in ignored local environment files; never commit them or change production URLs for local development.

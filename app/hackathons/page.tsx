@@ -1,334 +1,122 @@
 "use client";
-
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import {
-  NEW_EVENT_SCORING_POLICY,
-  type ScoringPolicy,
-} from "@/domain/event-scoring";
+import { EventSettingsFields } from "@/components/EventSettingsFields";
+import { eventSettings } from "@/domain/event-settings";
+import { NEW_EVENT_SCORING_POLICY, type ScoringPolicy } from "@/domain/event-scoring";
 import type { HackathonConfig } from "@/lib/hackathons";
-import { FormEvent, useCallback, useEffect, useState } from "react";
-
-type FormState = {
-  name: string;
-  slug: string;
-  baseId: string;
-  tableName: string;
-  imageUrl: string;
-  squareImageUrl: string;
-  scoringPolicy: ScoringPolicy;
-};
-
-type AirtableBaseOption = {
-  id: string;
-  name: string;
-  permissionLevel?: string;
-};
-
-type AirtableTableOption = {
-  id: string;
-  name: string;
-};
-
-const emptyForm: FormState = {
+import { useEffect, useState, type FormEvent } from "react";
+const blank = () => ({
   name: "",
   slug: "",
-  baseId: "",
-  tableName: "",
   imageUrl: "",
   squareImageUrl: "",
-  scoringPolicy: NEW_EVENT_SCORING_POLICY,
-};
-
-function isLumaEventUrl(value: string) {
-  try {
-    const host = new URL(value).hostname;
-    return ["lu.ma", "www.lu.ma", "luma.com", "www.luma.com"].includes(host);
-  } catch {
-    return false;
-  }
-}
-
+  scoringPolicy: NEW_EVENT_SCORING_POLICY as ScoringPolicy,
+  settings: eventSettings(),
+});
 export default function HackathonsPage() {
-  const [name, setName] = useState("");
-  const [hackathons, setHackathons] = useState<HackathonConfig[]>([]);
-  const [editing, setEditing] = useState<HackathonConfig | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [form, setForm] = useState<FormState>(emptyForm);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [editingImage, setEditingImage] = useState(false);
-  const [resolvingImage, setResolvingImage] = useState(false);
-  const [imageError, setImageError] = useState("");
-  const [airtableBases, setAirtableBases] = useState<AirtableBaseOption[]>([]);
-  const [airtableTables, setAirtableTables] = useState<AirtableTableOption[]>(
-    [],
-  );
-  const [loadingBases, setLoadingBases] = useState(false);
-  const [loadingTables, setLoadingTables] = useState(false);
-  const [airtableError, setAirtableError] = useState("");
-  const [error, setError] = useState("");
-
-  const refresh = useCallback(async () => {
-    const response = await fetch("/api/hackathons");
-    if (response.status === 401) {
-      window.location.href = "/";
-      return;
-    }
-    const data = (await response.json()) as {
-      hackathons?: HackathonConfig[];
-      error?: string;
-    };
-    if (!response.ok) throw new Error(data.error);
-    setHackathons(data.hackathons || []);
-  }, []);
-
-  useEffect(() => {
-    async function initialize() {
-      try {
-        const sessionResponse = await fetch("/api/auth/session");
-        if (!sessionResponse.ok) {
-          window.location.href = "/";
-          return;
-        }
-        const session = (await sessionResponse.json()) as {
-          name: string;
-          role: "judge" | "admin";
-          hackathon?: string;
-        };
-        if (session.role !== "admin") {
-          window.location.href = session.hackathon
-            ? `/${session.hackathon}/dashboard`
-            : "/";
-          return;
-        }
-        setName(session.name);
-        await refresh();
-      } catch (caught) {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "Hackathons could not be loaded.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-    void initialize();
-  }, [refresh]);
-
-  const closeEditor = useCallback(() => {
-    if (saving) return;
-    setEditing(null);
-    setForm(emptyForm);
-    setEditorOpen(false);
-    setEditingImage(false);
-    setResolvingImage(false);
-    setImageError("");
-    setAirtableError("");
-    setError("");
-  }, [saving]);
-
-  useEffect(() => {
-    if (!editorOpen) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") closeEditor();
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [closeEditor, editorOpen]);
-
-  useEffect(() => {
-    if (!editorOpen || editingImage) return;
-
-    const controller = new AbortController();
-    async function loadBases() {
-      setLoadingBases(true);
-      setAirtableError("");
-      try {
-        const response = await fetch("/api/airtable/schema", {
-          signal: controller.signal,
-        });
-        const data = (await response.json()) as {
-          bases?: AirtableBaseOption[];
-          defaultBaseId?: string;
-          error?: string;
-        };
-        if (!response.ok) {
-          throw new Error(data.error || "Could not load Airtable bases.");
-        }
-        const bases = data.bases || [];
-        setAirtableBases(bases);
-        setForm((current) => ({
-          ...current,
-          baseId: current.baseId || data.defaultBaseId || bases[0]?.id || "",
-        }));
-      } catch (caught) {
-        if (controller.signal.aborted) return;
-        setAirtableError(
-          caught instanceof Error
-            ? caught.message
-            : "Could not load Airtable bases.",
-        );
-      } finally {
-        if (!controller.signal.aborted) setLoadingBases(false);
-      }
-    }
-    void loadBases();
-    return () => controller.abort();
-  }, [editingImage, editorOpen]);
-
-  useEffect(() => {
-    if (!editorOpen || editingImage || !form.baseId) return;
-
-    const controller = new AbortController();
-    async function loadTables() {
-      setLoadingTables(true);
-      setAirtableError("");
-      try {
-        const response = await fetch(
-          `/api/airtable/schema?baseId=${encodeURIComponent(form.baseId)}`,
-          { signal: controller.signal },
-        );
-        const data = (await response.json()) as {
-          tables?: AirtableTableOption[];
-          error?: string;
-        };
-        if (!response.ok) {
-          throw new Error(data.error || "Could not load Airtable tables.");
-        }
-        setAirtableTables(data.tables || []);
-      } catch (caught) {
-        if (controller.signal.aborted) return;
-        setAirtableTables([]);
-        setAirtableError(
-          caught instanceof Error
-            ? caught.message
-            : "Could not load Airtable tables.",
-        );
-      } finally {
-        if (!controller.signal.aborted) setLoadingTables(false);
-      }
-    }
-    void loadTables();
-    return () => controller.abort();
-  }, [editingImage, editorOpen, form.baseId]);
-
-  useEffect(() => {
-    if (!editorOpen || !isLumaEventUrl(form.imageUrl)) return;
-
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setResolvingImage(true);
-      setImageError("");
-      try {
-        const response = await fetch("/api/hackathons/luma-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: form.imageUrl }),
-          signal: controller.signal,
-        });
-        const data = (await response.json()) as {
-          imageUrl?: string;
-          squareImageUrl?: string;
-          error?: string;
-        };
-        if (!response.ok || !data.imageUrl || !data.squareImageUrl) {
-          throw new Error(data.error || "Could not find the Luma event image.");
-        }
-        setForm((current) => ({
-          ...current,
-          imageUrl: data.imageUrl || "",
-          squareImageUrl: data.squareImageUrl || "",
-        }));
-      } catch (caught) {
-        if (controller.signal.aborted) return;
-        setImageError(
-          caught instanceof Error
-            ? caught.message
-            : "Could not find the Luma event image.",
-        );
-      } finally {
-        if (!controller.signal.aborted) setResolvingImage(false);
-      }
-    }, 450);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [editorOpen, form.imageUrl]);
-
-  function openCreate() {
-    setEditing(null);
-    setForm(emptyForm);
-    setEditingImage(false);
-    setImageError("");
-    setAirtableError("");
-    setEditorOpen(true);
-    setError("");
+  const [name, setName] = useState(""),
+    [events, setEvents] = useState<HackathonConfig[]>([]),
+    [loading, setLoading] = useState(true),
+    [editing, setEditing] = useState<HackathonConfig | null>(null),
+    [open, setOpen] = useState(false),
+    [form, setForm] = useState(blank),
+    [error, setError] = useState(""),
+    [saving, setSaving] = useState(false);
+  async function refresh(response?: Response) {
+    const r = response ?? (await fetch("/api/hackathons"));
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    setEvents(d.hackathons);
+    return d.hackathons as HackathonConfig[];
   }
-
-  function openEdit(hackathon: HackathonConfig, imageOnly = false) {
-    setEditing(hackathon.legacy ? null : hackathon);
+  function edit(event: HackathonConfig) {
+    setEditing(event);
     setForm({
-      name: hackathon.name,
-      slug: hackathon.slug,
-      baseId: hackathon.baseId,
-      tableName: hackathon.tableName,
-      imageUrl: hackathon.imageUrl,
-      squareImageUrl: hackathon.squareImageUrl,
-      scoringPolicy: hackathon.scoringPolicy,
+      name: event.name,
+      slug: event.slug,
+      imageUrl: event.imageUrl,
+      squareImageUrl: event.squareImageUrl,
+      scoringPolicy: event.scoringPolicy,
+      settings: eventSettings(event.settings),
     });
-    setEditingImage(imageOnly);
-    setImageError("");
-    setAirtableError("");
-    setEditorOpen(true);
     setError("");
+    setOpen(true);
   }
-
-  async function save(event: FormEvent) {
-    event.preventDefault();
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const [r, eventResponse] = await Promise.all([
+        fetch("/api/auth/session"),
+        fetch("/api/hackathons"),
+      ]);
+      if (!r.ok) {
+        window.location.href = "/";
+        return;
+      }
+      const session = await r.json();
+      if (session.role !== "admin") {
+        window.location.href = session.hackathon ? `/${session.hackathon}/judging` : "/";
+        return;
+      }
+      if (!alive) return;
+      setName(session.name);
+      const all = await refresh(eventResponse);
+      const slug = new URLSearchParams(window.location.search).get("edit");
+      const event = all.find((e) => e.slug === slug);
+      if (event) edit(event);
+    })()
+      .catch((e) => {
+        if (alive) setError(e.message);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !saving) setOpen(false);
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [open, saving]);
+  async function save(e: FormEvent) {
+    e.preventDefault();
     setSaving(true);
     setError("");
     try {
-      const response = await fetch("/api/hackathons", {
+      const r = await fetch("/api/hackathons", {
         method: editing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...(editing ? { id: editing.id } : {}),
           ...form,
+          ...(editing
+            ? { id: editing.id, baseId: editing.baseId, tableName: editing.tableName }
+            : {}),
         }),
       });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(data.error);
-      setEditing(null);
-      setForm(emptyForm);
-      setEditorOpen(false);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
+      setOpen(false);
       await refresh();
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "The hackathon could not be saved.",
-      );
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setSaving(false);
     }
   }
-
-  if (!name || loading) return <LoadingScreen />;
-  const imageIsLuma = isLumaEventUrl(form.imageUrl);
-  const hasPreviewImage = Boolean(form.imageUrl && !imageIsLuma);
-
+  if (!name)
+    return error ? (
+      <main className="workspace-main">
+        <div className="error-banner">{error}</div>
+      </main>
+    ) : (
+      <LoadingScreen />
+    );
   return (
     <AppShell name={name} role="admin">
       <main className="workspace-main hackathons-main">
@@ -336,326 +124,144 @@ export default function HackathonsPage() {
           <div>
             <span className="eyebrow">Admin workspace</span>
             <h1>Hackathons</h1>
-            <p>
-              Select an event to manage or create a new path-based judging
-              workspace.
-            </p>
+            <p>Select an event or create a hackathon.</p>
           </div>
-          <button className="primary-button" onClick={openCreate} type="button">
-            New hackathon <span aria-hidden>+</span>
+          <button
+            className="primary-button"
+            onClick={() => {
+              setEditing(null);
+              setForm(blank());
+              setError("");
+              setOpen(true);
+            }}
+          >
+            New hackathon +
           </button>
         </section>
-
-        {error && <div className="error-banner page-error">{error}</div>}
-
-        <section className="hackathon-grid" aria-label="Available hackathons">
-          {hackathons.map((hackathon) => (
-            <article className="hackathon-card card" key={hackathon.id}>
+        {error && !open && <div className="error-banner">{error}</div>}
+        {loading && <p role="status">Loading hackathons…</p>}
+        <section className="hackathon-grid" aria-label="Available hackathons" aria-busy={loading}>
+          {events.map((event) => (
+            <article className="hackathon-card card" key={event.id}>
               <div
-                className={`hackathon-card-image${
-                  hackathon.imageUrl ? "" : " fallback"
-                }`}
+                className={`hackathon-card-image${event.imageUrl ? "" : " fallback"}`}
                 style={
-                  hackathon.imageUrl
-                    ? { backgroundImage: `url("${hackathon.imageUrl}")` }
+                  event.imageUrl
+                    ? { backgroundImage: `url(${JSON.stringify(event.imageUrl)})` }
                     : undefined
                 }
               >
-                {!hackathon.imageUrl && (
-                  <span className="hackathon-card-initial">
-                    {hackathon.name.slice(0, 1).toUpperCase()}
-                  </span>
-                )}
+                {!event.imageUrl && <span className="hackathon-card-initial">{event.name[0]}</span>}
               </div>
               <div className="hackathon-card-body">
-                <h2>{hackathon.name}</h2>
+                <h2>{event.name}</h2>
                 <button
-                  aria-label={
-                    hackathon.imageUrl
-                      ? `Change ${hackathon.name} picture`
-                      : `Add a picture for ${hackathon.name}`
-                  }
                   className="hackathon-image-edit"
-                  onClick={() => openEdit(hackathon)}
-                  type="button"
+                  aria-label={`Edit ${event.name}`}
+                  onClick={() => edit(event)}
                 >
-                  <svg aria-hidden fill="none" viewBox="0 0 24 24">
-                    <path
-                      d="m15.2 5.2 3.6 3.6M4 20l4.25-.95L19.3 8a2.55 2.55 0 0 0-3.6-3.6L4.65 15.45 4 20Z"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.8"
-                    />
-                  </svg>
+                  ✎
                 </button>
               </div>
               <a
-                aria-label={`Open ${hackathon.name} dashboard`}
                 className="hackathon-card-link"
-                href={`/${hackathon.slug}/dashboard`}
+                aria-label={`Open ${event.name}`}
+                href={`/${event.slug}/judging`}
               />
             </article>
           ))}
         </section>
+        {!loading && !error && !events.length && (
+          <section className="empty-state card">
+            <h2>Create your first hackathon</h2>
+            <p>Share its submission form, then start judging.</p>
+          </section>
+        )}
       </main>
-
-      {editorOpen && (
+      {open && (
         <div
-          aria-labelledby="hackathon-editor-title"
-          aria-modal="true"
           className="hackathon-editor-modal"
-          onMouseDown={closeEditor}
           role="dialog"
+          aria-modal="true"
+          aria-labelledby="hackathon-editor-title"
+          onMouseDown={() => !saving && setOpen(false)}
         >
-          <section
-            className="hackathon-editor-dialog"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
+          <section className="hackathon-editor-dialog" onMouseDown={(e) => e.stopPropagation()}>
             <header className="hackathon-editor-header">
-              <div>
-                <span className="eyebrow">
-                  {editingImage
-                    ? "Event picture"
-                    : editing
-                      ? "Edit hackathon"
-                      : "New hackathon"}
-                </span>
-                <h2 id="hackathon-editor-title">
-                  {editing ? editing.name : "Create an event"}
-                </h2>
-              </div>
-              <button
-                aria-label="Close hackathon editor"
-                className="hackathon-editor-close"
-                disabled={saving}
-                onClick={closeEditor}
-                type="button"
-              >
-                ×
+              <h2 id="hackathon-editor-title">{editing ? "Edit hackathon" : "New hackathon"}</h2>
+              <button className="secondary-button" disabled={saving} onClick={() => setOpen(false)}>
+                Close
               </button>
             </header>
-
-            <form onSubmit={save}>
-              <div className="hackathon-editor-preview">
-                <div
-                  aria-label="Hackathon artwork preview"
-                  className={`hackathon-image-preview${
-                    hasPreviewImage ? "" : " fallback"
-                  }`}
-                  role="img"
-                  style={
-                    hasPreviewImage
-                      ? { backgroundImage: `url("${form.imageUrl}")` }
-                      : undefined
+            <form onSubmit={save} className="hackathon-editor-form">
+              {error && <div className="error-banner">{error}</div>}
+              <label className="field">
+                <span>Event name</span>
+                <input
+                  autoFocus
+                  required
+                  maxLength={120}
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+              </label>
+              <label className="field">
+                <span>Event URL</span>
+                <input
+                  value={form.slug}
+                  disabled={!!editing}
+                  placeholder="Generated from the event name"
+                  onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                />
+              </label>
+              <label className="field">
+                <span>
+                  Event image URL <small>Optional</small>
+                </span>
+                <input
+                  type="text"
+                  inputMode="url"
+                  value={form.imageUrl}
+                  onChange={(e) =>
+                    setForm({ ...form, imageUrl: e.target.value, squareImageUrl: "" })
                   }
-                >
-                  {resolvingImage ? (
-                    <span
-                      className="hackathon-image-loading"
-                      aria-live="polite"
-                    >
-                      Finding image…
-                    </span>
-                  ) : !hasPreviewImage ? (
-                    <span>
-                      {(form.name || "New event").slice(0, 1).toUpperCase()}
-                    </span>
-                  ) : null}
-                </div>
-                <p>{resolvingImage ? "Loading from Luma" : "Preview"}</p>
-              </div>
-
-              <div className="hackathon-editor-fields">
-                {!editingImage && (
-                  <label className="field">
-                    <span>Hackathon name</span>
-                    <input
-                      autoFocus
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          name: event.target.value,
-                        }))
-                      }
-                      placeholder="Night Hack IV"
-                      required
-                      value={form.name}
-                    />
-                  </label>
-                )}
-                <label className="field hackathon-image-field">
-                  <span>
-                    Image or Luma URL <small>Optional</small>
-                  </span>
-                  <input
-                    autoFocus={editingImage}
-                    inputMode="url"
-                    onChange={(event) => {
-                      setImageError("");
-                      setForm((current) => ({
-                        ...current,
-                        imageUrl: event.target.value,
-                        squareImageUrl: "",
-                        scoringPolicy: NEW_EVENT_SCORING_POLICY,
-                      }));
-                    }}
-                    placeholder="https://luma.com/your-event"
-                    type="url"
-                    value={form.imageUrl}
+                />
+              </label>
+              {editing?.storage !== "database" && editing ? (
+                <p>Historical Airtable event. Its original judging rules remain unchanged.</p>
+              ) : (
+                <>
+                  <EventSettingsFields
+                    value={form.settings}
+                    onChange={(settings) => setForm({ ...form, settings })}
                   />
-                  <small
-                    className={`field-hint${imageError ? " error" : ""}`}
-                    role={imageError ? "alert" : undefined}
-                  >
-                    {imageError ||
-                      (resolvingImage
-                        ? "Getting the event artwork from Luma…"
-                        : "Paste a Luma event link or a direct image link.")}
-                  </small>
-                </label>
-
-                {!editingImage && (
-                  <div className="hackathon-workspace-settings">
-                    <div>
-                      <strong>Workspace settings</strong>
-                      <span>Where this event lives and reads submissions.</span>
-                    </div>
-                    <div className="hackathon-workspace-fields">
-                      <label className="field">
-                        <span>Scoring method</span>
-                        <select
-                          disabled={Boolean(editing)}
-                          value={form.scoringPolicy}
-                          onChange={(event) =>
-                            setForm((current) => ({
-                              ...current,
-                              scoringPolicy: event.target
-                                .value as ScoringPolicy,
-                            }))
-                          }
-                        >
-                          <option value="normalized-v1">
-                            Normalized scoring
-                          </option>
-                          <option value="raw-v1">Original raw scoring</option>
-                        </select>
-                        <small className="field-hint">
-                          {editing
-                            ? "Fixed when this event was created. Historical results keep their original method."
-                            : "Normalized scoring adjusts for judge generosity and scoring range. Choose before creating the event; the method then stays fixed."}
-                        </small>
-                      </label>
-                      <label className="field">
-                        <span>URL slug</span>
-                        <input
-                          autoCapitalize="none"
-                          onChange={(event) =>
-                            setForm((current) => ({
-                              ...current,
-                              slug: event.target.value,
-                            }))
-                          }
-                          placeholder="nighthack4"
-                          required
-                          value={form.slug}
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Airtable base</span>
-                        <select
-                          disabled={Boolean(editing) || loadingBases}
-                          onChange={(event) => {
-                            setAirtableTables([]);
-                            setForm((current) => ({
-                              ...current,
-                              baseId: event.target.value,
-                              tableName: "",
-                            }));
-                          }}
-                          required
-                          value={form.baseId}
-                        >
-                          <option value="">
-                            {loadingBases ? "Loading bases…" : "Select a base"}
-                          </option>
-                          {airtableBases.map((base) => (
-                            <option key={base.id} value={base.id}>
-                              {base.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="field hackathon-table-field">
-                        <span>Airtable table</span>
-                        <select
-                          disabled={
-                            Boolean(editing) || !form.baseId || loadingTables
-                          }
-                          onChange={(event) =>
-                            setForm((current) => ({
-                              ...current,
-                              tableName: event.target.value,
-                            }))
-                          }
-                          required
-                          value={form.tableName}
-                        >
-                          <option value="">
-                            {loadingTables
-                              ? "Loading tables…"
-                              : "Select a table"}
-                          </option>
-                          {airtableTables.map((table) => (
-                            <option key={table.id} value={table.name}>
-                              {table.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {airtableError && (
-                        <small
-                          className="field-hint error hackathon-airtable-error"
-                          role="alert"
-                        >
-                          {airtableError}
-                        </small>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <footer className="hackathon-editor-actions">
-                <button
-                  className="secondary-button"
-                  disabled={saving}
-                  onClick={closeEditor}
-                  type="button"
-                >
-                  Cancel
-                </button>
-                <button
-                  className="primary-button"
-                  disabled={
-                    saving ||
-                    resolvingImage ||
-                    imageIsLuma ||
-                    (!editingImage &&
-                      (loadingBases ||
-                        loadingTables ||
-                        !form.baseId ||
-                        !form.tableName))
-                  }
-                  type="submit"
-                >
-                  {saving
-                    ? "Saving…"
-                    : editingImage
-                      ? "Save picture"
-                      : editing
-                        ? "Save changes"
-                        : "Create event"}
+                  <details>
+                    <summary>Scoring method</summary>
+                    <label className="field">
+                      <span>Method</span>
+                      <select
+                        value={form.scoringPolicy}
+                        onChange={(e) =>
+                          setForm({ ...form, scoringPolicy: e.target.value as ScoringPolicy })
+                        }
+                      >
+                        <option value="normalized-v1">Judge-normalized scores</option>
+                        <option value="raw-v1">Raw scores</option>
+                      </select>
+                    </label>
+                  </details>
+                </>
+              )}
+              {editing?.storage === "database" && (
+                <p className="field-hint">
+                  Submission form: <a href={`/${editing.slug}/submit`}>/{editing.slug}/submit</a> ·
+                  Judge sign-in: <a href={`/${editing.slug}`}>/{editing.slug}</a>. Judging rules
+                  lock after the first review session starts.
+                </p>
+              )}
+              <footer className="hackathon-editor-footer">
+                <button className="primary-button" disabled={saving}>
+                  {saving ? "Saving…" : "Save hackathon"}
                 </button>
               </footer>
             </form>

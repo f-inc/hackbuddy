@@ -44,5 +44,5 @@ next-env.d.ts
 # TypeScript incremental build cache
 *.tsbuildinfo
 
-# Local event studio database
+# Local development databases
 /.data/

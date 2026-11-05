@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
 type LoginScreenProps = {
@@ -72,14 +71,7 @@ export function LoginScreen({ hackathon, hackathonName }: LoginScreenProps) {
         <div className="brand">
           <span aria-hidden className="brand-mark" />
           <span>HackBuddy</span>
-          {!hackathon && (
-            <Link
-              href="/studio"
-              style={{ marginLeft: "auto", color: "inherit", fontSize: 13 }}
-            >
-              New event studio ↗
-            </Link>
-          )}
+
         </div>
 
         <div className="login-copy">

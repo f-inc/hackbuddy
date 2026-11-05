@@ -1,4 +1,4 @@
-import { PRELIMINARY_SCORE_MAX, RUBRIC_SCORE_MAX } from "./judging-policy";
+import { DEFAULT_EVENT_SETTINGS, type EventSettings } from "./event-settings";
 import { preliminaryRanking, finalRanking } from "./ranking";
 import type { ScoringPolicy } from "./event-scoring";
 import type { PublishedResults } from "./publication";
@@ -29,15 +29,10 @@ export type JudgedProject = Pick<
 };
 
 function belongsTo(review: SubmissionReview, judgeName: string) {
-  return (
-    review.judgeName.trim().toLowerCase() === judgeName.trim().toLowerCase()
-  );
+  return review.judgeName.trim().toLowerCase() === judgeName.trim().toLowerCase();
 }
 
-export function personalReviews(
-  submission: Submission,
-  judgeName: string,
-): PersonalReview[] {
+export function personalReviews(submission: Submission, judgeName: string): PersonalReview[] {
   return [
     ...submission.reviews
       .filter((r) => belongsTo(r, judgeName))
@@ -53,9 +48,9 @@ export function judgedProjects(
   judgeName: string,
   policy: ScoringPolicy = "raw-v1",
   publication: PublishedResults | null = null,
+  settings: EventSettings = DEFAULT_EVENT_SETTINGS,
 ): JudgedProject[] {
-  const ranked =
-    publication?.results ?? preliminaryRanking(submissions, policy).results;
+  const ranked = publication?.results ?? preliminaryRanking(submissions, policy).results;
   const ranks = new Map(ranked.map((s, index) => [s.id, index + 1]));
   const scores = new Map(ranked.map((s) => [s.id, s]));
   const finalScores =
@@ -67,16 +62,12 @@ export function judgedProjects(
           id: s.id,
           projectName: s.projectName,
           finalReviews: (s.finalJudging?.reviews ?? []).filter(
-            (review) =>
-              policy === "raw-v1" ||
-              s.finalJudging?.judges.includes(review.judgeName),
+            (review) => policy === "raw-v1" || s.finalJudging?.judges.includes(review.judgeName),
           ),
         })),
       policy,
     );
-  const finalScoreById = new Map(
-    finalScores.map((s) => [s.id, s.finalNormalizedScore]),
-  );
+  const finalScoreById = new Map(finalScores.map((s) => [s.id, s.finalNormalizedScore]));
   return submissions
     .flatMap((submission): JudgedProject[] => {
       const myReviews = personalReviews(submission, judgeName);
@@ -84,9 +75,7 @@ export function judgedProjects(
       const final = submission.finalJudging;
       const finalComplete = Boolean(
         final?.judges.length &&
-        final.judges.every((judge) =>
-          final.reviews.some((review) => belongsTo(review, judge)),
-        ),
+        final.judges.every((judge) => final.reviews.some((review) => belongsTo(review, judge))),
       );
       return [
         {
@@ -110,21 +99,16 @@ export function judgedProjects(
               policy === "normalized-v1"
                 ? (scores.get(submission.id)?.normalizedScore ?? null)
                 : null,
-            maximum: PRELIMINARY_SCORE_MAX,
+            maximum: 3 * settings.scoreMax * settings.requiredReviews,
             rank: ranks.get(submission.id) ?? null,
             complete: ranks.has(submission.id),
           },
           finalResult: final
             ? {
-                score: final.reviews.reduce(
-                  (sum, review) => sum + review.totalScore,
-                  0,
-                ),
+                score: final.reviews.reduce((sum, review) => sum + review.totalScore, 0),
                 normalizedScore:
-                  policy === "normalized-v1"
-                    ? (finalScoreById.get(submission.id) ?? null)
-                    : null,
-                maximum: final.judges.length * RUBRIC_SCORE_MAX,
+                  policy === "normalized-v1" ? (finalScoreById.get(submission.id) ?? null) : null,
+                maximum: final.judges.length * 3 * settings.scoreMax,
                 complete: finalComplete,
               }
             : null,
@@ -133,30 +117,24 @@ export function judgedProjects(
     })
     .sort(
       (a, b) =>
-        b.reviewedAt.localeCompare(a.reviewedAt) ||
-        a.projectName.localeCompare(b.projectName),
+        b.reviewedAt.localeCompare(a.reviewedAt) || a.projectName.localeCompare(b.projectName),
     );
 }
 
 /** Return only this judge's review notes, even when the project has other reviewers. */
-export function reviewedSubmission(
-  submission: Submission,
-  judgeName: string,
-): Submission | null {
+export function reviewedSubmission(submission: Submission, judgeName: string): Submission | null {
   const reviews = personalReviews(submission, judgeName);
   if (!reviews.length) return null;
   return {
     ...submission,
     notes: "",
-    reviews: reviews
-      .filter((r) => r.phase === "preliminary")
-      .map((r) => r.review),
+    contactEmail: "",
+    importedFields: undefined,
+    reviews: reviews.filter((r) => r.phase === "preliminary").map((r) => r.review),
     finalJudging: submission.finalJudging
       ? {
           ...submission.finalJudging,
-          reviews: reviews
-            .filter((r) => r.phase === "final")
-            .map((r) => r.review),
+          reviews: reviews.filter((r) => r.phase === "final").map((r) => r.review),
         }
       : null,
   };

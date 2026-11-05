@@ -1,13 +1,11 @@
+import { currentEventSettings, currentEventConfig } from "./event-context";
+import {
+  databaseSubmissionRepository,
+  completeDatabaseReview,
+} from "@/infrastructure/database/submission-repository";
 import { eventScoringRepository } from "@/infrastructure/airtable/event-scoring-repository";
-import {
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-} from "@/server/http/errors";
-import {
-  validatePublication,
-  applyPublishedScores,
-} from "@/domain/publication";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/server/http/errors";
+import { validatePublication, applyPublishedScores } from "@/domain/publication";
 import { AdminSubmissionService } from "@/application/admin-submission-service";
 import { DashboardQuery } from "@/application/dashboard-query";
 import { FinalsService } from "@/application/finals-service";
@@ -23,15 +21,17 @@ import {
 import { demoSubmissionRepository } from "@/infrastructure/demo/submission-repository";
 
 const repository: SubmissionRepositoryProvider = () =>
-  airtableIsConfigured()
-    ? airtableRepositoryFromContext()
-    : demoSubmissionRepository;
+  currentEventConfig()?.storage === "database"
+    ? databaseSubmissionRepository()
+    : airtableIsConfigured()
+      ? airtableRepositoryFromContext()
+      : demoSubmissionRepository;
 
 const queue = new QueueService(repository);
-const dashboard = new DashboardQuery(repository);
+const dashboard = new DashboardQuery(repository, currentEventSettings);
 const results = new ResultsQuery(repository);
-const judged = new JudgedProjectsQuery(repository);
-const finals = new FinalsService(repository);
+const judged = new JudgedProjectsQuery(repository, currentEventSettings);
+const finals = new FinalsService(repository, currentEventSettings);
 const admin = new AdminSubmissionService(repository);
 
 export function isDemoMode() {
@@ -47,10 +47,7 @@ export function getQueueStats() {
   return queue.getStats();
 }
 
-export async function claimNextSubmission(
-  judgeName: string,
-  skippedIds: string[] = [],
-) {
+export async function claimNextSubmission(judgeName: string, skippedIds: string[] = []) {
   await mutableScoring();
   return queue.claimNext(judgeName, skippedIds);
 }
@@ -60,13 +57,11 @@ export async function skipSubmission(id: string, judgeName: string) {
   return queue.skip(id, judgeName);
 }
 
-export async function completeSubmission(
-  id: string,
-  judgeName: string,
-  scores: ReviewScores,
-) {
+export async function completeSubmission(id: string, judgeName: string, scores: ReviewScores) {
   await mutableScoring();
-  return queue.complete(id, judgeName, scores);
+  return currentEventConfig()?.storage === "database"
+    ? completeDatabaseReview(id, judgeName, scores)
+    : queue.complete(id, judgeName, scores);
 }
 
 export async function getDashboard(judgeName: string) {
@@ -93,10 +88,7 @@ export async function getFinalsState(judgeName: string) {
   return finals.state(judgeName, state.scoringPolicy, state.publication);
 }
 
-export async function startFinalRound(
-  adminName: string,
-  requestedJudges?: string[],
-) {
+export async function startFinalRound(adminName: string, requestedJudges?: string[]) {
   const state = await mutableScoring();
   return finals.start(adminName, requestedJudges, state.scoringPolicy);
 }
@@ -115,9 +107,7 @@ export async function getFinalistSubmission(id: string, judgeName: string) {
   const state = await eventScoringRepository.read();
   if (state.publication) {
     if (!state.publication.finals.judges.includes(judgeName))
-      throw new ForbiddenError(
-        "You are not part of the final-round judge roster.",
-      );
+      throw new ForbiddenError("You are not part of the final-round judge roster.");
     if (!state.publication.finals.finalists.some((entry) => entry.id === id))
       throw new ConflictError("This project is not a published finalist.");
     const submission = await getSubmissionById(id);
@@ -127,11 +117,7 @@ export async function getFinalistSubmission(id: string, judgeName: string) {
   return finals.finalist(id, judgeName, state.scoringPolicy);
 }
 
-export async function submitFinalReview(
-  id: string,
-  judgeName: string,
-  scores: ReviewScores,
-) {
+export async function submitFinalReview(id: string, judgeName: string, scores: ReviewScores) {
   await mutableScoring();
   return finals.submitReview(id, judgeName, scores);
 }
@@ -179,41 +165,25 @@ export async function publishResults(adminName: string, winnerIds?: unknown) {
   // rankings cannot come from different reads of the event.
   const submissions = await repository().list();
   const report = await results.report(state.scoringPolicy, null, submissions);
-  const finalState = await finals.state(
-    adminName,
-    state.scoringPolicy,
-    null,
-    submissions,
-  );
+  const finalState = await finals.state(adminName, state.scoringPolicy, null, submissions);
   if (finalState.votingMode === "podium-v1") {
     const { validPicks } = await import("@/domain/final-ballot");
     if (!finalState.completedReviews)
-      throw new ConflictError(
-        "At least one submitted ballot is required before publication.",
-      );
+      throw new ConflictError("At least one submitted ballot is required before publication.");
     if (winnerIds !== undefined) {
-      if (
-        !validPicks(winnerIds, new Set(finalState.finalists.map((s) => s.id)))
-      )
-        throw new ConflictError(
-          "Choose three distinct finalists for the final podium.",
-        );
-      finalState.topThree = winnerIds.map(
-        (id) => finalState.standings!.find((s) => s.id === id)!,
-      );
+      if (!validPicks(winnerIds, new Set(finalState.finalists.map((s) => s.id))))
+        throw new ConflictError("Choose three distinct finalists for the final podium.");
+      finalState.topThree = winnerIds.map((id) => finalState.standings!.find((s) => s.id === id)!);
       finalState.organizerOverride = true;
     } else {
       const ranked = finalState.standings!;
       const relevant = ranked.slice(0, 4);
       if (
         relevant.some(
-          (entry, index) =>
-            index > 0 && entry.votePoints === relevant[index - 1].votePoints,
+          (entry, index) => index > 0 && entry.votePoints === relevant[index - 1].votePoints,
         )
       )
-        throw new ConflictError(
-          "Confirm the final podium to resolve tied vote totals.",
-        );
+        throw new ConflictError("Confirm the final podium to resolve tied vote totals.");
     }
   } else if (!finalState.allComplete)
     throw new ConflictError(
@@ -229,6 +199,10 @@ export async function publishResults(adminName: string, winnerIds?: unknown) {
     normalization: report.normalization,
     finals: { ...finalState, publishedAt },
   });
-  await eventScoringRepository.publish(snapshot);
+  await eventScoringRepository.publish(snapshot, state.revision);
   return getFinalsState(adminName);
+}
+
+export function getAllSubmissions() {
+  return repository().list();
 }

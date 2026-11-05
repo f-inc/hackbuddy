@@ -1,15 +1,11 @@
 "use client";
+import { useJudgingPolicy } from "./EventConfig";
 
 import { scoringPolicyLabel, type ScoringPolicy } from "@/domain/event-scoring";
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SubmissionDetails } from "@/components/SubmissionDetails";
-import {
-  JUDGING_POLICY,
-  PRELIMINARY_SCORE_MAX,
-  RUBRIC,
-  RUBRIC_SCORE_MAX,
-} from "@/domain/judging-policy";
+import { RUBRIC } from "@/domain/judging-policy";
 import {
   formatNormalizedScore,
   NORMALIZATION_POLICY,
@@ -48,6 +44,10 @@ export function ResultsView({
   hackathonName?: string;
   hackathonImageUrl?: string;
 }) {
+  const JUDGING_POLICY = useJudgingPolicy();
+  const RUBRIC_SCORE_MAX = 3 * JUDGING_POLICY.score.max;
+  const PRELIMINARY_SCORE_MAX = RUBRIC_SCORE_MAX * JUDGING_POLICY.preliminary.requiredReviews;
+
   const apiBase = hackathon ? `/api/hackathons/${hackathon}` : "/api";
   const pageBase = hackathon ? `/${hackathon}` : "";
   const [name, setName] = useState("");
@@ -55,17 +55,14 @@ export function ResultsView({
   const [results, setResults] = useState<ResultEntry[]>([]);
   const [pendingSubmissions, setPendingSubmissions] = useState<PendingResultEntry[]>([]);
   const [search, setSearch] = useState("");
-  const [normalization, setNormalization] =
-    useState<NormalizationDiagnostics | null>(null);
+  const [normalization, setNormalization] = useState<NormalizationDiagnostics | null>(null);
   const [showRaw, setShowRaw] = useState(false);
   const [scoringPolicy, setScoringPolicy] = useState<ScoringPolicy>("raw-v1");
   const [publishedAt, setPublishedAt] = useState("");
   const normalized = scoringPolicy === "normalized-v1";
   const [selectedTeam, setSelectedTeam] = useState<ResultEntry | null>(null);
-  const [reviewPickerProject, setReviewPickerProject] =
-    useState<ResultEntry | null>(null);
-  const [inspectedSubmission, setInspectedSubmission] =
-    useState<Submission | null>(null);
+  const [reviewPickerProject, setReviewPickerProject] = useState<ResultEntry | null>(null);
+  const [inspectedSubmission, setInspectedSubmission] = useState<Submission | null>(null);
   const [inspectingId, setInspectingId] = useState("");
   const [inspectionError, setInspectionError] = useState("");
   const [demoMode, setDemoMode] = useState(false);
@@ -91,9 +88,7 @@ export function ResultsView({
         setDemoMode(data.demoMode);
         setError("");
       } catch (caught) {
-        setError(
-          caught instanceof Error ? caught.message : "Could not load results.",
-        );
+        setError(caught instanceof Error ? caught.message : "Could not load results.");
       } finally {
         setLoading(false);
       }
@@ -114,16 +109,10 @@ export function ResultsView({
         hackathon?: string;
       };
       if (!hackathon && session.role === "judge") {
-        window.location.href = session.hackathon
-          ? `/${session.hackathon}/results`
-          : "/";
+        window.location.href = session.hackathon ? `/${session.hackathon}/results` : "/";
         return;
       }
-      if (
-        hackathon &&
-        session.role !== "admin" &&
-        session.hackathon !== hackathon
-      ) {
+      if (hackathon && session.role !== "admin" && session.hackathon !== hackathon) {
         window.location.href = `/${hackathon}`;
         return;
       }
@@ -160,9 +149,7 @@ export function ResultsView({
     setInspectedSubmission(null);
     setInspectionError("");
     try {
-      const response = await fetch(
-        `${apiBase}/submission?id=${encodeURIComponent(id)}`,
-      );
+      const response = await fetch(`${apiBase}/submission?id=${encodeURIComponent(id)}`);
       const data = (await response.json()) as {
         submission?: Submission;
         error?: string;
@@ -173,9 +160,7 @@ export function ResultsView({
       setInspectedSubmission(data.submission);
     } catch (caught) {
       setInspectionError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not load this submission.",
+        caught instanceof Error ? caught.message : "Could not load this submission.",
       );
     }
   }
@@ -189,14 +174,10 @@ export function ResultsView({
   const summary = useMemo(() => {
     const total = results.reduce((sum, result) => sum + result.totalScore, 0);
     const judges = new Set(
-      results.flatMap((result) =>
-        result.reviews.map((review) => review.judgeName),
-      ),
+      results.flatMap((result) => result.reviews.map((review) => review.judgeName)),
     );
     return {
-      average: results.length
-        ? Math.round((total / results.length) * 10) / 10
-        : 0,
+      average: results.length ? Math.round((total / results.length) * 10) / 10 : 0,
       judges: judges.size,
       highest: Math.max(0, ...results.map((result) => result.totalScore)),
     };
@@ -208,14 +189,16 @@ export function ResultsView({
     judges = "",
   ) {
     return [
-      result.projectName, result.teamName, result.submitterNames,
-      result.track, result.oneLiner, judges,
+      result.projectName,
+      result.teamName,
+      result.submitterNames,
+      result.track,
+      result.oneLiner,
+      judges,
     ].some((value) => value.toLocaleLowerCase().includes(query));
   }
   const orderedResults =
-    normalized && showRaw
-      ? [...results].sort((a, b) => a.rawRank - b.rawRank)
-      : results;
+    normalized && showRaw ? [...results].sort((a, b) => a.rawRank - b.rawRank) : results;
   const displayedResults = orderedResults.filter((result) =>
     matchesSearch(result, result.reviews.map((review) => review.judgeName).join(" ")),
   );
@@ -285,29 +268,27 @@ export function ResultsView({
         </div>
         {!normalized && (
           <p>
-            This event retains its original scoring and tie-break rules.
-            Normalization does not change its official results.
+            This event retains its original scoring and tie-break rules. Normalization does not
+            change its official results.
           </p>
         )}
         {normalized && (
           <section className="normalization-explanation card">
             <h2>Fairer judging</h2>
             <p>
-              Rankings adjust for each judge’s average and scoring range, then
-              average the three criteria and project reviews equally. Zero is
-              neutral; higher is better. Original scores are preserved below.
+              Rankings adjust for each judge’s average and scoring range, then average the three
+              criteria and project reviews equally. Zero is neutral; higher is better. Original
+              scores are preserved below.
             </p>
             <p>
-              Small scoring histories are dampened toward neutral. A judge with
-              one review, or identical scores for a criterion, contributes no
-              relative preference for that criterion. Rankings remain
-              provisional as reviews arrive or change.
+              Small scoring histories are dampened toward neutral. A judge with one review, or
+              identical scores for a criterion, contributes no relative preference for that
+              criterion. Rankings remain provisional as reviews arrive or change.
             </p>
             <p>
-              Judges should see comparable project mixes. Normalization cannot
-              distinguish a generous judge from a judge assigned stronger
-              projects. Existing final-round cohorts stay fixed until an
-              organizer syncs or resets them.
+              Judges should see comparable project mixes. Normalization cannot distinguish a
+              generous judge from a judge assigned stronger projects. Existing final-round cohorts
+              stay fixed until an organizer syncs or resets them.
             </p>
             {role === "admin" && normalization && (
               <details>
@@ -317,25 +298,22 @@ export function ResultsView({
                 </summary>
                 {normalization.judgeGroups > 1 && (
                   <p role="status">
-                    Judges form {normalization.judgeGroups} groups with no
-                    shared projects between them. Comparisons across these
-                    groups need organizer review.
+                    Judges form {normalization.judgeGroups} groups with no shared projects between
+                    them. Comparisons across these groups need organizer review.
                   </p>
                 )}
                 {normalization.missingReviewProjects > 0 && (
                   <p role="status">
-                    {normalization.missingReviewProjects} completed projects
-                    have no individual reviews. They receive a neutral
-                    normalized score; restore their reviews before relying on
-                    their ranks.
+                    {normalization.missingReviewProjects} completed projects have no individual
+                    reviews. They receive a neutral normalized score; restore their reviews before
+                    relying on their ranks.
                   </p>
                 )}
                 <div className="results-table-scroll">
                   <table className="results-table">
                     <caption>
-                      Preliminary reviews, including projects still awaiting
-                      another review. Each criterion shows mean ± standard
-                      deviation.
+                      Preliminary reviews, including projects still awaiting another review. Each
+                      criterion shows mean ± standard deviation.
                     </caption>
                     <thead>
                       <tr>
@@ -352,23 +330,16 @@ export function ResultsView({
                         <tr key={judge.judgeName}>
                           <td>{judge.judgeName}</td>
                           <td>{judge.reviewCount}</td>
-                          {(
-                            [
-                              "progressScore",
-                              "practicalityScore",
-                              "complexityScore",
-                            ] as const
-                          ).map((field) => (
-                            <td key={field}>
-                              {judge.criteria[field].mean.toFixed(1)} ±{" "}
-                              {judge.criteria[field].standardDeviation.toFixed(
-                                1,
-                              )}
-                            </td>
-                          ))}
+                          {(["progressScore", "practicalityScore", "complexityScore"] as const).map(
+                            (field) => (
+                              <td key={field}>
+                                {judge.criteria[field].mean.toFixed(1)} ±{" "}
+                                {judge.criteria[field].standardDeviation.toFixed(1)}
+                              </td>
+                            ),
+                          )}
                           <td>
-                            {judge.reviewCount <
-                            NORMALIZATION_POLICY.lowSampleReviews
+                            {judge.reviewCount < NORMALIZATION_POLICY.lowSampleReviews
                               ? "Few reviews"
                               : "5+ reviews"}
                             {Object.values(judge.criteria).some(
@@ -396,7 +367,10 @@ export function ResultsView({
             placeholder="Search projects, teams, builders, tracks, or judges"
           />
         </label>
-        <p role="status">{displayedResults.length + displayedPending.length} of {results.length + pendingSubmissions.length} submissions</p>
+        <p role="status">
+          {displayedResults.length + displayedPending.length} of{" "}
+          {results.length + pendingSubmissions.length} submissions
+        </p>
 
         <section className="results-table-card card">
           <div className="section-header">
@@ -453,7 +427,10 @@ export function ResultsView({
                       key={result.id}
                       onClick={() => void inspectSubmission(result.id)}
                       onKeyDown={(event) => {
-                        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                        if (
+                          event.target === event.currentTarget &&
+                          (event.key === "Enter" || event.key === " ")
+                        ) {
                           event.preventDefault();
                           void inspectSubmission(result.id);
                         }
@@ -500,15 +477,11 @@ export function ResultsView({
                             />
                           ) : (
                             <span className="builders-thumbnail fallback">
-                              {(result.submitterNames || result.teamName)
-                                .slice(0, 1)
-                                .toUpperCase()}
+                              {(result.submitterNames || result.teamName).slice(0, 1).toUpperCase()}
                             </span>
                           )}
                           <span>
-                            <strong>
-                              {result.submitterNames || "Not provided"}
-                            </strong>
+                            <strong>{result.submitterNames || "Not provided"}</strong>
                             {result.teamPhotoUrl && <small>View photo</small>}
                           </span>
                         </button>
@@ -536,9 +509,7 @@ export function ResultsView({
                         <span className="rubric-score">
                           {result.progressScore}
                           <small>
-                            /
-                            {JUDGING_POLICY.score.max *
-                              JUDGING_POLICY.preliminary.requiredReviews}
+                            /{JUDGING_POLICY.score.max * JUDGING_POLICY.preliminary.requiredReviews}
                           </small>
                         </span>
                       </td>
@@ -546,9 +517,7 @@ export function ResultsView({
                         <span className="rubric-score">
                           {result.practicalityScore}
                           <small>
-                            /
-                            {JUDGING_POLICY.score.max *
-                              JUDGING_POLICY.preliminary.requiredReviews}
+                            /{JUDGING_POLICY.score.max * JUDGING_POLICY.preliminary.requiredReviews}
                           </small>
                         </span>
                       </td>
@@ -556,9 +525,7 @@ export function ResultsView({
                         <span className="rubric-score">
                           {result.complexityScore}
                           <small>
-                            /
-                            {JUDGING_POLICY.score.max *
-                              JUDGING_POLICY.preliminary.requiredReviews}
+                            /{JUDGING_POLICY.score.max * JUDGING_POLICY.preliminary.requiredReviews}
                           </small>
                         </span>
                       </td>
@@ -596,7 +563,11 @@ export function ResultsView({
             <div className="panel-empty">
               <span>—</span>
               <h3>{query ? "No matching scored projects" : "No completed scores yet"}</h3>
-              <p>{query ? "Try another search." : "Finished judging sessions will appear here automatically."}</p>
+              <p>
+                {query
+                  ? "Try another search."
+                  : "Finished judging sessions will appear here automatically."}
+              </p>
             </div>
           )}
         </section>
@@ -604,7 +575,10 @@ export function ResultsView({
           <div className="section-header">
             <div>
               <h2>Awaiting reviews</h2>
-              <p>Open any submission to view its project details. Rankings appear when reviews are complete.</p>
+              <p>
+                Open any submission to view its project details. Rankings appear when reviews are
+                complete.
+              </p>
             </div>
           </div>
           {displayedPending.length ? (
@@ -626,7 +600,10 @@ export function ResultsView({
                       className="clickable-result-row"
                       onClick={() => void inspectSubmission(submission.id)}
                       onKeyDown={(event) => {
-                        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                        if (
+                          event.target === event.currentTarget &&
+                          (event.key === "Enter" || event.key === " ")
+                        ) {
                           event.preventDefault();
                           void inspectSubmission(submission.id);
                         }
@@ -637,12 +614,22 @@ export function ResultsView({
                       <td>
                         <div className="result-project">
                           <strong>{submission.projectName}</strong>
-                          <span>{submission.teamName} · {submission.track}</span>
+                          <span>
+                            {submission.teamName} · {submission.track}
+                          </span>
                         </div>
                       </td>
                       <td>{submission.submitterNames || "Not provided"}</td>
-                      <td>{submission.status === "in progress" ? "Review in progress" : submission.reviewCount ? "Awaiting another review" : "Not reviewed"}</td>
-                      <td>{submission.reviewCount}/{JUDGING_POLICY.preliminary.requiredReviews}</td>
+                      <td>
+                        {submission.status === "in progress"
+                          ? "Review in progress"
+                          : submission.reviewCount
+                            ? "Awaiting another review"
+                            : "Not reviewed"}
+                      </td>
+                      <td>
+                        {submission.reviewCount}/{JUDGING_POLICY.preliminary.requiredReviews}
+                      </td>
                       <td>
                         <button
                           type="button"
@@ -662,7 +649,9 @@ export function ResultsView({
             </div>
           ) : (
             <div className="panel-empty">
-              <h3>{query ? "No matching pending submissions" : "No submissions awaiting reviews"}</h3>
+              <h3>
+                {query ? "No matching pending submissions" : "No submissions awaiting reviews"}
+              </h3>
             </div>
           )}
         </section>
@@ -676,22 +665,13 @@ export function ResultsView({
           onClick={closeInspection}
           role="dialog"
         >
-          <div
-            className="submission-inspection-panel"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="submission-inspection-panel" onClick={(event) => event.stopPropagation()}>
             <header className="submission-inspection-header">
               <div>
                 <span className="eyebrow">Submission preview</span>
-                <strong>
-                  {inspectedSubmission?.projectName || "Loading project…"}
-                </strong>
+                <strong>{inspectedSubmission?.projectName || "Loading project…"}</strong>
               </div>
-              <button
-                aria-label="Close submission preview"
-                onClick={closeInspection}
-                type="button"
-              >
+              <button aria-label="Close submission preview" onClick={closeInspection} type="button">
                 ×
               </button>
             </header>
@@ -704,18 +684,24 @@ export function ResultsView({
                       {publishedAt ? (
                         <p>Published results are locked.</p>
                       ) : inspectedSubmission.status === "in progress" ? (
-                        <p>Release the active judging session from the dashboard before editing scores.</p>
-                      ) : inspectedSubmission.reviews.length ? inspectedSubmission.reviews.map((review, index) => (
+                        <p>
+                          Release the active judging session from the dashboard before editing
+                          scores.
+                        </p>
+                      ) : inspectedSubmission.reviews.length ? (
+                        inspectedSubmission.reviews.map((review, index) => (
                           <a
                             className="submission-inspection-judge-link"
                             key={`${review.judgeName}-${index}`}
                             href={`${pageBase}/judging?submission=${encodeURIComponent(inspectedSubmission.id)}&review=${index}`}
                           >
-                            Edit {review.judgeName || "Unknown judge"}’s scores · {review.totalScore}/{RUBRIC_SCORE_MAX}
+                            Edit {review.judgeName || "Unknown judge"}’s scores ·{" "}
+                            {review.totalScore}/{RUBRIC_SCORE_MAX}
                           </a>
-                        )) : (
-                          <p>No scores yet. This submission is awaiting its first review.</p>
-                        )}
+                        ))
+                      ) : (
+                        <p>No scores yet. This submission is awaiting its first review.</p>
+                      )}
                     </section>
                   )}
                   <SubmissionDetails submission={inspectedSubmission} />
@@ -745,17 +731,14 @@ export function ResultsView({
           onClick={() => setReviewPickerProject(null)}
           role="dialog"
         >
-          <section
-            className="review-picker-card"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <section className="review-picker-card" onClick={(event) => event.stopPropagation()}>
             <header>
               <div>
                 <span className="eyebrow">Administrator controls</span>
                 <h2 id="review-picker-title">Choose a judge’s review</h2>
                 <p>
-                  Select the submitted answers you want to inspect or correct
-                  for <strong>{reviewPickerProject.projectName}</strong>.
+                  Select the submitted answers you want to inspect or correct for{" "}
+                  <strong>{reviewPickerProject.projectName}</strong>.
                 </p>
               </div>
               <button
@@ -786,16 +769,13 @@ export function ResultsView({
                   </span>
                   <span className="review-picker-breakdown">
                     <span>
-                      {RUBRIC.progress.label}{" "}
-                      <strong>{review.progressScore}</strong>
+                      {RUBRIC.progress.label} <strong>{review.progressScore}</strong>
                     </span>
                     <span>
-                      {RUBRIC.practicality.label}{" "}
-                      <strong>{review.practicalityScore}</strong>
+                      {RUBRIC.practicality.label} <strong>{review.practicalityScore}</strong>
                     </span>
                     <span>
-                      {RUBRIC.complexity.label}{" "}
-                      <strong>{review.complexityScore}</strong>
+                      {RUBRIC.complexity.label} <strong>{review.complexityScore}</strong>
                     </span>
                   </span>
                   <span className="review-picker-total">
@@ -820,10 +800,7 @@ export function ResultsView({
           onClick={() => setSelectedTeam(null)}
           role="dialog"
         >
-          <div
-            className="photo-modal-content"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="photo-modal-content" onClick={(event) => event.stopPropagation()}>
             <button
               aria-label="Close photo"
               className="photo-modal-close"

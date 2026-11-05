@@ -1,4 +1,5 @@
 "use client";
+import { useJudgingPolicy } from "./EventConfig";
 
 import { formatNormalizedScore } from "@/domain/normalization";
 import Link from "next/link";
@@ -7,7 +8,7 @@ import { AppShell } from "./AppShell";
 import { LoadingScreen } from "./LoadingScreen";
 import { ScoreControl } from "./ScoreControl";
 import { SubmissionDetails } from "./SubmissionDetails";
-import { RUBRIC, RUBRIC_SCORE_MAX } from "@/domain/judging-policy";
+import { RUBRIC } from "@/domain/judging-policy";
 import type { JudgedProject } from "@/domain/judge-history";
 import type { ReviewPhase, Submission } from "@/domain/submission";
 
@@ -63,9 +64,7 @@ function ResultSummary({ project }: { project: JudgedProject }) {
       )}
       {project.finalResult && (
         <div className="history-final-result">
-          <span>
-            Final round{!project.finalResult.complete && " · in progress"}
-          </span>
+          <span>Final round{!project.finalResult.complete && " · in progress"}</span>
           <strong>
             {project.finalResult.normalizedScore !== null
               ? formatNormalizedScore(project.finalResult.normalizedScore)
@@ -95,6 +94,9 @@ export function JudgedProjectsView({
   submissionId?: string;
   initialPhase?: ReviewPhase;
 }) {
+  const JUDGING_POLICY = useJudgingPolicy();
+  const RUBRIC_SCORE_MAX = 3 * JUDGING_POLICY.score.max;
+
   const [session, setSession] = useState<Session | null>(null);
   const [data, setData] = useState<HistoryResponse | null>(null);
   const [error, setError] = useState("");
@@ -123,9 +125,7 @@ export function JudgedProjectsView({
         const current = (await auth.json()) as Session;
         setSession(current);
         if (current.role === "judge" && current.hackathon !== hackathon) {
-          throw new Error(
-            "Sign in to this hackathon to view your judged projects.",
-          );
+          throw new Error("Sign in to this hackathon to view your judged projects.");
         }
         const response = await fetch(
           `/api/hackathons/${hackathon}/judged${submissionId ? `?id=${encodeURIComponent(submissionId)}` : ""}`,
@@ -133,16 +133,12 @@ export function JudgedProjectsView({
         );
         const result = (await response.json()) as HistoryResponse;
         if (!response.ok)
-          throw new Error(
-            result.error || "Your judged projects could not be loaded.",
-          );
+          throw new Error(result.error || "Your judged projects could not be loaded.");
         setData(result);
       } catch (caught) {
         if (!controller.signal.aborted)
           setError(
-            caught instanceof Error
-              ? caught.message
-              : "Your judged projects could not be loaded.",
+            caught instanceof Error ? caught.message : "Your judged projects could not be loaded.",
           );
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -162,14 +158,10 @@ export function JudgedProjectsView({
         .includes(query.trim().toLowerCase()),
   );
   const average = allReviews.length
-    ? (
-        allReviews.reduce((sum, r) => sum + r.review.totalScore, 0) /
-        allReviews.length
-      ).toFixed(1)
+    ? (allReviews.reduce((sum, r) => sum + r.review.totalScore, 0) / allReviews.length).toFixed(1)
     : "—";
   const project = data?.project;
-  const selected =
-    project?.myReviews.find((r) => r.phase === phase) ?? project?.myReviews[0];
+  const selected = project?.myReviews.find((r) => r.phase === phase) ?? project?.myReviews[0];
 
   if (loading) return <LoadingScreen />;
 
@@ -182,9 +174,7 @@ export function JudgedProjectsView({
       hackathonImageUrl={hackathonImageUrl}
     >
       {data?.demoMode && (
-        <div className="demo-banner">
-          Preview mode — showing sample review history.
-        </div>
+        <div className="demo-banner">Preview mode — showing sample review history.</div>
       )}
       <main className="workspace-main history-main">
         {submissionId && (
@@ -197,20 +187,14 @@ export function JudgedProjectsView({
             <span className="eyebrow">
               {submissionId ? "Your saved review" : "Your judging history"}
             </span>
-            <h1>
-              {submissionId
-                ? project?.projectName || "Project review"
-                : "Projects judged"}
-            </h1>
+            <h1>{submissionId ? project?.projectName || "Project review" : "Projects judged"}</h1>
             <p>
               {submissionId
                 ? "Revisit the project, your scores, and the notes you left."
                 : "Every project you reviewed. Your perspective, alongside the results."}
             </p>
           </div>
-          {!submissionId && (
-            <span className="history-event-label">{hackathonName}</span>
-          )}
+          {!submissionId && <span className="history-event-label">{hackathonName}</span>}
         </header>
 
         {error ? (
@@ -236,9 +220,7 @@ export function JudgedProjectsView({
                     aria-pressed={selected.phase === r.phase}
                     onClick={() => setPhase(r.phase)}
                   >
-                    {r.phase === "preliminary"
-                      ? "Preliminary review"
-                      : "Final review"}
+                    {r.phase === "preliminary" ? "Preliminary review" : "Final review"}
                   </button>
                 ))}
               </div>
@@ -254,9 +236,7 @@ export function JudgedProjectsView({
                 <header className="compact-score-header">
                   <div>
                     <span className="eyebrow">
-                      {selected.phase === "final"
-                        ? "Final-round review"
-                        : "Preliminary review"}
+                      {selected.phase === "final" ? "Final-round review" : "Preliminary review"}
                     </span>
                     <h2>Your submitted score</h2>
                   </div>
@@ -266,6 +246,7 @@ export function JudgedProjectsView({
                   </div>
                 </header>
                 <ScoreControl
+                  max={JUDGING_POLICY.score.max}
                   label={RUBRIC.progress.label}
                   lowAnchor="Little meaningful progress"
                   highAnchor="Exceptional progress tonight"
@@ -273,6 +254,7 @@ export function JudgedProjectsView({
                   readOnly
                 />
                 <ScoreControl
+                  max={JUDGING_POLICY.score.max}
                   label={RUBRIC.practicality.label}
                   lowAnchor="No real-world use case"
                   highAnchor="Solves an actual problem"
@@ -280,6 +262,7 @@ export function JudgedProjectsView({
                   readOnly
                 />
                 <ScoreControl
+                  max={JUDGING_POLICY.score.max}
                   label={RUBRIC.complexity.label}
                   lowAnchor="Technically straightforward"
                   highAnchor="Complex and well executed"
@@ -291,16 +274,13 @@ export function JudgedProjectsView({
                   <textarea
                     readOnly
                     rows={4}
-                    value={
-                      selected.review.notes || "No notes saved for this review."
-                    }
+                    value={selected.review.notes || "No notes saved for this review."}
                   />
                 </label>
                 <ResultSummary project={project} />
                 <p className="history-readonly-note">
-                  Your review is saved. Browsing here won’t change scores or
-                  reserve a project. Project details reflect the current
-                  submission.
+                  Your review is saved. Browsing here won’t change scores or reserve a project.
+                  Project details reflect the current submission.
                 </p>
               </aside>
             </div>
@@ -308,10 +288,7 @@ export function JudgedProjectsView({
         ) : (
           !submissionId && (
             <>
-              <section
-                className="history-stats"
-                aria-label="Your judging summary"
-              >
+              <section className="history-stats" aria-label="Your judging summary">
                 <div>
                   <span>Projects judged</span>
                   <strong>{projects.length}</strong>
@@ -334,26 +311,21 @@ export function JudgedProjectsView({
               {projects.length > 0 ? (
                 <>
                   <div className="history-tools">
-                    <div
-                      className="history-filters"
-                      aria-label="Filter by round"
-                    >
-                      {(["all", "preliminary", "final"] as const).map(
-                        (value) => (
-                          <button
-                            key={value}
-                            type="button"
-                            aria-pressed={round === value}
-                            onClick={() => setRound(value)}
-                          >
-                            {value === "all"
-                              ? "All projects"
-                              : value === "preliminary"
-                                ? "Preliminary"
-                                : "Final round"}
-                          </button>
-                        ),
-                      )}
+                    <div className="history-filters" aria-label="Filter by round">
+                      {(["all", "preliminary", "final"] as const).map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={round === value}
+                          onClick={() => setRound(value)}
+                        >
+                          {value === "all"
+                            ? "All projects"
+                            : value === "preliminary"
+                              ? "Preliminary"
+                              : "Final round"}
+                        </button>
+                      ))}
                     </div>
                     <input
                       type="search"
@@ -365,22 +337,17 @@ export function JudgedProjectsView({
                   </div>
                   <div className="history-list-caption" role="status">
                     <span>
-                      {filtered.length}{" "}
-                      {filtered.length === 1 ? "project" : "projects"}
+                      {filtered.length} {filtered.length === 1 ? "project" : "projects"}
                     </span>
                     <span>Most recently reviewed first</span>
                   </div>
                   {filtered.length ? (
-                    <ul
-                      className="history-project-list"
-                      aria-label="Projects you judged"
-                    >
+                    <ul className="history-project-list" aria-label="Projects you judged">
                       {filtered.map((item) => {
                         const openPhase =
                           round === "all"
                             ? item.myReviews.at(-1)!.phase
-                            : item.myReviews.find((r) => r.phase === round)!
-                                .phase;
+                            : item.myReviews.find((r) => r.phase === round)!.phase;
                         return (
                           <li key={item.id}>
                             <Link
@@ -412,9 +379,7 @@ export function JudgedProjectsView({
                               </div>
                               <div className="history-row-project">
                                 {item.teamName !== item.projectName && (
-                                  <span className="history-team">
-                                    {item.teamName}
-                                  </span>
+                                  <span className="history-team">{item.teamName}</span>
                                 )}
                                 <h2>{item.projectName}</h2>
                                 <p className="history-one-liner">
@@ -432,11 +397,7 @@ export function JudgedProjectsView({
                                 {item.myReviews.map((r) => (
                                   <div key={r.phase}>
                                     <span>
-                                      Your{" "}
-                                      {r.phase === "final"
-                                        ? "final"
-                                        : "preliminary"}{" "}
-                                      score
+                                      Your {r.phase === "final" ? "final" : "preliminary"} score
                                     </span>
                                     <strong>
                                       {r.review.totalScore}
@@ -478,9 +439,8 @@ export function JudgedProjectsView({
                   </span>
                   <h2>Your reviews will live here</h2>
                   <p>
-                    Once you submit a score, you can revisit the project
-                    here—even while it’s waiting for another judge. Sign in with
-                    the same name you used when judging.
+                    Once you submit a score, you can revisit the project here—even while it’s
+                    waiting for another judge. Sign in with the same name you used when judging.
                   </p>
                   <Link className="primary-button" href={`${base}/judging`}>
                     Go to judging <span aria-hidden>→</span>

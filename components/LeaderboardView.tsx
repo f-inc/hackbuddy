@@ -1,4 +1,5 @@
 "use client";
+import { useEventSettings, useJudgingPolicy } from "./EventConfig";
 
 import "./winner-presentation.css";
 import "./top-seven-presentation.css";
@@ -8,7 +9,6 @@ import Image from "next/image";
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SubmissionDetails } from "@/components/SubmissionDetails";
-import { JUDGING_POLICY } from "@/domain/judging-policy";
 import type { FinalistEntry, FinalsState, Submission } from "@/lib/types";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
@@ -17,22 +17,7 @@ type FinalsResponse = {
   error?: string;
 };
 
-const WINNER_SPONSORS = [
-  { name: "bolt.new", file: "bolt-new", width: 452, height: 125 },
-  { name: "AI", file: "ai", width: 515, height: 259 },
-  { name: "Mercury", file: "mercury", width: 616, height: 133 },
-  { name: "heypcb", file: "heypcb", width: 521, height: 117 },
-  { name: "Firecrawl", file: "firecrawl", width: 726, height: 172 },
-];
-
-const CONFETTI_COLORS = [
-  "#f4c84a",
-  "#f08b5d",
-  "#ef5da8",
-  "#6f79e8",
-  "#23b6a5",
-  "#46a4f2",
-];
+const CONFETTI_COLORS = ["#f4c84a", "#f08b5d", "#ef5da8", "#6f79e8", "#23b6a5", "#46a4f2"];
 
 type ConfettiParticle = {
   age: number;
@@ -57,10 +42,7 @@ function ConfettiCanvas() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (
-      !canvas ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
+    if (!canvas || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return;
     }
     const context = canvas.getContext("2d");
@@ -102,18 +84,14 @@ function ConfettiCanvas() {
           ? width * randomBetween(0.16, 1.04)
           : width * randomBetween(-0.04, 0.84);
         const targetY = height * randomBetween(0.015, 0.6);
-        const launchVx =
-          ((targetX - originX) / travelTime + randomBetween(-90, 90)) *
-          strength;
+        const launchVx = ((targetX - originX) / travelTime + randomBetween(-90, 90)) * strength;
         const launchVy =
-          ((targetY - originY - 0.5 * gravity * travelTime * travelTime) /
-            travelTime +
+          ((targetY - originY - 0.5 * gravity * travelTime * travelTime) / travelTime +
             randomBetween(-100, 80)) *
           strength;
         particles.push({
           age: 0,
-          color:
-            CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+          color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
           drag: randomBetween(0.9945, 0.9985),
           flip: randomBetween(0, Math.PI * 2),
           flipSpeed: randomBetween(5, 13) * (Math.random() > 0.5 ? 1 : -1),
@@ -146,8 +124,7 @@ function ConfettiCanvas() {
       }
 
       drawingContext.clearRect(0, 0, width, height);
-      const endingOpacity =
-        elapsed > 9_150 ? Math.max(0, (10_000 - elapsed) / 850) : 1;
+      const endingOpacity = elapsed > 9_150 ? Math.max(0, (10_000 - elapsed) / 850) : 1;
 
       for (let index = particles.length - 1; index >= 0; index -= 1) {
         const particle = particles[index];
@@ -159,11 +136,7 @@ function ConfettiCanvas() {
         particle.rotation += particle.rotationSpeed * delta;
         particle.flip += particle.flipSpeed * delta;
 
-        if (
-          particle.y > height + 80 ||
-          particle.x < -320 ||
-          particle.x > width + 320
-        ) {
+        if (particle.y > height + 80 || particle.x < -320 || particle.x > width + 320) {
           particles.splice(index, 1);
           continue;
         }
@@ -208,9 +181,7 @@ function ConfettiCanvas() {
     };
   }, []);
 
-  return (
-    <canvas aria-hidden className="confetti-celebration" ref={canvasRef} />
-  );
+  return <canvas aria-hidden className="confetti-celebration" ref={canvasRef} />;
 }
 
 export function LeaderboardView({
@@ -224,6 +195,19 @@ export function LeaderboardView({
   hackathonName?: string;
   hackathonImageUrl?: string;
 }) {
+  const settings = useEventSettings();
+  const configuredSponsors = [
+    ...(settings.sponsors || []),
+    ...settings.collections
+      .filter((c) => c.sponsor)
+      .map((c) => ({ id: c.id, name: c.sponsor, logo: c.logo })),
+  ];
+  const sponsors = configuredSponsors.filter(
+    (sponsor, index, all) =>
+      all.findIndex((other) => other.name.toLowerCase() === sponsor.name.toLowerCase()) === index,
+  );
+  const JUDGING_POLICY = useJudgingPolicy();
+
   const apiBase = hackathon ? `/api/hackathons/${hackathon}` : "/api";
   const [name, setName] = useState("");
   const [role, setRole] = useState<"judge" | "admin">("judge");
@@ -235,13 +219,27 @@ export function LeaderboardView({
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
   const [presenting, setPresenting] = useState(false);
+  const [presentationPage, setPresentationPage] = useState(0);
+  const presentationPages = Math.max(1, Math.ceil((finals?.finalists.length || 0) / 7));
+  useEffect(() => {
+    if (
+      !presenting ||
+      view !== "top-seven" ||
+      presentationPages < 2 ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return;
+    const timer = window.setInterval(
+      () => setPresentationPage((page) => (page + 1) % presentationPages),
+      12000,
+    );
+    return () => window.clearInterval(timer);
+  }, [presenting, view, presentationPages]);
   const isSecondPass = view === "second-pass";
   const isWinners = view === "winners";
-  const [selectedFinalist, setSelectedFinalist] =
-    useState<FinalistEntry | null>(null);
+  const [selectedFinalist, setSelectedFinalist] = useState<FinalistEntry | null>(null);
   const [inspectingId, setInspectingId] = useState("");
-  const [inspectedSubmission, setInspectedSubmission] =
-    useState<Submission | null>(null);
+  const [inspectedSubmission, setInspectedSubmission] = useState<Submission | null>(null);
   const [inspectionError, setInspectionError] = useState("");
   const [selectedJudges, setSelectedJudges] = useState<string[]>([]);
   const [newJudgeName, setNewJudgeName] = useState("");
@@ -284,11 +282,7 @@ export function LeaderboardView({
         }
         setError("");
       } catch (caught) {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "Could not load the leaderboard.",
-        );
+        setError(caught instanceof Error ? caught.message : "Could not load the leaderboard.");
       } finally {
         setLoading(false);
       }
@@ -314,11 +308,7 @@ export function LeaderboardView({
           : "/";
         return;
       }
-      if (
-        hackathon &&
-        session.role !== "admin" &&
-        session.hackathon !== hackathon
-      ) {
+      if (hackathon && session.role !== "admin" && session.hackathon !== hackathon) {
         window.location.href = `/${hackathon}`;
         return;
       }
@@ -342,8 +332,7 @@ export function LeaderboardView({
       }
     }
     document.addEventListener("fullscreenchange", syncFullscreenState);
-    return () =>
-      document.removeEventListener("fullscreenchange", syncFullscreenState);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreenState);
   }, []);
 
   useEffect(
@@ -374,8 +363,7 @@ export function LeaderboardView({
     }
 
     document.addEventListener("keydown", leavePresentationOnEscape);
-    return () =>
-      document.removeEventListener("keydown", leavePresentationOnEscape);
+    return () => document.removeEventListener("keydown", leavePresentationOnEscape);
   }, [presenting]);
 
   const advanceReveal = useCallback(() => {
@@ -411,9 +399,7 @@ export function LeaderboardView({
     function handleRevealKey(event: KeyboardEvent) {
       if (event.repeat) return;
       const target = event.target as HTMLElement | null;
-      if (
-        target?.matches("input, textarea, select, [contenteditable='true']")
-      ) {
+      if (target?.matches("input, textarea, select, [contenteditable='true']")) {
         return;
       }
 
@@ -457,9 +443,7 @@ export function LeaderboardView({
     setInspectedSubmission(null);
     setInspectionError("");
     try {
-      const response = await fetch(
-        `${apiBase}/submission?id=${encodeURIComponent(id)}`,
-      );
+      const response = await fetch(`${apiBase}/submission?id=${encodeURIComponent(id)}`);
       const data = (await response.json()) as {
         submission?: Submission;
         error?: string;
@@ -470,9 +454,7 @@ export function LeaderboardView({
       setInspectedSubmission(data.submission);
     } catch (caught) {
       setInspectionError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not load this submission.",
+        caught instanceof Error ? caught.message : "Could not load this submission.",
       );
     }
   }
@@ -483,7 +465,7 @@ export function LeaderboardView({
     setInspectionError("");
   }
 
-  async function togglePresentation() {
+  async function togglePresentation(reveal = false) {
     if (presenting) {
       if (document.fullscreenElement) await document.exitFullscreen();
       setPresenting(false);
@@ -498,12 +480,14 @@ export function LeaderboardView({
       ceremonyTimer.current = null;
     }
     const revealWinners =
+      reveal &&
       role === "admin" &&
       isWinners &&
       finals?.topThree.length === JUDGING_POLICY.finals.winnerCount;
     setCelebrating(false);
     setCeremonyMode(revealWinners);
     setRevealStage(revealWinners ? 0 : 3);
+    setPresentationPage(0);
     setPresenting(true);
     try {
       await document.documentElement.requestFullscreen();
@@ -533,9 +517,7 @@ export function LeaderboardView({
       if (!response.ok) throw new Error(data.error);
       setFinals(data.finals);
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Could not start finals.",
-      );
+      setError(caught instanceof Error ? caught.message : "Could not start finals.");
     } finally {
       setStarting(false);
     }
@@ -558,11 +540,7 @@ export function LeaderboardView({
       if (!response.ok) throw new Error(data.error);
       setFinals(data.finals);
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not synchronize the finalists.",
-      );
+      setError(caught instanceof Error ? caught.message : "Could not synchronize the finalists.");
     } finally {
       setSyncing(false);
     }
@@ -583,16 +561,11 @@ export function LeaderboardView({
         body: JSON.stringify({ action: "publish" }),
       });
       const data = (await response.json()) as FinalsResponse;
-      if (!response.ok)
-        throw new Error(data.error || "Results could not be published.");
+      if (!response.ok) throw new Error(data.error || "Results could not be published.");
       setFinals(data.finals);
       setError("");
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Results could not be published.",
-      );
+      setError(caught instanceof Error ? caught.message : "Results could not be published.");
     } finally {
       setPublishing(false);
     }
@@ -617,11 +590,7 @@ export function LeaderboardView({
       setSelectedJudges(data.finals.judges);
       rosterInitialized.current = true;
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not reset final judging.",
-      );
+      setError(caught instanceof Error ? caught.message : "Could not reset final judging.");
     } finally {
       setResetting(false);
     }
@@ -652,11 +621,18 @@ export function LeaderboardView({
   const results = isWinners
     ? finalState.topThree
     : view === "top-seven"
-      ? [...finalState.finalists].sort((a, b) =>
-          a.projectName.localeCompare(b.projectName, "en", { sensitivity: "base" }) ||
-          a.id.localeCompare(b.id),
+      ? [...finalState.finalists].sort(
+          (a, b) =>
+            a.projectName.localeCompare(b.projectName, "en", { sensitivity: "base" }) ||
+            a.id.localeCompare(b.id),
         )
       : finalState.finalists;
+  const visibleResults = presentingFinalists
+    ? results.slice(
+        (presentationPage % presentationPages) * 7,
+        ((presentationPage % presentationPages) + 1) * 7,
+      )
+    : results;
   const ResultsList = view === "top-seven" ? "ul" : "ol";
   const heading = isWinners
     ? "Winners"
@@ -674,9 +650,7 @@ export function LeaderboardView({
       : finalState.started || finalState.publishedAt
         ? "Meet the finalists selected from preliminary judging, listed alphabetically."
         : "The current shortlist, listed alphabetically. Teams may change until the second pass starts.";
-  const availableJudgeNames = Array.from(
-    new Set([...finalState.judges, ...selectedJudges]),
-  ).sort();
+  const availableJudgeNames = Array.from(new Set([...finalState.judges, ...selectedJudges])).sort();
 
   function finalistContent(result: FinalistEntry) {
     return (
@@ -688,9 +662,7 @@ export function LeaderboardView({
             <span className="live-podium-points">
               {result.votePoints ?? 0} points
               {finalState.standings?.some(
-                (other) =>
-                  other.id !== result.id &&
-                  other.votePoints === result.votePoints,
+                (other) => other.id !== result.id && other.votePoints === result.votePoints,
               ) && " · Tied"}
             </span>
           )}
@@ -699,9 +671,7 @@ export function LeaderboardView({
             !(showingTopThree && finalState.votingMode === "podium-v1") && (
               <small className="normalized-finalist-score">
                 {formatNormalizedScore(
-                  showingTopThree
-                    ? result.finalNormalizedScore
-                    : result.normalizedScore,
+                  showingTopThree ? result.finalNormalizedScore : result.normalizedScore,
                 )}{" "}
                 · {showingTopThree ? "Final" : "Preliminary"} normalized
               </small>
@@ -732,10 +702,9 @@ export function LeaderboardView({
             />
           ) : (
             <span className="tv-team-photo fallback">
-              {(presentingFinalists
-                ? result.projectName
-                : result.submitterNames || result.teamName
-              ).slice(0, 1).toUpperCase()}
+              {(presentingFinalists ? result.projectName : result.submitterNames || result.teamName)
+                .slice(0, 1)
+                .toUpperCase()}
             </span>
           )}
           <span className="tv-builders-copy">
@@ -744,11 +713,7 @@ export function LeaderboardView({
           </span>
         </div>
         {isSecondPass && finalState.started && !finalState.publishedAt && (
-          <span
-            className={`final-review-status${
-              result.reviewedByYou ? " complete" : ""
-            }`}
-          >
+          <span className={`final-review-status${result.reviewedByYou ? " complete" : ""}`}>
             {!finalState.eligibleJudge
               ? "View only"
               : result.reviewedByYou
@@ -768,9 +733,7 @@ export function LeaderboardView({
       }`}
       id="finals-view"
     >
-      {showingTopThree && celebrating && (
-        <ConfettiCanvas key={`confetti-${confettiRun}`} />
-      )}
+      {showingTopThree && celebrating && <ConfettiCanvas key={`confetti-${confettiRun}`} />}
       <header className="tv-leaderboard-header">
         <div className="tv-leaderboard-title">
           <span aria-hidden className="brand-mark small" />
@@ -786,9 +749,7 @@ export function LeaderboardView({
           </div>
         )}
         <div className="tv-leaderboard-actions">
-          <span
-            className={`results-live${presenting && livePodium ? " tv-live-status" : ""}`}
-          >
+          <span className={`results-live${presenting && livePodium ? " tv-live-status" : ""}`}>
             <span />
             {presenting && livePodium
               ? "Provisional · updates live"
@@ -799,21 +760,30 @@ export function LeaderboardView({
           {!isSecondPass && (
             <button
               className="secondary-button tv-present-button"
-              onClick={togglePresentation}
+              onClick={() => void togglePresentation()}
               type="button"
             >
               {presenting ? "Exit presentation" : "Present on TV"}
               <span aria-hidden>{presenting ? "↙" : "↗"}</span>
             </button>
           )}
+          {isWinners && !presenting && role === "admin" && results.length === 3 && (
+            <details className="tv-reveal-options">
+              <summary>Reveal options</summary>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => void togglePresentation(true)}
+              >
+                Reveal winners one at a time
+              </button>
+            </details>
+          )}
         </div>
       </header>
 
       {presenting && ceremonyMode && (
-        <section
-          className="tv-ceremony-controls"
-          aria-label="Winner reveal controls"
-        >
+        <section className="tv-ceremony-controls" aria-label="Winner reveal controls">
           <div>
             <p role="status" aria-live="polite">
               {revealStage === 0
@@ -822,23 +792,15 @@ export function LeaderboardView({
                   ? "All winners revealed"
                   : `${revealStage === 1 ? "Third" : "Second"} place revealed`}
             </p>
-            <small>
-              Use ← and → to reveal each place. Esc exits presentation.
-            </small>
+            <small>Use ← and → to reveal each place. Esc exits presentation.</small>
           </div>
           <div className="tv-ceremony-buttons">
-            <button
-              type="button"
-              onClick={rewindReveal}
-              disabled={revealStage === 0}
-            >
+            <button type="button" onClick={rewindReveal} disabled={revealStage === 0}>
               ← Back
             </button>
             {revealStage < 3 ? (
               <button type="button" onClick={advanceReveal}>
-                Reveal{" "}
-                {revealStage === 0 ? "3rd" : revealStage === 1 ? "2nd" : "1st"}{" "}
-                place →
+                Reveal {revealStage === 0 ? "3rd" : revealStage === 1 ? "2nd" : "1st"} place →
               </button>
             ) : (
               <button type="button" onClick={replayReveal}>
@@ -853,14 +815,12 @@ export function LeaderboardView({
 
       {error && <div className="error-banner page-error">{error}</div>}
 
-      {finalState.publishedAt && !presentingFinalists && (
+      {finalState.publishedAt && !presenting && (
         <p>Published {new Date(finalState.publishedAt).toLocaleString()}</p>
       )}
       <section className="final-round-status">
         <div className="final-round-status-label">
-          <span
-            className={`final-round-dot${finalState.started ? " live" : ""}`}
-          />
+          <span className={`final-round-dot${finalState.started ? " live" : ""}`} />
           <strong>
             {finalState.publishedAt
               ? "Results published and locked"
@@ -889,17 +849,16 @@ export function LeaderboardView({
             role === "admin" &&
             !finalState.publishedAt && (
               <div className="final-round-admin-actions">
-                {finalState.votingMode !== "podium-v1" &&
-                  finals.allComplete && (
-                    <button
-                      className="normalization-compare"
-                      type="button"
-                      disabled={publishing}
-                      onClick={publishFinals}
-                    >
-                      {publishing ? "Publishing…" : "Publish and lock results"}
-                    </button>
-                  )}
+                {finalState.votingMode !== "podium-v1" && finals.allComplete && (
+                  <button
+                    className="normalization-compare"
+                    type="button"
+                    disabled={publishing}
+                    onClick={publishFinals}
+                  >
+                    {publishing ? "Publishing…" : "Publish and lock results"}
+                  </button>
+                )}
                 {finalState.completedReviews === 0 && (
                   <button
                     className="final-sync-button"
@@ -908,9 +867,7 @@ export function LeaderboardView({
                     title={`Replace finalists with the current first ${JUDGING_POLICY.finals.finalistCount} rows from Results`}
                     type="button"
                   >
-                    {syncing
-                      ? "Syncing…"
-                      : `Sync Top ${JUDGING_POLICY.finals.finalistCount}`}
+                    {syncing ? "Syncing…" : `Sync Top ${JUDGING_POLICY.finals.finalistCount}`}
                   </button>
                 )}
                 <button
@@ -927,115 +884,88 @@ export function LeaderboardView({
         </div>
       </section>
 
-      {isSecondPass &&
-        !presenting &&
-        !finalState.started &&
-        role === "admin" && (
-          <section
-            aria-labelledby="final-roster-title"
-            className="final-judge-roster card"
-          >
-            <div className="final-roster-header">
-              <div>
-                <span className="eyebrow">Admin setup</span>
-                <h2 id="final-roster-title">Second-pass judge roster</h2>
-                <p>
-                  Choose who can vote on the Top{" "}
-                  {JUDGING_POLICY.finals.finalistCount} teams. This roster locks
-                  when final judging starts.
-                </p>
-              </div>
-              <span className="final-roster-count">
-                {selectedJudges.length} selected
-              </span>
-            </div>
-
-            <div className="final-roster-options">
-              {availableJudgeNames.map((judge) => {
-                const selected = selectedJudges.includes(judge);
-                const detected = finalState.judges.includes(judge);
-                return (
-                  <label
-                    className={`final-judge-option${selected ? " selected" : ""}`}
-                    key={judge}
-                  >
-                    <input
-                      checked={selected}
-                      onChange={(event) =>
-                        toggleJudge(judge, event.target.checked)
-                      }
-                      type="checkbox"
-                    />
-                    <span className="judge-chip">
-                      {judge.slice(0, 1).toUpperCase()}
-                    </span>
-                    <span>
-                      <strong>{judge}</strong>
-                      <small>
-                        {detected ? "Preliminary judge" : "Added manually"}
-                      </small>
-                    </span>
-                    <b aria-hidden>{selected ? "✓" : ""}</b>
-                  </label>
-                );
-              })}
-            </div>
-
-            <form className="final-add-judge" onSubmit={addJudge}>
-              <label htmlFor="new-final-judge">Add another login name</label>
-              <div>
-                <input
-                  autoCapitalize="none"
-                  autoComplete="off"
-                  id="new-final-judge"
-                  onChange={(event) => setNewJudgeName(event.target.value)}
-                  placeholder="e.g. maya chen"
-                  value={newJudgeName}
-                />
-                <button
-                  className="secondary-button"
-                  disabled={!newJudgeName.trim()}
-                  type="submit"
-                >
-                  Add judge
-                </button>
-              </div>
-              <small>
-                Names must match what each judge enters at sign-in.
-                Capitalization does not matter.
-              </small>
-            </form>
-
-            <div className="final-roster-actions">
+      {isSecondPass && !presenting && !finalState.started && role === "admin" && (
+        <section aria-labelledby="final-roster-title" className="final-judge-roster card">
+          <div className="final-roster-header">
+            <div>
+              <span className="eyebrow">Admin setup</span>
+              <h2 id="final-roster-title">Second-pass judge roster</h2>
               <p>
-                {finalState.canStart
-                  ? `${selectedJudges.length} judges will each choose a podium from ${finalState.finalists.length} finalists.`
-                  : "Final judging can start after at least three projects receive completed preliminary scores."}
+                Choose who can vote on the Top {JUDGING_POLICY.finals.finalistCount} teams. This
+                roster locks when final judging starts.
               </p>
-              <button
-                className="primary-button tv-start-button"
-                disabled={
-                  starting || !finalState.canStart || !selectedJudges.length
-                }
-                onClick={startFinals}
-                type="button"
-              >
-                {starting ? "Starting…" : "Confirm roster & start second pass"}
-                {!starting && <span aria-hidden>→</span>}
+            </div>
+            <span className="final-roster-count">{selectedJudges.length} selected</span>
+          </div>
+
+          <div className="final-roster-options">
+            {availableJudgeNames.map((judge) => {
+              const selected = selectedJudges.includes(judge);
+              const detected = finalState.judges.includes(judge);
+              return (
+                <label className={`final-judge-option${selected ? " selected" : ""}`} key={judge}>
+                  <input
+                    checked={selected}
+                    onChange={(event) => toggleJudge(judge, event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span className="judge-chip">{judge.slice(0, 1).toUpperCase()}</span>
+                  <span>
+                    <strong>{judge}</strong>
+                    <small>{detected ? "Preliminary judge" : "Added manually"}</small>
+                  </span>
+                  <b aria-hidden>{selected ? "✓" : ""}</b>
+                </label>
+              );
+            })}
+          </div>
+
+          <form className="final-add-judge" onSubmit={addJudge}>
+            <label htmlFor="new-final-judge">Add another login name</label>
+            <div>
+              <input
+                autoCapitalize="none"
+                autoComplete="off"
+                id="new-final-judge"
+                onChange={(event) => setNewJudgeName(event.target.value)}
+                placeholder="e.g. maya chen"
+                value={newJudgeName}
+              />
+              <button className="secondary-button" disabled={!newJudgeName.trim()} type="submit">
+                Add judge
               </button>
             </div>
-          </section>
-        )}
+            <small>
+              Names must match what each judge enters at sign-in. Capitalization does not matter.
+            </small>
+          </form>
+
+          <div className="final-roster-actions">
+            <p>
+              {finalState.canStart
+                ? `${selectedJudges.length} judges will each choose a podium from ${finalState.finalists.length} finalists.`
+                : "Final judging can start after at least three projects receive completed preliminary scores."}
+            </p>
+            <button
+              className="primary-button tv-start-button"
+              disabled={starting || !finalState.canStart || !selectedJudges.length}
+              onClick={startFinals}
+              type="button"
+            >
+              {starting ? "Starting…" : "Confirm roster & start second pass"}
+              {!starting && <span aria-hidden>→</span>}
+            </button>
+          </div>
+        </section>
+      )}
 
       {livePodium && showingTopThree && !presenting && (
         <p className="live-podium-note" role="status">
-          {finalState.completedReviews} of {finalState.requiredReviews} ballots
-          submitted.
+          {finalState.completedReviews} of {finalState.requiredReviews} ballots submitted.
           <span className="live-podium-detail">
             {" "}
-            These standings update as judges submit or revise their votes. Tied
-            points are marked; order within a tie is provisional. No results are
-            locked.
+            These standings update as judges submit or revise their votes. Tied points are marked;
+            order within a tie is provisional. No results are locked.
           </span>
         </p>
       )}
@@ -1051,13 +981,9 @@ export function LeaderboardView({
           />
         </div>
       )}
-      {isSecondPass &&
-      finalState.started &&
-      !finalState.publishedAt ? null : results.length ? (
-        <ResultsList
-          className={`tv-ranking${showingTopThree ? " top-three-ranking" : ""}`}
-        >
-          {results.map((result, index) => (
+      {isSecondPass && finalState.started && !finalState.publishedAt ? null : results.length ? (
+        <ResultsList className={`tv-ranking${showingTopThree ? " top-three-ranking" : ""}`}>
+          {visibleResults.map((result, index) => (
             <li
               className={`${isSecondPass && result.reviewedByYou ? "reviewed-by-you" : ""}${
                 showingTopThree
@@ -1084,11 +1010,7 @@ export function LeaderboardView({
                 {showingTopThree && (
                   <span
                     aria-label={
-                      index === 0
-                        ? "First place"
-                        : index === 1
-                          ? "Second place"
-                          : "Third place"
+                      index === 0 ? "First place" : index === 1 ? "Second place" : "Third place"
                     }
                     className="podium-mark"
                   >
@@ -1101,11 +1023,7 @@ export function LeaderboardView({
                     <span>
                       <strong>{index + 1}</strong>
                       <small>
-                        {index === 0
-                          ? "Champion"
-                          : index === 1
-                            ? "Runner-up"
-                            : "Third place"}
+                        {index === 0 ? "Champion" : index === 1 ? "Runner-up" : "Third place"}
                       </small>
                     </span>
                   </span>
@@ -1129,22 +1047,23 @@ export function LeaderboardView({
         </section>
       )}
 
-      {showingTopThree && results.length > 0 && (
+      {showingTopThree && results.length > 0 && sponsors.length > 0 && (
         <section className="tv-winner-sponsors" aria-label="Event sponsors">
           <p>Sponsored by</p>
           <div className="tv-sponsor-logos">
-            {WINNER_SPONSORS.map((sponsor) => (
-              <span
-                className={`tv-sponsor-logo${sponsor.file === "ai" ? " tv-sponsor-logo-compact" : ""}`}
-                key={sponsor.file}
-              >
-                <Image
-                  src={`/sponsors/${sponsor.file}.svg`}
-                  alt={sponsor.name}
-                  width={sponsor.width}
-                  height={sponsor.height}
-                  unoptimized
-                />
+            {sponsors.map((sponsor) => (
+              <span className="tv-sponsor-logo" key={sponsor.id}>
+                {sponsor.logo ? (
+                  <Image
+                    src={sponsor.logo}
+                    alt={sponsor.name}
+                    width={220}
+                    height={70}
+                    unoptimized
+                  />
+                ) : (
+                  <strong>{sponsor.name}</strong>
+                )}
               </span>
             ))}
           </div>
@@ -1152,6 +1071,27 @@ export function LeaderboardView({
       )}
       <footer className="tv-leaderboard-footer">
         <span>HackBuddy</span>
+        {presentingFinalists && presentationPages > 1 && (
+          <span>
+            <button
+              className="tv-page-button"
+              aria-label="Previous finalist page"
+              onClick={() =>
+                setPresentationPage((page) => (page + presentationPages - 1) % presentationPages)
+              }
+            >
+              ←
+            </button>{" "}
+            Page {(presentationPage % presentationPages) + 1} of {presentationPages}{" "}
+            <button
+              className="tv-page-button"
+              aria-label="Next finalist page"
+              onClick={() => setPresentationPage((page) => (page + 1) % presentationPages)}
+            >
+              →
+            </button>
+          </span>
+        )}
         <span>
           {Boolean(finalState.publishedAt) && isWinners
             ? `${JUDGING_POLICY.finals.winnerCount} winners confirmed by the organizer`
@@ -1184,16 +1124,11 @@ export function LeaderboardView({
           onClick={closeInspection}
           role="dialog"
         >
-          <div
-            className="submission-inspection-panel"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="submission-inspection-panel" onClick={(event) => event.stopPropagation()}>
             <header className="submission-inspection-header">
               <div>
                 <span className="eyebrow">Finalist submission</span>
-                <strong>
-                  {inspectedSubmission?.projectName || "Loading project…"}
-                </strong>
+                <strong>{inspectedSubmission?.projectName || "Loading project…"}</strong>
               </div>
               <div className="submission-inspection-header-actions">
                 <button
@@ -1232,10 +1167,7 @@ export function LeaderboardView({
           onClick={() => setSelectedFinalist(null)}
           role="dialog"
         >
-          <div
-            className="photo-modal-content"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="photo-modal-content" onClick={(event) => event.stopPropagation()}>
             <button
               aria-label="Close photo"
               className="photo-modal-close"

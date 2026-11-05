@@ -7,6 +7,7 @@ export function ScoreControl({
   value,
   onChange,
   readOnly = false,
+  max = JUDGING_POLICY.score.max,
 }: {
   label: string;
   lowAnchor: string;
@@ -14,7 +15,9 @@ export function ScoreControl({
   value: number;
   onChange?: (value: number) => void;
   readOnly?: boolean;
+  max?: number;
 }) {
+  const min = JUDGING_POLICY.score.min;
   return (
     <fieldset className="score-control" disabled={readOnly}>
       <div className="score-label">
@@ -23,16 +26,17 @@ export function ScoreControl({
         </div>
         <strong>{value || "—"}</strong>
       </div>
-      <div className="score-options">
-        {Array.from(
-          {
-            length:
-              JUDGING_POLICY.score.max - JUDGING_POLICY.score.min + 1,
-          },
-          (_, index) => index + JUDGING_POLICY.score.min,
-        ).map((score) => (
+      <div
+        className="score-options"
+        style={
+          min === JUDGING_POLICY.score.min && max === JUDGING_POLICY.score.max
+            ? undefined
+            : { gridTemplateColumns: `repeat(${max - min + 1}, minmax(0, 1fr))` }
+        }
+      >
+        {Array.from({ length: max - min + 1 }, (_, index) => index + min).map((score) => (
           <button
-            aria-label={`${label}: ${score} out of ${JUDGING_POLICY.score.max}`}
+            aria-label={`${label}: ${score} out of ${max}`}
             aria-pressed={value === score}
             className={value === score ? "selected" : ""}
             key={score}

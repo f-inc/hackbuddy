@@ -1,10 +1,5 @@
-import {
-  ballotReview,
-  readBallots,
-  podiumStandings,
-  validPicks,
-} from "@/domain/final-ballot";
-import { JUDGING_POLICY } from "@/domain/judging-policy";
+import { DEFAULT_EVENT_SETTINGS, type EventSettings } from "@/domain/event-settings";
+import { ballotReview, readBallots, podiumStandings, validPicks } from "@/domain/final-ballot";
 import type { ScoringPolicy } from "@/domain/event-scoring";
 import { publishedFinals, type PublishedResults } from "@/domain/publication";
 import type { Submission } from "@/domain/submission";
@@ -52,19 +47,18 @@ function finalistEntry(
     rawRank: submission.rawRank,
     finalNormalizedScore: 0,
     finalReviews,
-    reviewedByYou: finalReviews.some(
-      (review) => review.judgeName === judgeName,
-    ),
+    reviewedByYou: finalReviews.some((review) => review.judgeName === judgeName),
     fullyReviewed:
       judges.length > 0 &&
-      judges.every((judge) =>
-        finalReviews.some((review) => review.judgeName === judge),
-      ),
+      judges.every((judge) => finalReviews.some((review) => review.judgeName === judge)),
   };
 }
 
 export class FinalsService {
-  constructor(private readonly repository: SubmissionRepositoryProvider) {}
+  constructor(
+    private readonly repository: SubmissionRepositoryProvider,
+    private readonly settings: () => EventSettings = () => DEFAULT_EVENT_SETTINGS,
+  ) {}
 
   async state(
     judgeName: string,
@@ -79,7 +73,7 @@ export class FinalsService {
     const canStart = completed.length >= 3;
 
     if (!frozen.length) {
-      const preview = selectFinalists(submissions, policy);
+      const preview = selectFinalists(submissions, policy, this.settings().finalistCount);
       const judges = Array.from(
         new Set(
           completed
@@ -112,15 +106,14 @@ export class FinalsService {
 
     // Older rounds may have frozen ten teams. Apply the current cutoff in
     // preliminary order, while retaining every saved review for ballot lookup.
-    const cohort = frozen.slice(0, JUDGING_POLICY.finals.finalistCount);
+    const cohort = frozen.slice(0, this.settings().finalistCount);
     const judges = frozen[0].finalJudging?.judges ?? [];
     const ballots = readBallots(
       frozen.flatMap((submission) => submission.finalJudging?.reviews ?? []),
       judges,
       new Set(cohort.map((submission) => submission.id)),
     );
-    const ownBallot =
-      ballots.find((ballot) => ballot.judgeName === judgeName) ?? null;
+    const ownBallot = ballots.find((ballot) => ballot.judgeName === judgeName) ?? null;
     const finalists = cohort
       .map((submission) => ({
         ...finalistEntry(submission, judgeName, judges, policy),
@@ -130,8 +123,7 @@ export class FinalsService {
     const standings = podiumStandings(finalists, ballots);
     const completedReviews = ballots.length;
     const requiredReviews = judges.length;
-    const allComplete =
-      requiredReviews > 0 && completedReviews >= requiredReviews;
+    const allComplete = requiredReviews > 0 && completedReviews >= requiredReviews;
 
     return {
       scoringPolicy: policy,
@@ -153,11 +145,7 @@ export class FinalsService {
     };
   }
 
-  async start(
-    adminName: string,
-    requestedJudges?: string[],
-    policy: ScoringPolicy = "raw-v1",
-  ) {
+  async start(adminName: string, requestedJudges?: string[], policy: ScoringPolicy = "raw-v1") {
     const repository = this.repository();
     const existing = await this.state(adminName, policy);
     if (existing.started) return existing;
@@ -205,7 +193,7 @@ export class FinalsService {
       );
     }
     const submissions = await repository.list();
-    const finalists = selectFinalists(submissions, policy);
+    const finalists = selectFinalists(submissions, policy, this.settings().finalistCount);
     if (!finalists.length) {
       throw new ConflictError(
         "At least three projects with completed preliminary scores are required.",
@@ -230,9 +218,7 @@ export class FinalsService {
 
   async reset(adminName: string, policy: ScoringPolicy = "raw-v1") {
     const repository = this.repository();
-    const selected = (await repository.list()).filter(
-      (submission) => submission.finalJudging,
-    );
+    const selected = (await repository.list()).filter((submission) => submission.finalJudging);
     if (!selected.length) {
       throw new ConflictError("Final judging has not started.");
     }
@@ -243,44 +229,26 @@ export class FinalsService {
     return this.state(adminName, policy);
   }
 
-  async finalist(
-    id: string,
-    judgeName: string,
-    policy: ScoringPolicy = "raw-v1",
-  ) {
+  async finalist(id: string, judgeName: string, policy: ScoringPolicy = "raw-v1") {
     const submission = await this.repository().findById(id);
     if (!submission) throw new NotFoundError("Submission not found.");
     const state = await this.state(judgeName, policy);
-    if (
-      !submission.finalJudging ||
-      !state.finalists.some((entry) => entry.id === id)
-    ) {
+    if (!submission.finalJudging || !state.finalists.some((entry) => entry.id === id)) {
       throw new ConflictError("This project is not in the final round.");
     }
     if (!submission.finalJudging.judges.includes(judgeName)) {
-      throw new ForbiddenError(
-        "You are not part of the final-round judge roster.",
-      );
+      throw new ForbiddenError("You are not part of the final-round judge roster.");
     }
     return submission;
   }
 
-  async submitBallot(
-    judgeName: string,
-    picks: unknown,
-    policy: ScoringPolicy = "raw-v1",
-  ) {
+  async submitBallot(judgeName: string, picks: unknown, policy: ScoringPolicy = "raw-v1") {
     const repository = this.repository();
-    const selected = (await repository.list()).filter(
-      (submission) => submission.finalJudging,
-    );
-    if (!selected.length)
-      throw new ConflictError("Final judging has not started.");
+    const selected = (await repository.list()).filter((submission) => submission.finalJudging);
+    if (!selected.length) throw new ConflictError("Final judging has not started.");
     const anchor = [...selected].sort((a, b) => a.id.localeCompare(b.id))[0];
     if (!anchor.finalJudging!.judges.includes(judgeName)) {
-      throw new ForbiddenError(
-        "You are not part of the final-round judge roster.",
-      );
+      throw new ForbiddenError("You are not part of the final-round judge roster.");
     }
     const state = await this.state(judgeName, policy);
     if (!validPicks(picks, new Set(state.finalists.map((s) => s.id)))) {
