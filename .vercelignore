@@ -1,0 +1,11 @@
+# Keep private local data and unrelated worktrees out of CLI deployments.
+.data
+.worktrees
+.env*
+!.env.example
+.git
+.next
+.vinext
+.wrangler
+node_modules
+*.tsbuildinfo
