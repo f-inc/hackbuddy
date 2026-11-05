@@ -1,11 +1,7 @@
 import type { ScoringPolicy } from "./event-scoring";
 import { JUDGING_POLICY } from "./judging-policy";
 import { createNormalizer } from "./normalization";
-import type {
-  ScoredSubmission,
-  Submission,
-  SubmissionReview,
-} from "./submission";
+import type { ScoredSubmission, Submission, SubmissionReview } from "./submission";
 
 export type RankedSubmission = ScoredSubmission & {
   normalizedScore: number;
@@ -58,18 +54,11 @@ export function scoredCompleted(submissions: Submission[]): ScoredSubmission[] {
   );
 }
 
-export function preliminaryRanking(
-  submissions: Submission[],
-  policy: ScoringPolicy = "raw-v1",
-) {
-  const normalizer = createNormalizer(
-    submissions.map((submission) => submission.reviews),
-  );
+export function preliminaryRanking(submissions: Submission[], policy: ScoringPolicy = "raw-v1") {
+  const normalizer = createNormalizer(submissions.map((submission) => submission.reviews));
   const completed = scoredCompleted(submissions);
   const rawRanks = new Map(
-    [...completed]
-      .sort(compareRawRank)
-      .map((submission, index) => [submission.id, index + 1]),
+    [...completed].sort(compareRawRank).map((submission, index) => [submission.id, index + 1]),
   );
   const results: RankedSubmission[] = completed
     .map((submission) => ({
@@ -83,9 +72,7 @@ export function preliminaryRanking(
     diagnostics: {
       judges: normalizer.judges,
       judgeGroups: normalizer.judgeGroups,
-      missingReviewProjects: completed.filter(
-        (submission) => !submission.reviews.length,
-      ).length,
+      missingReviewProjects: completed.filter((submission) => !submission.reviews.length).length,
     },
   };
 }
@@ -93,11 +80,9 @@ export function preliminaryRanking(
 export function selectFinalists(
   submissions: Submission[],
   policy: ScoringPolicy = "raw-v1",
+  finalistCount: number = JUDGING_POLICY.finals.finalistCount,
 ) {
-  return preliminaryRanking(submissions, policy).results.slice(
-    0,
-    JUDGING_POLICY.finals.finalistCount,
-  );
+  return preliminaryRanking(submissions, policy).results.slice(0, finalistCount);
 }
 
 export function finalRanking<
@@ -107,9 +92,7 @@ export function finalRanking<
     finalReviews: SubmissionReview[];
   },
 >(finalists: T[], policy: ScoringPolicy = "raw-v1") {
-  const normalizer = createNormalizer(
-    finalists.map((finalist) => finalist.finalReviews),
-  );
+  const normalizer = createNormalizer(finalists.map((finalist) => finalist.finalReviews));
   return finalists
     .map((finalist) => ({
       ...finalist,
@@ -118,10 +101,8 @@ export function finalRanking<
     .sort((a, b) =>
       policy === "raw-v1"
         ? b.finalReviews.reduce((sum, review) => sum + review.totalScore, 0) -
-            a.finalReviews.reduce(
-              (sum, review) => sum + review.totalScore,
-              0,
-            ) || a.projectName.localeCompare(b.projectName)
+            a.finalReviews.reduce((sum, review) => sum + review.totalScore, 0) ||
+          a.projectName.localeCompare(b.projectName)
         : comparePreliminaryRank(
             { ...a, normalizedScore: a.finalNormalizedScore },
             { ...b, normalizedScore: b.finalNormalizedScore },
@@ -136,8 +117,5 @@ export function selectWinners<
     finalReviews: SubmissionReview[];
   },
 >(finalists: T[], policy: ScoringPolicy = "raw-v1") {
-  return finalRanking(finalists, policy).slice(
-    0,
-    JUDGING_POLICY.finals.winnerCount,
-  );
+  return finalRanking(finalists, policy).slice(0, JUDGING_POLICY.finals.winnerCount);
 }

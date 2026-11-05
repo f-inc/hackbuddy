@@ -1,26 +1,19 @@
 "use client";
+import { useManagedEvent, useJudgingPolicy } from "./EventConfig";
 
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { ScoreControl } from "@/components/ScoreControl";
 import { SubmissionDetails } from "@/components/SubmissionDetails";
-import {
-  JUDGING_POLICY,
-  RUBRIC,
-  RUBRIC_SCORE_MAX,
-} from "@/domain/judging-policy";
-import type {
-  FinalsState,
-  QueueStats,
-  Submission,
-  SubmissionReview,
-} from "@/lib/types";
-import { useCallback, useEffect, useState } from "react";
+import { RUBRIC } from "@/domain/judging-policy";
+import type { FinalsState, QueueStats, Submission, SubmissionReview } from "@/lib/types";
+import { useCallback, useEffect, useState, useRef } from "react";
 
 type ClaimResponse = {
   submission: Submission | null;
   stats: QueueStats;
   demoMode: boolean;
+  draft?: { scores: Partial<import("@/domain/submission").ReviewScores>; updatedAt: string } | null;
   error?: string;
 };
 
@@ -48,6 +41,10 @@ export function JudgingView({
   hackathonName?: string;
   hackathonImageUrl?: string;
 }) {
+  const managed = useManagedEvent();
+  const JUDGING_POLICY = useJudgingPolicy();
+  const RUBRIC_SCORE_MAX = 3 * JUDGING_POLICY.score.max;
+
   const apiBase = hackathon ? `/api/hackathons/${hackathon}` : "/api";
   const pageBase = hackathon ? `/${hackathon}` : "";
   const [name, setName] = useState("");
@@ -56,9 +53,7 @@ export function JudgingView({
   const [finalMode, setFinalMode] = useState(false);
   const [editingFinalReview, setEditingFinalReview] = useState(false);
   const [finalsState, setFinalsState] = useState<FinalsState | null>(null);
-  const [editingReviewIndex, setEditingReviewIndex] = useState<number | null>(
-    null,
-  );
+  const [editingReviewIndex, setEditingReviewIndex] = useState<number | null>(null);
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [stats, setStats] = useState<QueueStats | null>(null);
   const [progress, setProgress] = useState(0);
@@ -71,23 +66,120 @@ export function JudgingView({
   const [demoMode, setDemoMode] = useState(false);
   const [completedNow, setCompletedNow] = useState(0);
   const [transitioning, setTransitioning] = useState(false);
-  const [transitionState, setTransitionState] = useState<
-    "idle" | "saving" | "success" | "exiting"
-  >("idle");
+  const [transitionState, setTransitionState] = useState<"idle" | "saving" | "success" | "exiting">(
+    "idle",
+  );
   const [releasing, setReleasing] = useState(false);
+  const [skipping, setSkipping] = useState(false);
+  const [skippedIds, setSkippedIds] = useState<string[]>([]);
 
   useEffect(() => {
     document.body.classList.add("judging-scroll-lock");
     return () => document.body.classList.remove("judging-scroll-lock");
   }, []);
 
+  const [draftStatus, setDraftStatus] = useState("");
+  const [draftReady, setDraftReady] = useState("");
+  const saveChain = useRef<Promise<unknown>>(Promise.resolve());
+  const draftKey = (id: string) => `hackbuddy-review:${hackathon || "default"}:${name}:${id}`;
+  const restoreClaim = useCallback(
+    (result: ClaimResponse) => {
+      let draft = result.draft;
+      if (result.submission) {
+        try {
+          const saved = JSON.parse(
+            localStorage.getItem(
+              `hackbuddy-review:${hackathon || "default"}:${name}:${result.submission.id}`,
+            ) || "null",
+          );
+          if (saved && (!draft || saved.updatedAt > draft.updatedAt)) draft = saved;
+        } catch {}
+      }
+      setProgress(draft?.scores.progress || 0);
+      setPracticality(draft?.scores.practicality || 0);
+      setComplexity(draft?.scores.complexity || 0);
+      setNotes(draft?.scores.notes || "");
+      setDraftReady(result.submission?.id || "");
+      setDraftStatus(draft ? "Saved draft restored" : "");
+    },
+    [hackathon, name],
+  );
+  useEffect(() => {
+    if (
+      !submission ||
+      inspectionMode ||
+      finalMode ||
+      draftReady !== submission.id ||
+      submitting ||
+      skipping
+    )
+      return;
+    const scores = {
+      ...(progress ? { progress } : {}),
+      ...(practicality ? { practicality } : {}),
+      ...(complexity ? { complexity } : {}),
+      notes,
+    };
+    const key = `hackbuddy-review:${hackathon || "default"}:${name}:${submission.id}`;
+    const draft = { scores, updatedAt: new Date().toISOString() };
+    try {
+      localStorage.setItem(key, JSON.stringify(draft));
+    } catch {}
+    const save = () => {
+      if (!managed) {
+        setDraftStatus("Draft saved on this device");
+        return;
+      }
+      saveChain.current = saveChain.current
+        .catch(() => {})
+        .then(async () => {
+          const r = await fetch(`${apiBase}/queue/draft`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: submission.id, scores }),
+          });
+          if (!r.ok) {
+            const d = await r.json();
+            throw new Error(d.error);
+          }
+          setDraftStatus("Draft saved");
+        })
+        .catch(() => setDraftStatus("Saved on this device. Reconnect to sync."));
+    };
+    const timer = window.setTimeout(save, 800);
+    const heartbeat = window.setInterval(save, 60000);
+    window.addEventListener("online", save);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(heartbeat);
+      window.removeEventListener("online", save);
+    };
+  }, [
+    submission,
+    inspectionMode,
+    finalMode,
+    draftReady,
+    submitting,
+    skipping,
+    progress,
+    practicality,
+    complexity,
+    notes,
+    hackathon,
+    name,
+    managed,
+    apiBase,
+  ]);
+
   const claim = useCallback(
-    async (showFullPageLoader = false) => {
+    async (showFullPageLoader = false, skippedIds: string[] = []) => {
       if (showFullPageLoader) setLoading(true);
       setError("");
       try {
         const response = await fetch(`${apiBase}/queue/claim`, {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skippedIds }),
         });
         if (response.status === 401) {
           window.location.href = hackathon ? `/${hackathon}` : "/";
@@ -98,21 +190,14 @@ export function JudgingView({
         setSubmission(result.submission);
         setStats(result.stats);
         setDemoMode(result.demoMode);
-        setProgress(0);
-        setPracticality(0);
-        setComplexity(0);
-        setNotes("");
+        restoreClaim(result);
       } catch (caught) {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "Could not load the queue.",
-        );
+        setError(caught instanceof Error ? caught.message : "Could not load the queue.");
       } finally {
         if (showFullPageLoader) setLoading(false);
       }
     },
-    [apiBase, hackathon],
+    [apiBase, hackathon, restoreClaim],
   );
 
   useEffect(() => {
@@ -128,16 +213,10 @@ export function JudgingView({
         hackathon?: string;
       };
       if (!hackathon && session.role === "judge") {
-        window.location.href = session.hackathon
-          ? `/${session.hackathon}/judging`
-          : "/";
+        window.location.href = session.hackathon ? `/${session.hackathon}/judging` : "/";
         return;
       }
-      if (
-        hackathon &&
-        session.role !== "admin" &&
-        session.hackathon !== hackathon
-      ) {
+      if (hackathon && session.role !== "admin" && session.hackathon !== hackathon) {
         window.location.href = `/${hackathon}`;
         return;
       }
@@ -149,9 +228,7 @@ export function JudgingView({
       const isFinalMode = searchParams.get("final") === "1";
       const reviewParam = searchParams.get("review");
       const selectedReviewIndex =
-        reviewParam !== null && /^\d+$/.test(reviewParam)
-          ? Number(reviewParam)
-          : null;
+        reviewParam !== null && /^\d+$/.test(reviewParam) ? Number(reviewParam) : null;
       if (isFinalMode) {
         window.location.replace(`${pageBase}/second-pass`);
         return;
@@ -200,10 +277,7 @@ export function JudgingView({
         setSubmission(result.submission);
         setStats(result.stats);
         setDemoMode(result.demoMode);
-        if (
-          selectedReviewIndex !== null &&
-          result.submission?.reviews[selectedReviewIndex]
-        ) {
+        if (selectedReviewIndex !== null && result.submission?.reviews[selectedReviewIndex]) {
           const selectedReview = result.submission.reviews[selectedReviewIndex];
           setProgress(selectedReview.progressScore);
           setPracticality(selectedReview.practicalityScore);
@@ -229,14 +303,54 @@ export function JudgingView({
       setStats(result.stats);
     }
 
-    const interval = window.setInterval(
-      () => void refreshCollectiveProgress(),
-      30_000,
-    );
+    const interval = window.setInterval(() => void refreshCollectiveProgress(), 30_000);
     return () => window.clearInterval(interval);
   }, [apiBase, finalMode, name]);
 
+  async function skipCurrentSubmission() {
+    if (!submission || submitting || skipping) return;
+    setSkipping(true);
+    setError("");
+    try {
+      await saveChain.current;
+      if (managed) {
+        const saved = await fetch(`${apiBase}/queue/draft`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: submission.id,
+            scores: {
+              ...(progress ? { progress } : {}),
+              ...(practicality ? { practicality } : {}),
+              ...(complexity ? { complexity } : {}),
+              notes,
+            },
+          }),
+        });
+        if (!saved.ok) throw new Error("Draft could not be synced. Your local draft is retained.");
+      }
+      const response = await fetch(`${apiBase}/queue/skip`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: submission.id }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error);
+      const nextSkippedIds = [...new Set([...skippedIds, submission.id])];
+      setSkippedIds(nextSkippedIds);
+      // The reservation is released even if loading the next project fails.
+      setSubmission(null);
+      setDraftReady("");
+      await claim(false, nextSkippedIds);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not skip this submission.");
+    } finally {
+      setSkipping(false);
+    }
+  }
+
   async function submitScore() {
+    if (submitting || skipping) return;
     if (!submission || !progress || !practicality || !complexity) {
       setError("Choose a score for all three rubric categories.");
       return;
@@ -247,6 +361,7 @@ export function JudgingView({
     setTransitionState("saving");
     setError("");
     try {
+      await saveChain.current;
       const response = await fetch(`${apiBase}/queue/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -256,22 +371,23 @@ export function JudgingView({
           practicality,
           complexity,
           notes,
+          skippedIds,
         }),
       });
       const result = (await response.json()) as ClaimResponse & {
         ok?: boolean;
       };
       if (!response.ok) throw new Error(result.error);
+      try {
+        localStorage.removeItem(draftKey(submission.id));
+      } catch {}
       setTransitionState("success");
       await new Promise((resolve) => window.setTimeout(resolve, 900));
       setCompletedNow((count) => count + 1);
       setSubmission(result.submission);
       setStats(result.stats);
       setDemoMode(result.demoMode);
-      setProgress(0);
-      setPracticality(0);
-      setComplexity(0);
-      setNotes("");
+      restoreClaim(result);
       await new Promise<void>((resolve) => {
         window.requestAnimationFrame(() => {
           window.requestAnimationFrame(() => resolve());
@@ -285,9 +401,7 @@ export function JudgingView({
     } catch (caught) {
       setTransitionState("idle");
       setTransitioning(false);
-      setError(
-        caught instanceof Error ? caught.message : "Could not save the score.",
-      );
+      setError(caught instanceof Error ? caught.message : "Could not save the score.");
     } finally {
       setSubmitting(false);
     }
@@ -307,11 +421,7 @@ export function JudgingView({
       if (!response.ok) throw new Error(result.error);
       window.location.href = `${pageBase}/dashboard`;
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not release this submission.",
-      );
+      setError(caught instanceof Error ? caught.message : "Could not release this submission.");
       setReleasing(false);
     }
   }
@@ -343,11 +453,7 @@ export function JudgingView({
       if (!response.ok) throw new Error(result.error);
       window.location.href = `${pageBase}/results`;
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not update the review.",
-      );
+      setError(caught instanceof Error ? caught.message : "Could not update the review.");
       setSubmitting(false);
     }
   }
@@ -385,11 +491,7 @@ export function JudgingView({
     } catch (caught) {
       setTransitionState("idle");
       setTransitioning(false);
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not save the final score.",
-      );
+      setError(caught instanceof Error ? caught.message : "Could not save the final score.");
       setSubmitting(false);
     }
   }
@@ -397,8 +499,7 @@ export function JudgingView({
   if (!name || loading) return <LoadingScreen />;
 
   const reviewed = finalMode
-    ? (finalsState?.finalists.filter((finalist) => finalist.reviewedByYou)
-        .length ?? 0)
+    ? (finalsState?.finalists.filter((finalist) => finalist.reviewedByYou).length ?? 0)
     : (stats?.completed ?? 0);
   const total = finalMode
     ? (finalsState?.finalists.length ?? JUDGING_POLICY.finals.finalistCount)
@@ -442,19 +543,13 @@ export function JudgingView({
           </div>
           <div className="queue-progress">
             <div className="progress-copy">
-              <span>
-                {finalMode
-                  ? "Your finalist progress"
-                  : "Collective queue progress"}
-              </span>
+              <span>{finalMode ? "Your finalist progress" : "Collective queue progress"}</span>
               <strong>
                 {reviewed} / {total}
               </strong>
             </div>
             <div className="progress-track">
-              <span
-                style={{ width: `${total ? (reviewed / total) * 100 : 0}%` }}
-              />
+              <span style={{ width: `${total ? (reviewed / total) * 100 : 0}%` }} />
             </div>
           </div>
         </section>
@@ -462,22 +557,42 @@ export function JudgingView({
         {error && <div className="error-banner page-error">{error}</div>}
 
         <div
-          aria-busy={transitioning}
+          aria-busy={transitioning || skipping}
           className={`project-transition-shell${transitioning ? " switching" : ""}`}
         >
           {!submission ? (
             <section className="empty-state card">
               <span className="success-icon">✓</span>
-              <h2>The queue is clear</h2>
+              <h2>
+                {skipping
+                  ? "Loading the next project…"
+                  : error
+                    ? "Could not load the next project"
+                    : skippedIds.length
+                      ? "No more projects in your queue"
+                      : "The queue is clear"}
+              </h2>
               <p>
-                There are no available submissions right now. You completed{" "}
-                {completedNow} {completedNow === 1 ? "review" : "reviews"} in
-                this session.
+                {skippedIds.length
+                  ? "Any projects you skipped remain available for other judges. "
+                  : "There are no available submissions right now. "}
+                You completed {completedNow} {completedNow === 1 ? "review" : "reviews"} in this
+                session.
               </p>
-              <a
-                className="empty-state-results-link"
-                href={`${pageBase}/results`}
-              >
+              {!inspectionMode && !finalMode && (
+                <button
+                  className="secondary-button"
+                  disabled={skipping || loading}
+                  onClick={() => {
+                    setSkippedIds([]);
+                    void claim(true);
+                  }}
+                  type="button"
+                >
+                  {skippedIds.length ? "Revisit skipped submissions" : "Check queue"}
+                </button>
+              )}
+              <a className="empty-state-results-link" href={`${pageBase}/results`}>
                 See results <span aria-hidden>→</span>
               </a>
             </section>
@@ -494,9 +609,7 @@ export function JudgingView({
                       <span className="eyebrow">Administrator controls</span>
                       <h2>Active session</h2>
                     </div>
-                    <span className="table-status in-progress">
-                      In progress
-                    </span>
+                    <span className="table-status in-progress">In progress</span>
                   </header>
 
                   <div className="admin-session-details">
@@ -515,8 +628,7 @@ export function JudgingView({
                     <div>
                       <span>Completed reviews</span>
                       <strong>
-                        {submission.reviews.length} of{" "}
-                        {JUDGING_POLICY.preliminary.requiredReviews}
+                        {submission.reviews.length} of {JUDGING_POLICY.preliminary.requiredReviews}
                       </strong>
                     </div>
                   </div>
@@ -524,8 +636,8 @@ export function JudgingView({
                   <div className="release-explanation">
                     <strong>Return this project to the queue</strong>
                     <p>
-                      Releasing removes the current reservation. Another judge
-                      can immediately claim this submission.
+                      Releasing removes the current reservation. Another judge can immediately claim
+                      this submission.
                     </p>
                   </div>
 
@@ -539,10 +651,7 @@ export function JudgingView({
                     {!releasing && <span>↗</span>}
                   </button>
 
-                  <a
-                    className="back-to-dashboard"
-                    href={`${pageBase}/dashboard`}
-                  >
+                  <a className="back-to-dashboard" href={`${pageBase}/dashboard`}>
                     ← Back to dashboard
                   </a>
                 </aside>
@@ -557,13 +666,12 @@ export function JudgingView({
                             : "Final-round review"
                           : editingReviewIndex !== null
                             ? `Review by ${
-                                submission.reviews[editingReviewIndex]
-                                  ?.judgeName || "unknown judge"
+                                submission.reviews[editingReviewIndex]?.judgeName || "unknown judge"
                               }`
                             : `Review ${Math.min(
                                 submission.reviews.length + 1,
                                 JUDGING_POLICY.preliminary.requiredReviews,
-                              )} of {JUDGING_POLICY.preliminary.requiredReviews}`}
+                              )} of ${JUDGING_POLICY.preliminary.requiredReviews}`}
                       </span>
                       <h2>
                         {finalMode
@@ -582,6 +690,7 @@ export function JudgingView({
                   </header>
 
                   <ScoreControl
+                    max={JUDGING_POLICY.score.max}
                     highAnchor="Exceptional progress tonight"
                     label={RUBRIC.progress.label}
                     lowAnchor="Little meaningful progress"
@@ -589,6 +698,7 @@ export function JudgingView({
                     value={progress}
                   />
                   <ScoreControl
+                    max={JUDGING_POLICY.score.max}
                     highAnchor="Solves an actual problem"
                     label={RUBRIC.practicality.label}
                     lowAnchor="No real-world use case"
@@ -596,6 +706,7 @@ export function JudgingView({
                     value={practicality}
                   />
                   <ScoreControl
+                    max={JUDGING_POLICY.score.max}
                     highAnchor="Complex and well executed"
                     label={RUBRIC.complexity.label}
                     lowAnchor="Technically straightforward"
@@ -616,26 +727,31 @@ export function JudgingView({
                   </label>
 
                   <footer className="compact-submit">
+                    {!inspectionMode && !finalMode && (
+                      <span role="status" className="field-hint">
+                        {draftStatus}
+                      </span>
+                    )}
                     <p>
                       {finalMode ? (
                         <>
-                          Score the team’s live presentation. You can return and
-                          edit this review from the Second pass tab.
+                          Score the team’s live presentation. You can return and edit this review
+                          from the Second pass tab.
                         </>
                       ) : editingReviewIndex !== null ? (
                         <>
-                          Updating this judge’s review will recalculate the
-                          project’s total score.
+                          Updating this judge’s review will recalculate the project’s total score.
                         </>
                       ) : (
                         <>
-                          This project is reserved for <strong>{name}</strong>.
+                          This project is reserved for <strong>{name}</strong>. Scores and notes are
+                          saved automatically.
                         </>
                       )}
                     </p>
                     <button
                       className="primary-button"
-                      disabled={submitting}
+                      disabled={submitting || skipping}
                       onClick={
                         finalMode
                           ? submitFinalScore
@@ -656,20 +772,25 @@ export function JudgingView({
                             : "Submit score"}
                       {!submitting && <span>→</span>}
                     </button>
+                    {!inspectionMode && !finalMode && (
+                      <button
+                        className="secondary-button skip-submission-button"
+                        disabled={submitting || skipping}
+                        onClick={skipCurrentSubmission}
+                        type="button"
+                      >
+                        {skipping ? "Skipping…" : "Skip submission"}
+                        {!skipping && <span aria-hidden>→</span>}
+                      </button>
+                    )}
                   </footer>
                   {finalMode && (
-                    <a
-                      className="back-to-dashboard"
-                      href={`${pageBase}/second-pass`}
-                    >
+                    <a className="back-to-dashboard" href={`${pageBase}/second-pass`}>
                       ← Back to Second pass
                     </a>
                   )}
                   {!finalMode && editingReviewIndex !== null && (
-                    <a
-                      className="back-to-dashboard"
-                      href={`${pageBase}/results`}
-                    >
+                    <a className="back-to-dashboard" href={`${pageBase}/results`}>
                       ← Back to results
                     </a>
                   )}
@@ -688,16 +809,8 @@ export function JudgingView({
         <div className="submission-confirmation-content">
           <span className="submission-saving-spinner" aria-hidden />
           <svg aria-hidden className="submission-check" viewBox="0 0 80 80">
-            <circle
-              className="submission-check-circle"
-              cx="40"
-              cy="40"
-              r="35"
-            />
-            <path
-              className="submission-check-mark"
-              d="M24 41.5 35.5 53 57 29.5"
-            />
+            <circle className="submission-check-circle" cx="40" cy="40" r="35" />
+            <path className="submission-check-mark" d="M24 41.5 35.5 53 57 29.5" />
           </svg>
           <div>
             <strong>

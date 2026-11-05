@@ -1,4 +1,12 @@
 import {
+  managedEvents,
+  insertEvent,
+  changeEvent,
+  readEvent,
+} from "@/infrastructure/database/events";
+import { randomUUID } from "node:crypto";
+import { eventSettings, type EventSettings } from "@/domain/event-settings";
+import {
   readScoringPolicy,
   assertSameScoringPolicy,
   NEW_EVENT_SCORING_POLICY,
@@ -6,14 +14,11 @@ import {
 } from "@/domain/event-scoring";
 import { ensureAirtableReviewsTable } from "./airtable-metadata";
 import { airtableCredentials } from "@/server/config/env";
-import {
-  ConflictError,
-  NotFoundError,
-  UpstreamError,
-  ValidationError,
-} from "@/server/http/errors";
+import { ConflictError, NotFoundError, UpstreamError, ValidationError } from "@/server/http/errors";
 
 export type HackathonConfig = {
+  storage?: "database";
+  settings?: EventSettings;
   id: string;
   name: string;
   slug: string;
@@ -43,20 +48,14 @@ const registryField = {
   name: process.env.AIRTABLE_HACKATHON_NAME_FIELD || "Name",
   slug: process.env.AIRTABLE_HACKATHON_SLUG_FIELD || "Slug",
   baseId: process.env.AIRTABLE_HACKATHON_BASE_ID_FIELD || "Airtable Base ID",
-  tableName:
-    process.env.AIRTABLE_HACKATHON_TABLE_NAME_FIELD || "Airtable Table Name",
+  tableName: process.env.AIRTABLE_HACKATHON_TABLE_NAME_FIELD || "Airtable Table Name",
   reviewsTableName:
-    process.env.AIRTABLE_HACKATHON_REVIEWS_TABLE_NAME_FIELD ||
-    "Airtable Reviews Table Name",
+    process.env.AIRTABLE_HACKATHON_REVIEWS_TABLE_NAME_FIELD || "Airtable Reviews Table Name",
   imageUrl: process.env.AIRTABLE_HACKATHON_IMAGE_URL_FIELD || "Image URL",
-  squareImageUrl:
-    process.env.AIRTABLE_HACKATHON_SQUARE_IMAGE_URL_FIELD || "Square Image URL",
+  squareImageUrl: process.env.AIRTABLE_HACKATHON_SQUARE_IMAGE_URL_FIELD || "Square Image URL",
   active: process.env.AIRTABLE_HACKATHON_ACTIVE_FIELD || "Active",
-  scoringPolicy:
-    process.env.AIRTABLE_HACKATHON_SCORING_POLICY_FIELD || "Scoring Policy",
-  publishedResults:
-    process.env.AIRTABLE_HACKATHON_PUBLISHED_RESULTS_FIELD ||
-    "Published Results",
+  scoringPolicy: process.env.AIRTABLE_HACKATHON_SCORING_POLICY_FIELD || "Scoring Policy",
+  publishedResults: process.env.AIRTABLE_HACKATHON_PUBLISHED_RESULTS_FIELD || "Published Results",
 };
 
 function configured() {
@@ -91,10 +90,9 @@ async function registryRequest<T>(
   }
   if (!response.ok) {
     const details = await response.text();
-    throw new UpstreamError(
-      `Hackathon registry request failed (${response.status}).`,
-      { cause: new Error(details) },
-    );
+    throw new UpstreamError(`Hackathon registry request failed (${response.status}).`, {
+      cause: new Error(details),
+    });
   }
   try {
     return (await response.json()) as T;
@@ -118,10 +116,7 @@ async function assertTableAvailable(baseId: string, tableName: string) {
       },
     );
   } catch (cause) {
-    throw new UpstreamError(
-      `The Airtable table "${tableName}" could not be reached.`,
-      { cause },
-    );
+    throw new UpstreamError(`The Airtable table "${tableName}" could not be reached.`, { cause });
   }
   if (!response.ok) {
     throw new UpstreamError(
@@ -145,6 +140,7 @@ function text(value: unknown) {
 function normalizedImageUrl(value: string) {
   const imageUrl = value.trim();
   if (!imageUrl) return "";
+  if (/^\/api\/hackathons\/[a-z0-9-]+\/assets\/[a-f0-9]{40}$/.test(imageUrl)) return imageUrl;
   try {
     const parsed = new URL(imageUrl);
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
@@ -158,13 +154,9 @@ function normalizedImageUrl(value: string) {
 
 function toConfig(record: AirtableRecord): HackathonConfig {
   const name = text(record.fields[registryField.name]);
-  const slug = normalizeHackathonSlug(
-    text(record.fields[registryField.slug]) || name,
-  );
+  const slug = normalizeHackathonSlug(text(record.fields[registryField.slug]) || name);
   const baseId =
-    text(record.fields[registryField.baseId]) ||
-    process.env.AIRTABLE_BASE_ID?.trim() ||
-    "";
+    text(record.fields[registryField.baseId]) || process.env.AIRTABLE_BASE_ID?.trim() || "";
   const tableName = text(record.fields[registryField.tableName]);
   if (!name || !slug || !baseId || !tableName) {
     throw new UpstreamError(
@@ -177,17 +169,13 @@ function toConfig(record: AirtableRecord): HackathonConfig {
     slug,
     baseId,
     tableName,
-    reviewsTableName:
-      text(record.fields[registryField.reviewsTableName]) ||
-      `${name} - Reviews`,
+    reviewsTableName: text(record.fields[registryField.reviewsTableName]) || `${name} - Reviews`,
     imageUrl: text(record.fields[registryField.imageUrl]),
     squareImageUrl:
       text(record.fields[registryField.squareImageUrl]) ||
       text(record.fields[registryField.imageUrl]),
     active: record.fields[registryField.active] !== false,
-    scoringPolicy: readScoringPolicy(
-      record.fields[registryField.scoringPolicy],
-    ),
+    scoringPolicy: readScoringPolicy(record.fields[registryField.scoringPolicy]),
   };
 }
 
@@ -198,13 +186,10 @@ function legacyHackathon(): HackathonConfig | null {
   return {
     id: "legacy-default",
     name,
-    slug: normalizeHackathonSlug(
-      process.env.DEFAULT_HACKATHON_SLUG || "nighthack3",
-    ),
+    slug: normalizeHackathonSlug(process.env.DEFAULT_HACKATHON_SLUG || "nighthack3"),
     baseId: process.env.AIRTABLE_BASE_ID?.trim() || "",
     tableName,
-    reviewsTableName:
-      process.env.AIRTABLE_REVIEWS_TABLE_NAME?.trim() || `${name} - Reviews`,
+    reviewsTableName: process.env.AIRTABLE_REVIEWS_TABLE_NAME?.trim() || `${name} - Reviews`,
     imageUrl: process.env.DEFAULT_HACKATHON_IMAGE_URL?.trim() || "",
     squareImageUrl:
       process.env.DEFAULT_HACKATHON_SQUARE_IMAGE_URL?.trim() ||
@@ -216,7 +201,7 @@ function legacyHackathon(): HackathonConfig | null {
   };
 }
 
-export async function listHackathons() {
+export async function listAirtableHackathons() {
   if (!configured()) {
     const legacy = legacyHackathon();
     return legacy ? [legacy] : [];
@@ -229,9 +214,7 @@ export async function listHackathons() {
     if (offset) params.set("offset", offset);
     const page = await registryRequest<AirtableListResponse>(`?${params}`);
     if (!Array.isArray(page.records)) {
-      throw new UpstreamError(
-        "The hackathon registry returned an invalid response.",
-      );
+      throw new UpstreamError("The hackathon registry returned an invalid response.");
     }
     configs.push(...page.records.map(toConfig));
     offset = page.offset;
@@ -246,14 +229,15 @@ export async function listHackathons() {
 
 export async function getHackathon(slug: string) {
   const normalized = normalizeHackathonSlug(slug);
+  const saved = (await managedEvents()).find((event) => event.slug === normalized);
+  if (saved) return saved.active ? saved : null;
   return (
-    (await listHackathons()).find(
-      (hackathon) => hackathon.slug === normalized && hackathon.active,
-    ) ?? null
+    (await listAirtableHackathons()).find((event) => event.slug === normalized && event.active) ??
+    null
   );
 }
 
-export async function createHackathon(input: {
+export async function createAirtableHackathon(input: {
   name: string;
   slug: string;
   baseId: string;
@@ -267,36 +251,21 @@ export async function createHackathon(input: {
   const slug = normalizeHackathonSlug(input.slug || name);
   const baseId = input.baseId.trim();
   const tableName = input.tableName.trim();
-  const reviewsTableName =
-    input.reviewsTableName?.trim() || `${name} - Reviews`;
+  const reviewsTableName = input.reviewsTableName?.trim() || `${name} - Reviews`;
   const imageUrl = normalizedImageUrl(input.imageUrl || "");
-  const squareImageUrl = normalizedImageUrl(
-    input.squareImageUrl || input.imageUrl || "",
-  );
+  const squareImageUrl = normalizedImageUrl(input.squareImageUrl || input.imageUrl || "");
   if (!name || !slug || !baseId || !tableName || !reviewsTableName) {
-    throw new ValidationError(
-      "Name, URL slug, Airtable base, and Airtable table are required.",
-    );
+    throw new ValidationError("Name, URL slug, Airtable base, and Airtable table are required.");
   }
-  const existingEvents = await listHackathons();
-  if (
-    existingEvents.some(
-      (hackathon) => hackathon.slug === slug && !hackathon.legacy,
-    )
-  ) {
+  const existingEvents = await listAirtableHackathons();
+  if (existingEvents.some((hackathon) => hackathon.slug === slug && !hackathon.legacy)) {
     throw new ConflictError("That hackathon URL slug is already in use.");
   }
   await assertTableAvailable(baseId, tableName);
   await ensureAirtableReviewsTable(baseId, reviewsTableName);
-  const scoringPolicy = readScoringPolicy(
-    input.scoringPolicy ?? NEW_EVENT_SCORING_POLICY,
-  );
+  const scoringPolicy = readScoringPolicy(input.scoringPolicy ?? NEW_EVENT_SCORING_POLICY);
   if (scoringPolicy === "normalized-v1") {
-    if (
-      existingEvents.some(
-        (event) => event.baseId === baseId && event.tableName === tableName,
-      )
-    ) {
+    if (existingEvents.some((event) => event.baseId === baseId && event.tableName === tableName)) {
       throw new ConflictError(
         "This submissions table is already attached to an event. Existing events must retain their original scoring method.",
       );
@@ -309,12 +278,9 @@ export async function createHackathon(input: {
       },
     );
     if (!history.ok)
-      throw new UpstreamError(
-        "Could not verify that the new event has no review history.",
-      );
+      throw new UpstreamError("Could not verify that the new event has no review history.");
     const rows = (await history.json()) as AirtableListResponse;
-    if (!Array.isArray(rows.records))
-      throw new UpstreamError("Invalid review history response.");
+    if (!Array.isArray(rows.records)) throw new UpstreamError("Invalid review history response.");
     if (rows.records.length)
       throw new ConflictError(
         "This review table already has scores. Use original raw scoring to register an existing event.",
@@ -332,9 +298,7 @@ export async function createHackathon(input: {
             [registryField.tableName]: tableName,
             [registryField.reviewsTableName]: reviewsTableName,
             ...(imageUrl ? { [registryField.imageUrl]: imageUrl } : {}),
-            ...(squareImageUrl
-              ? { [registryField.squareImageUrl]: squareImageUrl }
-              : {}),
+            ...(squareImageUrl ? { [registryField.squareImageUrl]: squareImageUrl } : {}),
             [registryField.active]: true,
             [registryField.scoringPolicy]: scoringPolicy,
           },
@@ -348,7 +312,7 @@ export async function createHackathon(input: {
   return toConfig(result.records[0]);
 }
 
-export async function updateHackathon(
+export async function updateAirtableHackathon(
   id: string,
   input: {
     name: string;
@@ -371,7 +335,7 @@ export async function updateHackathon(
   const slug = normalizeHackathonSlug(input.slug || name);
   const baseId = input.baseId.trim();
   const tableName = input.tableName.trim();
-  const existingHackathons = await listHackathons();
+  const existingHackathons = await listAirtableHackathons();
   const existing = existingHackathons.find((hackathon) => hackathon.id === id);
   if (!existing) throw new NotFoundError("Hackathon not found.");
   try {
@@ -393,21 +357,14 @@ export async function updateHackathon(
   }
 
   const reviewsTableName =
-    input.reviewsTableName?.trim() ||
-    existing.reviewsTableName ||
-    `${name} - Reviews`;
+    input.reviewsTableName?.trim() || existing.reviewsTableName || `${name} - Reviews`;
   const imageUrl = normalizedImageUrl(input.imageUrl || "");
-  const squareImageUrl = normalizedImageUrl(
-    input.squareImageUrl || input.imageUrl || "",
-  );
+  const squareImageUrl = normalizedImageUrl(input.squareImageUrl || input.imageUrl || "");
   if (!name || !slug || !baseId || !tableName || !reviewsTableName) {
-    throw new ValidationError(
-      "Name, URL slug, Airtable base, and Airtable table are required.",
-    );
+    throw new ValidationError("Name, URL slug, Airtable base, and Airtable table are required.");
   }
   const duplicate = existingHackathons.find(
-    (hackathon) =>
-      hackathon.slug === slug && hackathon.id !== id && !hackathon.legacy,
+    (hackathon) => hackathon.slug === slug && hackathon.id !== id && !hackathon.legacy,
   );
   if (duplicate) {
     throw new ConflictError("That hackathon URL slug is already in use.");
@@ -434,21 +391,16 @@ export async function updateHackathon(
 
 /** Raw registry access is server-only; published snapshot contents are not exposed in event setup responses. */
 export async function readEventScoringRecord(id: string) {
-  if (id === "legacy-default")
-    return { scoringPolicy: "raw-v1" as const, encodedPublication: "" };
+  if (id === "legacy-default") return { scoringPolicy: "raw-v1" as const, encodedPublication: "" };
   const record = await registryRequest<AirtableRecord>(`/${id}`);
   return {
-    scoringPolicy: readScoringPolicy(
-      record.fields[registryField.scoringPolicy],
-    ),
+    scoringPolicy: readScoringPolicy(record.fields[registryField.scoringPolicy]),
     encodedPublication:
-      text(record.fields[registryField.publishedResults]) ||
-      (await firstJournalPublication(id)),
+      text(record.fields[registryField.publishedResults]) || (await firstJournalPublication(id)),
   };
 }
 
-const publicationTable =
-  process.env.AIRTABLE_PUBLICATIONS_TABLE || "HackBuddy Publications";
+const publicationTable = process.env.AIRTABLE_PUBLICATIONS_TABLE || "HackBuddy Publications";
 
 async function firstJournalPublication(id: string) {
   const escapedId = id.replace(/'/g, "\\'");
@@ -469,18 +421,14 @@ async function firstJournalPublication(id: string) {
   if (!first) return "";
   const encoded = text(first.fields.Snapshot);
   if (!encoded || !Number.isFinite(first.fields.Sequence)) {
-    throw new UpstreamError(
-      "Published snapshot is invalid. Refusing to recalculate results.",
-    );
+    throw new UpstreamError("Published snapshot is invalid. Refusing to recalculate results.");
   }
   return encoded;
 }
 
 export async function writeEventPublication(id: string, encoded: string) {
   if (id === "legacy-default")
-    throw new ConflictError(
-      "Register this legacy event before publishing a permanent snapshot.",
-    );
+    throw new ConflictError("Register this legacy event before publishing a permanent snapshot.");
   const existing = await readEventScoringRecord(id);
   if (existing.encodedPublication) return existing.encodedPublication;
   // Never PATCH a published snapshot. Airtable assigns an increasing Sequence
@@ -497,7 +445,109 @@ export async function writeEventPublication(id: string, encoded: string) {
     publicationTable,
   );
   const authoritative = await firstJournalPublication(id);
-  if (!authoritative)
-    throw new UpstreamError("Published snapshot could not be verified.");
+  if (!authoritative) throw new UpstreamError("Published snapshot could not be verified.");
   return authoritative;
+}
+
+export async function listHackathons() {
+  const saved = await managedEvents();
+  // Once events are managed here, their catalog must not wait for Airtable.
+  // Keep the original registry as a bootstrap for unmigrated installations.
+  const events = saved.length ? saved : await listAirtableHackathons();
+  return events.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function createHackathon(input: {
+  name: string;
+  slug: string;
+  imageUrl?: string;
+  squareImageUrl?: string;
+  scoringPolicy?: ScoringPolicy;
+  settings?: EventSettings;
+}) {
+  const name = input.name.trim(),
+    slug = normalizeHackathonSlug(input.slug || name);
+  if (
+    !name ||
+    !slug ||
+    [
+      "api",
+      "studio",
+      "events",
+      "showcase",
+      "hackathons",
+      "judging",
+      "dashboard",
+      "leaderboard",
+      "results",
+      "judge",
+    ].includes(slug)
+  )
+    throw new ValidationError("Choose an event name and a unique URL.");
+  if (await getHackathon(slug)) throw new ConflictError("That hackathon URL already exists.");
+  const config: HackathonConfig = {
+    id: randomUUID(),
+    name,
+    slug,
+    baseId: "",
+    tableName: "",
+    reviewsTableName: "",
+    imageUrl: normalizedImageUrl(input.imageUrl || ""),
+    squareImageUrl: normalizedImageUrl(input.squareImageUrl || input.imageUrl || ""),
+    active: true,
+    storage: "database",
+    scoringPolicy: input.scoringPolicy || NEW_EVENT_SCORING_POLICY,
+    settings: eventSettings(input.settings),
+  };
+  await insertEvent({ config, submissions: [], drafts: {}, publication: null });
+  return config;
+}
+export async function updateHackathon(
+  id: string,
+  input: {
+    name: string;
+    slug: string;
+    imageUrl?: string;
+    squareImageUrl?: string;
+    scoringPolicy?: ScoringPolicy;
+    settings?: EventSettings;
+    active?: boolean;
+    baseId?: string;
+    tableName?: string;
+  },
+) {
+  if (!(await readEvent(id)))
+    return updateAirtableHackathon(id, {
+      ...input,
+      baseId: input.baseId || "",
+      tableName: input.tableName || "",
+    });
+  const name = input.name.trim(),
+    slug = normalizeHackathonSlug(input.slug || name);
+  const duplicate = await getHackathon(slug);
+  if (duplicate && duplicate.id !== id) throw new ConflictError("That URL is already in use.");
+  return changeEvent(id, (event) => {
+    const settings = eventSettings(input.settings || event.config.settings);
+    if (
+      (event.submissions.some((s) => s.reviews.length || s.claimedBy || s.finalJudging) ||
+        event.publication) &&
+      (settings.requiredReviews !== event.config.settings?.requiredReviews ||
+        settings.finalistCount !== event.config.settings?.finalistCount ||
+        settings.scoreMax !== event.config.settings?.scoreMax ||
+        (input.scoringPolicy ?? event.config.scoringPolicy) !== event.config.scoringPolicy)
+    )
+      throw new ConflictError("Judging rules are locked after judging begins.");
+    if (!name || !slug) throw new ValidationError("Event name and URL are required.");
+    event.config = {
+      ...event.config,
+      name,
+      slug,
+      settings,
+      imageUrl: normalizedImageUrl(input.imageUrl || ""),
+      squareImageUrl: normalizedImageUrl(input.squareImageUrl || input.imageUrl || ""),
+      active: input.active ?? event.config.active,
+      scoringPolicy: input.scoringPolicy || event.config.scoringPolicy,
+    };
+    return event.config;
+  });
 }

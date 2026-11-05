@@ -1,13 +1,10 @@
 "use client";
+import { useJudgingPolicy } from "./EventConfig";
 
 import { formatNormalizedScore } from "@/domain/normalization";
 import type { ScoringPolicy } from "@/domain/event-scoring";
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import {
-  RUBRIC_SCORE_MAX,
-  PRELIMINARY_SCORE_MAX,
-} from "@/domain/judging-policy";
 import type {
   ActiveSession,
   LeaderboardEntry,
@@ -49,10 +46,7 @@ const emptyData: DashboardData = {
 
 function timeAgo(value: string) {
   if (!value) return "Just now";
-  const minutes = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(value).getTime()) / 60_000),
-  );
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60_000));
   if (minutes < 1) return "Just now";
   if (minutes < 60) return `${minutes}m ago`;
   return `${Math.floor(minutes / 60)}h ago`;
@@ -67,6 +61,10 @@ export function DashboardView({
   hackathonName?: string;
   hackathonImageUrl?: string;
 }) {
+  const JUDGING_POLICY = useJudgingPolicy();
+  const RUBRIC_SCORE_MAX = 3 * JUDGING_POLICY.score.max;
+  const PRELIMINARY_SCORE_MAX = RUBRIC_SCORE_MAX * JUDGING_POLICY.preliminary.requiredReviews;
+
   const apiBase = hackathon ? `/api/hackathons/${hackathon}` : "/api";
   const pageBase = hackathon ? `/${hackathon}` : "";
   const [name, setName] = useState("");
@@ -89,11 +87,7 @@ export function DashboardView({
         setData(result);
         setError("");
       } catch (caught) {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "Could not load the dashboard.",
-        );
+        setError(caught instanceof Error ? caught.message : "Could not load the dashboard.");
       } finally {
         setLoading(false);
       }
@@ -114,16 +108,10 @@ export function DashboardView({
         hackathon?: string;
       };
       if (!hackathon && session.role === "judge") {
-        window.location.href = session.hackathon
-          ? `/${session.hackathon}/dashboard`
-          : "/";
+        window.location.href = session.hackathon ? `/${session.hackathon}/dashboard` : "/";
         return;
       }
-      if (
-        hackathon &&
-        session.role !== "admin" &&
-        session.hackathon !== hackathon
-      ) {
+      if (hackathon && session.role !== "admin" && session.hackathon !== hackathon) {
         window.location.href = `/${hackathon}`;
         return;
       }
@@ -141,10 +129,7 @@ export function DashboardView({
   const completion = data.stats.total
     ? Math.round((data.stats.completed / data.stats.total) * 100)
     : 0;
-  const largestScoreBucket = Math.max(
-    1,
-    ...data.scoreDistribution.map((bucket) => bucket.count),
-  );
+  const largestScoreBucket = Math.max(1, ...data.scoreDistribution.map((bucket) => bucket.count));
   const scoredSubmissionCount = data.scoreDistribution.reduce(
     (total, bucket) => total + bucket.count,
     0,
@@ -167,9 +152,7 @@ export function DashboardView({
         </div>
       )}
       <main className="workspace-main dashboard-main">
-        <section
-          className={`page-heading${role === "judge" ? " judge-page-heading" : ""}`}
-        >
+        <section className={`page-heading${role === "judge" ? " judge-page-heading" : ""}`}>
           <div className="dashboard-event-heading">
             {hackathonImageUrl && (
               <span
@@ -182,9 +165,7 @@ export function DashboardView({
               />
             )}
             <div>
-              {hackathonName && (
-                <span className="eyebrow">{hackathonName}</span>
-              )}
+              {hackathonName && <span className="eyebrow">{hackathonName}</span>}
               <h1>{role === "admin" ? "Dashboard" : "Judging queue"}</h1>
               <p>
                 {role === "admin"
@@ -194,10 +175,7 @@ export function DashboardView({
             </div>
           </div>
           {role === "admin" && (
-            <a
-              className="primary-button link-button"
-              href={`${pageBase}/judging`}
-            >
+            <a className="primary-button link-button" href={`${pageBase}/judging`}>
               Start judging <span>→</span>
             </a>
           )}
@@ -220,9 +198,7 @@ export function DashboardView({
                 <p>
                   {scoredSubmissionCount
                     ? `Across ${scoredSubmissionCount} completed ${
-                        scoredSubmissionCount === 1
-                          ? "submission"
-                          : "submissions"
+                        scoredSubmissionCount === 1 ? "submission" : "submissions"
                       }`
                     : "Scores will appear as reviews are completed"}
                 </p>
@@ -240,9 +216,7 @@ export function DashboardView({
                 </div>
                 {data.scoreDistribution.map((bucket, index) => (
                   <div className="distribution-column" key={bucket.label}>
-                    <span className="distribution-count">
-                      {bucket.count || ""}
-                    </span>
+                    <span className="distribution-count">{bucket.count || ""}</span>
                     <div className="distribution-track">
                       <span
                         className="distribution-bar"
@@ -327,9 +301,7 @@ export function DashboardView({
                           <strong>{session.judgeName || "judge"}</strong>
                           <span>{timeAgo(session.claimedAt)}</span>
                         </div>
-                        <span className="table-status in-progress">
-                          In progress
-                        </span>
+                        <span className="table-status in-progress">In progress</span>
                         <a
                           className="inspect-session"
                           href={`${pageBase}/judging?submission=${encodeURIComponent(session.id)}`}
@@ -399,11 +371,7 @@ export function DashboardView({
             <header>
               <span
                 className={`judge-work-status ${
-                  queueComplete
-                    ? "complete"
-                    : judgeHasWork
-                      ? "ready"
-                      : "waiting"
+                  queueComplete ? "complete" : judgeHasWork ? "ready" : "waiting"
                 }`}
               >
                 <span />
@@ -439,9 +407,7 @@ export function DashboardView({
                       : "Pick up the next submission and keep the queue moving."
                     : data.stats.inProgress
                       ? `${data.stats.inProgress} ${
-                          data.stats.inProgress === 1
-                            ? "project is"
-                            : "projects are"
+                          data.stats.inProgress === 1 ? "project is" : "projects are"
                         } currently being reviewed by other judges.`
                       : "New projects will appear here as soon as they enter the queue."}
               </p>
@@ -460,24 +426,15 @@ export function DashboardView({
 
             <footer>
               <span>
-                <strong>{data.stats.completed}</strong> of{" "}
-                <strong>{data.stats.total}</strong> submissions reviewed
+                <strong>{data.stats.completed}</strong> of <strong>{data.stats.total}</strong>{" "}
+                submissions reviewed
               </span>
               {judgeHasWork ? (
-                <a
-                  className="primary-button link-button"
-                  href={`${pageBase}/judging`}
-                >
-                  {data.hasActiveReview
-                    ? "Continue judging"
-                    : "Judge next project"}{" "}
-                  <span>→</span>
+                <a className="primary-button link-button" href={`${pageBase}/judging`}>
+                  {data.hasActiveReview ? "Continue judging" : "Judge next project"} <span>→</span>
                 </a>
               ) : queueComplete ? (
-                <a
-                  className="secondary-button link-button"
-                  href={`${pageBase}/results`}
-                >
+                <a className="secondary-button link-button" href={`${pageBase}/results`}>
                   View results <span>→</span>
                 </a>
               ) : null}

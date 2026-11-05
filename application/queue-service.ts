@@ -36,7 +36,7 @@ export class QueueService {
     return queueStats(await this.repository().list());
   }
 
-  async claimNext(judgeName: string) {
+  async claimNext(judgeName: string, skippedIds: string[] = []) {
     const repository = this.repository();
     const submissions = await repository.list();
     const existing = submissions.find(
@@ -51,6 +51,7 @@ export class QueueService {
       .filter(
         (submission) =>
           submission.status === "available" &&
+          !skippedIds.includes(submission.id) &&
           !hasReviewBy(submission.reviews, judgeName),
       )
       .sort(
@@ -63,6 +64,20 @@ export class QueueService {
       if (claimed) return claimed;
     }
     return null;
+  }
+
+  async skip(id: string, judgeName: string) {
+    const repository = this.repository();
+    const submission = await repository.findById(id);
+    if (!submission) throw new NotFoundError("Submission not found.");
+    if (
+      submission.status !== "in progress" ||
+      submission.claimedBy !== judgeName ||
+      hasReviewBy(submission.reviews, judgeName)
+    ) {
+      throw new ConflictError("This submission is not assigned to you.");
+    }
+    await repository.release(id);
   }
 
   async complete(id: string, judgeName: string, scores: ReviewScores) {

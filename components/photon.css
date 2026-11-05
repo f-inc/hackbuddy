@@ -1,0 +1,8 @@
+.photon-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr)); gap: 20px; }
+.photon-entry { display: flex; flex-direction: column; align-items: flex-start; gap: 15px; padding: 24px; border-radius: 15px; background: #f1f1f1; color: #000; letter-spacing: -.02em; overflow-wrap: anywhere; text-decoration: none; }
+.photon-entry:hover { background: #e7e7e7; }
+.photon-label { padding: 4px 10px; border-radius: 100px; background: #0000000d; font-size: 14px; letter-spacing: -.04em; }
+.photon-entry h2 { margin: 0; font-size: 26px; line-height: 1.2; }
+.photon-entry p { margin: 0; color: #0009; }
+.photon-entry .photon-builders { color: #000; font-size: 16px; font-weight: 500; }
+.photon-open { display: flex; justify-content: space-between; gap: 20px; width: 100%; margin-top: auto; padding-top: 10px; font-weight: 500; letter-spacing: -.04em; }

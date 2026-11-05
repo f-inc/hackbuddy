@@ -13,6 +13,8 @@ export const submissionField = {
   demoUrl: process.env.AIRTABLE_DEMO_FIELD || "Demo",
   demoVideoUrl: process.env.AIRTABLE_DEMO_VIDEO_URL_FIELD || "Demo Video URL",
   repositoryUrl: process.env.AIRTABLE_REPOSITORY_URL_FIELD || "Repository URL",
+  toolsUsed: process.env.AIRTABLE_TOOLS_USED_FIELD || "Tools Used",
+  progressOutline: process.env.AIRTABLE_PROGRESS_OUTLINE_FIELD || "Progress Outline",
   track: process.env.AIRTABLE_TRACK_FIELD || "Track",
   submittedAt: process.env.AIRTABLE_SUBMITTED_AT_FIELD || "Submitted At",
   status: process.env.AIRTABLE_STATUS_FIELD || "Status",

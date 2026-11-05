@@ -15,6 +15,7 @@ function formatSubmitted(value: string) {
 
 function externalUrl(value: string) {
   const trimmed = value.trim();
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) return trimmed;
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
@@ -32,11 +33,31 @@ function repositoryDetails(value: string) {
   }
 }
 
-export function SubmissionDetails({ submission }: { submission: Submission }) {
+type SubmissionDetailData = Pick<
+  Submission,
+  | "files"
+  | "importedFields"
+  | "liveDemoUrl"
+  | "projectName"
+  | "teamName"
+  | "repositoryUrl"
+  | "demoType"
+  | "demoUrl"
+  | "demoVideoUrl"
+  | "previewImageUrl"
+  | "oneLiner"
+  | "description"
+  | "progressOutline"
+  | "toolsUsed"
+  | "teamPhotoUrl"
+  | "submitterNames"
+  | "attendance"
+  | "createdAt"
+  | "contactEmail"
+>;
+export function SubmissionDetails({ submission }: { submission: SubmissionDetailData }) {
   const [showTeamPhoto, setShowTeamPhoto] = useState(false);
-  const repositoryUrl = submission.repositoryUrl
-    ? externalUrl(submission.repositoryUrl)
-    : "";
+  const repositoryUrl = submission.repositoryUrl ? externalUrl(submission.repositoryUrl) : "";
   const repository = repositoryUrl ? repositoryDetails(repositoryUrl) : null;
   const isVideo =
     submission.demoType.startsWith("video/") ||
@@ -53,11 +74,7 @@ export function SubmissionDetails({ submission }: { submission: Submission }) {
 
   return (
     <>
-      <article
-        aria-label="Submission details"
-        className="project-workspace card"
-        tabIndex={0}
-      >
+      <article aria-label="Submission details" className="project-workspace card" tabIndex={0}>
         <header className="project-header">
           <div>
             <div className="project-title-row">
@@ -71,10 +88,7 @@ export function SubmissionDetails({ submission }: { submission: Submission }) {
                   target="_blank"
                   title={repository.label}
                 >
-                  <span
-                    aria-hidden
-                    className="repository-mini-icon github-icon"
-                  />
+                  <span aria-hidden className="repository-mini-icon github-icon" />
                   <span>GitHub</span>
                   <span aria-hidden>↗</span>
                 </a>
@@ -116,31 +130,23 @@ export function SubmissionDetails({ submission }: { submission: Submission }) {
           )}
 
           <div className="media-actions">
-            {submission.demoUrl &&
-              submission.demoUrl !== submission.demoVideoUrl && (
-                <a
-                  href={externalUrl(submission.demoUrl)}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  Open uploaded demo video ↗
-                </a>
-              )}
+            {submission.liveDemoUrl && (
+              <a href={externalUrl(submission.liveDemoUrl)} rel="noreferrer" target="_blank">
+                Open live demo ↗
+              </a>
+            )}
+            {submission.demoUrl && submission.demoUrl !== submission.demoVideoUrl && (
+              <a href={externalUrl(submission.demoUrl)} rel="noreferrer" target="_blank">
+                Open uploaded demo video ↗
+              </a>
+            )}
             {submission.demoVideoUrl && (
-              <a
-                href={externalUrl(submission.demoVideoUrl)}
-                rel="noreferrer"
-                target="_blank"
-              >
+              <a href={externalUrl(submission.demoVideoUrl)} rel="noreferrer" target="_blank">
                 Watch submitted video link ↗
               </a>
             )}
             {submission.previewImageUrl && (
-              <a
-                href={submission.previewImageUrl}
-                rel="noreferrer"
-                target="_blank"
-              >
+              <a href={submission.previewImageUrl} rel="noreferrer" target="_blank">
                 Progress image ↗
               </a>
             )}
@@ -149,9 +155,7 @@ export function SubmissionDetails({ submission }: { submission: Submission }) {
 
         <section className="submission-story">
           <div className="story-block one-liner-block">
-            <p>
-              {submission.oneLiner || "No one-line description was provided."}
-            </p>
+            <p>{submission.oneLiner || "No one-line description was provided."}</p>
           </div>
           {submission.description &&
             submission.description.trim() !== submission.oneLiner.trim() && (
@@ -160,15 +164,25 @@ export function SubmissionDetails({ submission }: { submission: Submission }) {
                 <p>{submission.description}</p>
               </div>
             )}
+          {submission.progressOutline && (
+            <div className="story-block">
+              <span>Progress outline</span>
+              <p>{submission.progressOutline}</p>
+            </div>
+          )}
+          {Boolean(submission.toolsUsed?.length) && (
+            <div className="story-block">
+              <span>Tools used</span>
+              <p>{submission.toolsUsed!.join(", ")}</p>
+            </div>
+          )}
         </section>
 
         <section className="submission-details">
           <div className="detail-item builders">
             {submission.teamPhotoUrl ? (
               <button
-                aria-label={`Enlarge photo of ${
-                  submission.submitterNames || submission.teamName
-                }`}
+                aria-label={`Enlarge photo of ${submission.submitterNames || submission.teamName}`}
                 className="team-photo"
                 onClick={() => setShowTeamPhoto(true)}
                 style={{
@@ -181,9 +195,7 @@ export function SubmissionDetails({ submission }: { submission: Submission }) {
             )}
             <div>
               <span>Builders</span>
-              <strong>
-                {submission.submitterNames || submission.teamName}
-              </strong>
+              <strong>{submission.submitterNames || submission.teamName}</strong>
             </div>
           </div>
           <div className="detail-item">
@@ -205,15 +217,45 @@ export function SubmissionDetails({ submission }: { submission: Submission }) {
             <div>
               <span>Contact</span>
               {submission.contactEmail ? (
-                <a href={`mailto:${submission.contactEmail}`}>
-                  {submission.contactEmail}
-                </a>
+                <a href={`mailto:${submission.contactEmail}`}>{submission.contactEmail}</a>
               ) : (
                 <strong>Not provided</strong>
               )}
             </div>
           </div>
         </section>
+        {Boolean(submission.files?.length) && (
+          <details className="story-block" style={{ margin: "0 24px 20px" }}>
+            <summary>All submitted files ({submission.files!.length})</summary>
+            <ul>
+              {submission.files!.map((file) => (
+                <li key={file.id}>
+                  <a href={file.url} target="_blank" rel="noreferrer">
+                    {file.filename}
+                  </a>{" "}
+                  <small>{file.field}</small>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+        {submission.importedFields && (
+          <details className="story-block" style={{ margin: "0 24px 20px" }}>
+            <summary>Original submission fields</summary>
+            <dl>
+              {Object.entries(submission.importedFields).map(([name, value]) => (
+                <div key={name} style={{ marginTop: 12 }}>
+                  <dt>{name}</dt>
+                  <dd style={{ margin: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                    {typeof value === "string" || typeof value === "number"
+                      ? String(value)
+                      : JSON.stringify(value, null, 2)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        )}
       </article>
 
       {showTeamPhoto && submission.teamPhotoUrl && (
@@ -224,10 +266,7 @@ export function SubmissionDetails({ submission }: { submission: Submission }) {
           onClick={() => setShowTeamPhoto(false)}
           role="dialog"
         >
-          <div
-            className="photo-modal-content"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="photo-modal-content" onClick={(event) => event.stopPropagation()}>
             <button
               aria-label="Close photo"
               className="photo-modal-close"
@@ -237,9 +276,7 @@ export function SubmissionDetails({ submission }: { submission: Submission }) {
               ×
             </button>
             <div
-              aria-label={`Builders: ${
-                submission.submitterNames || submission.teamName
-              }`}
+              aria-label={`Builders: ${submission.submitterNames || submission.teamName}`}
               className="photo-modal-image"
               role="img"
               style={{
@@ -248,9 +285,7 @@ export function SubmissionDetails({ submission }: { submission: Submission }) {
             />
             <div className="photo-modal-caption">
               <span>Builders</span>
-              <strong>
-                {submission.submitterNames || submission.teamName}
-              </strong>
+              <strong>{submission.submitterNames || submission.teamName}</strong>
             </div>
           </div>
         </div>

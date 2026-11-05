@@ -4,6 +4,7 @@ import type { Submission } from "@/domain/submission";
 import type { SubmissionRepositoryProvider } from "./ports/submission-repository";
 import { preliminaryRanking } from "@/domain/ranking";
 import type { ResultEntry } from "@/lib/types";
+import type { PendingResultEntry } from "@/domain/results";
 
 export class ResultsQuery {
   constructor(private readonly repository: SubmissionRepositoryProvider) {}
@@ -16,19 +17,44 @@ export class ResultsQuery {
     policy: ScoringPolicy = "raw-v1",
     publication: PublishedResults | null = null,
     submissions?: Submission[],
+    includePending = false,
   ) {
-    if (publication)
+    if (publication && !includePending)
       return {
+        pendingSubmissions: [] as PendingResultEntry[],
         results: structuredClone(publication.results),
         normalization: structuredClone(publication.normalization),
         scoringPolicy: publication.scoringPolicy,
         publishedAt: publication.publishedAt,
       };
-    const ranking = preliminaryRanking(
-      submissions ?? (await this.repository().list()),
-      policy,
+    const allSubmissions = submissions ?? (await this.repository().list());
+    const ranking = publication ? null : preliminaryRanking(allSubmissions, policy);
+    const rankedIds = new Set(
+      (publication?.results ?? ranking!.results)
+        .map((result) => result.id),
     );
-    const results: ResultEntry[] = ranking.results.map((submission) => ({
+    const pendingSubmissions: PendingResultEntry[] = allSubmissions
+      .filter((submission) => !rankedIds.has(submission.id))
+      .map((submission) => ({
+        id: submission.id,
+        projectName: submission.projectName,
+        teamName: submission.teamName,
+        oneLiner: submission.oneLiner,
+        submitterNames: submission.submitterNames,
+        track: submission.track,
+        status: submission.status,
+        reviewCount: submission.reviews.length,
+      }))
+      .sort((a, b) => a.projectName.localeCompare(b.projectName));
+    if (publication)
+      return {
+        pendingSubmissions,
+        results: structuredClone(publication.results),
+        normalization: structuredClone(publication.normalization),
+        scoringPolicy: publication.scoringPolicy,
+        publishedAt: publication.publishedAt,
+      };
+    const results: ResultEntry[] = ranking!.results.map((submission) => ({
       id: submission.id,
       teamName: submission.teamName,
       projectName: submission.projectName,
@@ -47,7 +73,8 @@ export class ResultsQuery {
     }));
     return {
       results,
-      normalization: ranking.diagnostics,
+      pendingSubmissions,
+      normalization: ranking!.diagnostics,
       scoringPolicy: policy,
       publishedAt: "",
     };

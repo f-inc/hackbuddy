@@ -1,29 +1,22 @@
 "use client";
+import { useEventSettings, useJudgingPolicy } from "./EventConfig";
 
-import { JUDGING_POLICY } from "@/domain/judging-policy";
 import Link from "next/link";
 import "./mobile-navigation.css";
 import { usePathname, useRouter } from "next/navigation";
 
-const eventNavigation = [
-  { href: "/dashboard", label: "Dashboard", icon: "▦" },
-  { href: "/judging", label: "First pass judging", icon: "✓" },
-  {
-    href: "/leaderboard",
-    label: `Top ${JUDGING_POLICY.finals.finalistCount}`,
-    icon: "★",
-  },
-  { href: "/second-pass", label: "Second pass judging", icon: "◷" },
-  { href: "/winners", label: "Winners", icon: "♛" },
-  { href: "/results", label: "Results", icon: "≡" },
-  { href: "/judged", label: "Projects judged", icon: "▤" },
-];
+export type AppNavigationItem = {
+  href: string;
+  label: string;
+  icon: string;
+  primary?: boolean;
+  active?: boolean;
+};
 
 function MobileTabIcon({ route }: { route: string }) {
   const paths: Record<string, string> = {
     judging: "m5 12 4 4L19 6",
-    leaderboard:
-      "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z",
+    leaderboard: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z",
     "second-pass": "M8 5H5v14h14V5h-3M9 3h6v4H9V3Zm-1 9 2 2 5-5",
     winners:
       "M8 4h8v4a4 4 0 0 1-8 0V4Zm0 2H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 0v5m-4 3h8m-6-3h4",
@@ -50,6 +43,7 @@ export function AppShell({
   hackathon,
   hackathonName,
   hackathonImageUrl,
+  activeCollection = "",
 }: {
   children: React.ReactNode;
   name: string;
@@ -57,32 +51,64 @@ export function AppShell({
   hackathon?: string;
   hackathonName?: string;
   hackathonImageUrl?: string;
+  activeCollection?: string;
 }) {
+  const settings = useEventSettings();
+  const JUDGING_POLICY = useJudgingPolicy();
+  const eventNavigation: AppNavigationItem[] = [
+    { href: "/dashboard", label: "Dashboard", icon: "▦" },
+    { href: "/judging", label: "First pass judging", icon: "✓" },
+    {
+      href: "/leaderboard",
+      label: `Top ${JUDGING_POLICY.finals.finalistCount}`,
+      icon: "★",
+    },
+    { href: "/second-pass", label: "Second pass judging", icon: "◷" },
+    { href: "/winners", label: "Winners", icon: "♛" },
+    { href: "/results", label: "Results", icon: "≡" },
+    { href: "/judged", label: "Projects judged", icon: "▤" },
+  ];
+
   const pathname = usePathname();
   const router = useRouter();
-  const navigation = [
+  const navigation: AppNavigationItem[] = [
     ...(hackathon
       ? eventNavigation.map((item) => ({
           ...item,
           href: `/${hackathon}${item.href}`,
         }))
       : []),
+    ...(hackathon
+      ? settings.collections.map((c) => ({
+          href: `/${hackathon}/projects?collection=${encodeURIComponent(c.id)}`,
+          label: c.name,
+          icon: "✦",
+          active: activeCollection === c.id,
+        }))
+      : []),
+    ...(hackathon && role === "admin"
+      ? [
+          {
+            href: `/${hackathon}/projects`,
+            label: "Projects",
+            icon: "▤",
+            active: !activeCollection && pathname.startsWith(`/${hackathon}/projects`),
+          },
+          { href: `/hackathons?edit=${hackathon}`, label: "Event settings", icon: "⚙" },
+        ]
+      : []),
   ];
 
-  const primaryRoutes = new Set([
-    "judging",
-    "leaderboard",
-    "second-pass",
-    "winners",
-  ]);
-  const primaryNavigation = navigation.filter((item) =>
-    primaryRoutes.has(item.href.split("/").at(-1)!),
+  const primaryRoutes = new Set(["judging", "leaderboard", "second-pass", "winners"]);
+  const primaryNavigation = navigation.filter(
+    (item) => item.primary ?? primaryRoutes.has(item.href.split("/").at(-1)!),
   );
   const otherNavigation = navigation.filter(
-    (item) => !primaryRoutes.has(item.href.split("/").at(-1)!),
+    (item) => !(item.primary ?? primaryRoutes.has(item.href.split("/").at(-1)!)),
   );
   const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+    navigation.find((item) => item.href === href)?.active ??
+    (pathname === href.split("?")[0] || pathname.startsWith(`${href.split("?")[0]}/`));
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -95,20 +121,14 @@ export function AppShell({
       <span
         aria-hidden
         className={`sidebar-event-image${hackathonImageUrl ? "" : " fallback"}`}
-        style={
-          hackathonImageUrl
-            ? { backgroundImage: `url("${hackathonImageUrl}")` }
-            : undefined
-        }
+        style={hackathonImageUrl ? { backgroundImage: `url("${hackathonImageUrl}")` } : undefined}
       >
         {!hackathonImageUrl && hackathonName.slice(0, 1).toUpperCase()}
       </span>
       <span className="sidebar-event-copy">
         <small>
           <span className="event-label-current">Current event</span>
-          {role === "admin" && (
-            <span className="event-label-switch">Other hackathons</span>
-          )}
+          {role === "admin" && <span className="event-label-switch">Other hackathons</span>}
         </small>
         <strong>{hackathonName}</strong>
       </span>
@@ -139,10 +159,7 @@ export function AppShell({
               {eventIdentityContent}
             </Link>
           ) : hackathonName ? (
-            <div
-              aria-label={`Current event: ${hackathonName}`}
-              className="sidebar-event-identity"
-            >
+            <div aria-label={`Current event: ${hackathonName}`} className="sidebar-event-identity">
               {eventIdentityContent}
             </div>
           ) : null}
@@ -153,16 +170,8 @@ export function AppShell({
             <span className="nav-label">Workspace</span>
             {navigation.map((item) => (
               <a
-                aria-current={
-                  pathname === item.href || pathname.startsWith(`${item.href}/`)
-                    ? "page"
-                    : undefined
-                }
-                className={
-                  pathname === item.href || pathname.startsWith(`${item.href}/`)
-                    ? "active"
-                    : ""
-                }
+                aria-current={isActive(item.href) ? "page" : undefined}
+                className={isActive(item.href) ? "active" : ""}
                 href={item.href}
                 key={item.href}
               >
@@ -196,9 +205,7 @@ export function AppShell({
                 Hack<span>Buddy</span>
               </span>
             </div>
-            {hackathonName && (
-              <span className="mobile-event-name">{hackathonName}</span>
-            )}
+            {hackathonName && <span className="mobile-event-name">{hackathonName}</span>}
           </div>
           <button
             className="mobile-menu-trigger"
@@ -218,11 +225,7 @@ export function AppShell({
             Menu
           </button>
         </header>
-        <div
-          className="mobile-workspace-menu"
-          id="mobile-workspace-menu"
-          popover="auto"
-        >
+        <div className="mobile-workspace-menu" id="mobile-workspace-menu" popover="auto">
           <div className="mobile-menu-heading">
             <span>Workspace</span>
             <button

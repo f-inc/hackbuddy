@@ -7,10 +7,7 @@ type LoginScreenProps = {
   hackathonName?: string;
 };
 
-export function LoginScreen({
-  hackathon,
-  hackathonName,
-}: LoginScreenProps) {
+export function LoginScreen({ hackathon, hackathonName }: LoginScreenProps) {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -57,7 +54,8 @@ export function LoginScreen({
       };
       if (!response.ok) throw new Error(result.error);
       window.location.href =
-        result.redirectTo || (hackathon ? `/${hackathon}/dashboard` : "/hackathons");
+        result.redirectTo ||
+        (hackathon ? `/${hackathon}/dashboard` : "/hackathons");
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Could not sign you in.",
@@ -73,6 +71,7 @@ export function LoginScreen({
         <div className="brand">
           <span aria-hidden className="brand-mark" />
           <span>HackBuddy</span>
+
         </div>
 
         <div className="login-copy">

@@ -60,3 +60,21 @@
     flex-wrap: wrap;
   }
 }
+
+.tv-reveal-options {
+  position: relative;
+  color: #000;
+}
+.tv-reveal-options summary {
+  cursor: pointer;
+  font-size: 14px;
+  letter-spacing: -0.04em;
+}
+.tv-reveal-options[open] > button {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 10px;
+  z-index: 5;
+  white-space: nowrap;
+}

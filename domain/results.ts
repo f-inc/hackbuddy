@@ -1,5 +1,5 @@
 import type { FinalBallot } from "./final-ballot";
-import type { SubmissionReview } from "./submission";
+import type { SubmissionReview, Submission } from "./submission";
 import type { ScoringPolicy } from "./event-scoring";
 
 export type ResultEntry = {
@@ -19,6 +19,11 @@ export type ResultEntry = {
   normalizedScore: number;
   rawRank: number;
 };
+
+export type PendingResultEntry = Pick<
+  Submission,
+  "id" | "projectName" | "teamName" | "oneLiner" | "submitterNames" | "track" | "status"
+> & { reviewCount: number };
 
 export type FinalistEntry = ResultEntry & {
   votePoints?: number;

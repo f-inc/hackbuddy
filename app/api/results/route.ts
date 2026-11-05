@@ -7,7 +7,7 @@ export async function GET() {
   try {
     await requireHackathonSession();
     return NextResponse.json({
-      ...await getResultsReport(),
+      ...await getResultsReport(true),
       demoMode: isDemoMode(),
     });
   } catch (error) {

@@ -1,3 +1,11 @@
+export type SubmissionFile = {
+  id: string;
+  field: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  url: string;
+};
 export type QueueStatus = "available" | "in progress" | "completed";
 
 export type ReviewPhase = "preliminary" | "final";
@@ -40,6 +48,11 @@ export type SubmissionContact = {
 };
 
 export type SubmissionProject = {
+  files?: SubmissionFile[];
+  importedFields?: Record<string, unknown>;
+  liveDemoUrl?: string;
+  toolsUsed?: string[];
+  progressOutline?: string;
   oneLiner: string;
   description: string;
   previewImageUrl: string;
@@ -76,4 +89,3 @@ export type ScoredSubmission = Submission & {
   complexityScore: number;
   totalScore: number;
 };
-

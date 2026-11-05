@@ -1,15 +1,7 @@
-import type {
-  ReviewPhase,
-  SubmissionReview,
-} from "@/domain/submission";
+import type { ReviewPhase, SubmissionReview } from "@/domain/submission";
 import { isValidRubricScore } from "@/domain/scoring";
 import { UpstreamError } from "@/server/http/errors";
-import {
-  AirtableClient,
-  airtableFormula,
-  parseListResponse,
-  type AirtableRecord,
-} from "./client";
+import { AirtableClient, airtableFormula, parseListResponse, type AirtableRecord } from "./client";
 import { reviewField } from "./field-config";
 
 export type StoredReview = {
@@ -19,7 +11,7 @@ export type StoredReview = {
   review: SubmissionReview;
 };
 
-function parseStoredReview(record: AirtableRecord): StoredReview {
+export function parseStoredReview(record: AirtableRecord): StoredReview {
   const fields = record.fields;
   const submissionId = fields[reviewField.submissionId];
   const phase = fields[reviewField.phase];
@@ -40,14 +32,10 @@ function parseStoredReview(record: AirtableRecord): StoredReview {
     !isValidRubricScore(complexityScore) ||
     !Number.isInteger(totalScore) ||
     Number(totalScore) !==
-      Number(progressScore) +
-        Number(practicalityScore) +
-        Number(complexityScore) ||
+      Number(progressScore) + Number(practicalityScore) + Number(complexityScore) ||
     typeof completedAt !== "string"
   ) {
-    throw new UpstreamError(
-      `Airtable review ${record.id} does not match the review schema.`,
-    );
+    throw new UpstreamError(`Airtable review ${record.id} does not match the review schema.`);
   }
   return {
     id: record.id,
@@ -65,32 +53,22 @@ function parseStoredReview(record: AirtableRecord): StoredReview {
   };
 }
 
-export function reviewKey(
-  phase: ReviewPhase,
-  submissionId: string,
-  judgeName: string,
-) {
+export function reviewKey(phase: ReviewPhase, submissionId: string, judgeName: string) {
   return `${phase}:${submissionId}:${judgeName.trim().toLowerCase()}`;
 }
 
 export class AirtableReviewRepository {
   constructor(private readonly client: AirtableClient) {}
 
-  async list(options?: {
-    submissionId?: string;
-    phase?: ReviewPhase;
-  }) {
+  async list(options?: { submissionId?: string; phase?: ReviewPhase }) {
     const filters: string[] = [];
     if (options?.submissionId) {
-      filters.push(
-        airtableFormula(reviewField.submissionId, options.submissionId),
-      );
+      filters.push(airtableFormula(reviewField.submissionId, options.submissionId));
     }
     if (options?.phase) {
       filters.push(airtableFormula(reviewField.phase, options.phase));
     }
-    const filter =
-      filters.length > 1 ? `AND(${filters.join(",")})` : filters[0];
+    const filter = filters.length > 1 ? `AND(${filters.join(",")})` : filters[0];
     const records: AirtableRecord[] = [];
     let offset: string | undefined;
     do {
@@ -104,11 +82,7 @@ export class AirtableReviewRepository {
     return records.map(parseStoredReview);
   }
 
-  async upsert(
-    submissionId: string,
-    phase: ReviewPhase,
-    review: SubmissionReview,
-  ) {
+  async upsert(submissionId: string, phase: ReviewPhase, review: SubmissionReview) {
     const normalizedJudge = review.judgeName.trim().toLowerCase();
     const value = await this.client.request("", {
       method: "PATCH",
@@ -117,11 +91,7 @@ export class AirtableReviewRepository {
         records: [
           {
             fields: {
-              [reviewField.key]: reviewKey(
-                phase,
-                submissionId,
-                normalizedJudge,
-              ),
+              [reviewField.key]: reviewKey(phase, submissionId, normalizedJudge),
               [reviewField.submissionId]: submissionId,
               [reviewField.phase]: phase,
               [reviewField.judgeName]: normalizedJudge,
