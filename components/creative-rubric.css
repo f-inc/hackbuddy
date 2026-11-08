@@ -1,0 +1,41 @@
+.creative-rubric {
+  flex: 0 0 auto;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+.creative-rubric-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+.creative-rubric-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+.creative-rubric-header > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.creative-rubric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 24px;
+  margin-top: 12px;
+}
+.creative-rubric-grid h3 {
+  margin: 0 0 3px;
+  font-size: 13px;
+}
+.creative-rubric-grid p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+@media (max-width: 640px) {
+  .creative-rubric-grid {
+    grid-template-columns: 1fr;
+  }
+}
