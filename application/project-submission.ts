@@ -80,8 +80,10 @@ export function submissionFields(
     teamPhotoUrl: safeUrl(value.teamPhotoUrl),
     demoUrl: hillClimb ? "" : safeUrl(value.demoUrl),
     demoVideoUrl: hillClimb ? "" : safeUrl(value.demoVideoUrl),
-    repositoryUrl: hillClimb ? "" : safeUrl(value.repositoryUrl),
+    repositoryUrl: safeUrl(value.repositoryUrl),
   };
+  if (template === MAKERMODS_FORM && !fields.repositoryUrl)
+    throw new ValidationError("Add your GitHub repository link.");
   if (!fields.description)
     throw new ValidationError(
       hillClimb

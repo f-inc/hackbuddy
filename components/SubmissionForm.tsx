@@ -538,18 +538,17 @@ export function SubmissionForm({
                 requesting access.
               </small>
             </label>
-            {!hillClimb && (
-              <label className="field">
-                <span>GitHub repository link (optional, preferred)</span>
-                <input
-                  name="repositoryUrl"
-                  type="url"
-                  maxLength={2000}
-                  value={form.repositoryUrl}
-                  onChange={(e) => update("repositoryUrl", e.target.value)}
-                />
-              </label>
-            )}
+            <label className="field">
+              <span>GitHub repository link{makerMods ? " *" : " (optional, preferred)"}</span>
+              <input
+                name="repositoryUrl"
+                type="url"
+                required={makerMods}
+                maxLength={2000}
+                value={form.repositoryUrl}
+                onChange={(e) => update("repositoryUrl", e.target.value)}
+              />
+            </label>
             {!hillClimb && (
               <details>
                 <summary>Project image (optional)</summary>

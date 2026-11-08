@@ -96,6 +96,10 @@ async function run() {
       [null, {}],
       [answers({ description: "" }), {}],
       [answers({ teamNumber: "" }), {}],
+      [answers({ repositoryUrl: "" }), {}],
+      [answers({ repositoryUrl: undefined }), {}],
+      [answers({ track: "Hill Climb", repositoryUrl: "" }), {}],
+      [answers({ track: "Hill Climb", repositoryUrl: undefined }), {}],
       [answers({ teamNumber: undefined }), {}],
       [answers({ track: "Hill Climb", teamNumber: "" }), {}],
       [answers({ track: "Hill Climb", teamNumber: undefined }), {}],
@@ -163,6 +167,7 @@ async function run() {
     assert.equal(hillProject.track, "Hill Climb");
     assert.equal(hillProject.description, hill.description);
     assert.equal(hillProject.teamPhotoUrl, hill.teamPhotoUrl);
+    assert.equal(hillProject.repositoryUrl, hill.repositoryUrl);
     assert.deepEqual(hillProject.toolsUsed, [
       "Dream-1",
       "LiveKit",

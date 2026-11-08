@@ -10,7 +10,7 @@ Changing event settings preserves that template.
 The form recreates the previous Night Hack submission questions for this event:
 required team number (first input for both tracks), project/team names, builder names, organizer-only contact email, a 50-character
 one-liner, description, progress outline, tools, demo video, project link,
-team photo link, repository, and optional project image. Team photos use direct
+team photo link, required GitHub repository link for both tracks, and optional project image. Team photos use direct
 image links rather than the old Tally attachment upload. Videos remain link-only,
 with instructions for a Public or Unlisted YouTube video of at most 60 seconds.
 Video length and remote-link accessibility cannot be verified automatically.
@@ -20,9 +20,9 @@ compatibility with existing drafts and clients. Creative Applications keeps its
 one-liner, project description, hackathon progress and required demo video.
 
 Hill Climb is evaluated in person. It keeps team/project names, team number,
-builders, contact email, the same tools and team photo. Its required description
+builders, contact email, a required GitHub repository link, the same tools and team photo. Its required description
 asks how the base model was improved, with episodes collected and training steps
-as examples. It hides the one-liner, progress, demo video, website, repository and
+as examples. It hides the one-liner, progress, demo video, website and
 project-image inputs. Switching tracks preserves unsent draft answers, but the
 server discards creative-only fields when saving a Hill Climb project. No new
 Hill Climb evaluation or leaderboard is implemented by this form change.
