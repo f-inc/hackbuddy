@@ -1,3 +1,4 @@
+import { isHillClimb } from "@/domain/hill-climb";
 import { currentEventSettings, currentEventConfig } from "./event-context";
 import {
   databaseSubmissionRepository,
@@ -20,13 +21,25 @@ import {
 } from "@/infrastructure/airtable/submission-repository";
 import { demoSubmissionRepository } from "@/infrastructure/demo/submission-repository";
 
-const repository: SubmissionRepositoryProvider = () =>
+const rawRepository: SubmissionRepositoryProvider = () =>
   currentEventConfig()?.storage === "database"
     ? databaseSubmissionRepository()
     : airtableIsConfigured()
       ? airtableRepositoryFromContext()
       : demoSubmissionRepository;
 
+// Relay runs have their own rubric and stay out of the creative judging pipeline.
+const repository: SubmissionRepositoryProvider = () => {
+  const source = rawRepository();
+  if (currentEventSettings().submissionForm !== "makermods-physical-ai") return source;
+  return {
+    ...source,
+    findById: source.findById.bind(source),
+    async list() {
+      return (await source.list()).filter((submission) => !isHillClimb(submission));
+    },
+  };
+};
 const queue = new QueueService(repository);
 const dashboard = new DashboardQuery(repository, currentEventSettings);
 const results = new ResultsQuery(repository);
@@ -204,5 +217,5 @@ export async function publishResults(adminName: string, winnerIds?: unknown) {
 }
 
 export function getAllSubmissions() {
-  return repository().list();
+  return rawRepository().list();
 }

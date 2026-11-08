@@ -1,5 +1,6 @@
 import type { SubmissionRepository } from "@/application/ports/submission-repository";
 import type { Submission, ReviewScores } from "@/domain/submission";
+import { isHillClimb } from "@/domain/hill-climb";
 import { aggregateReviews, createReview, hasReviewBy } from "@/domain/scoring";
 import { currentEventConfig } from "@/lib/event-context";
 import { eventSettings } from "@/domain/event-settings";
@@ -47,10 +48,13 @@ export function databaseSubmissionRepository(): SubmissionRepository {
         mutable(event);
         const s = find(event, sid);
         const current = project(event, s);
+        const relay = (entry: Submission) =>
+          event.config.settings?.submissionForm === "makermods-physical-ai" && isHillClimb(entry);
         if (
+          relay(s) ||
           current.status !== "available" ||
           hasReviewBy(s.reviews, judge) ||
-          event.submissions.some((other) => project(event, other).claimedBy === judge)
+          event.submissions.some((other) => !relay(other) && project(event, other).claimedBy === judge)
         )
           return null;
         s.claimedBy = judge;
@@ -108,6 +112,8 @@ export async function completeDatabaseReview(sid: string, judge: string, scores:
   await changeEvent(eventId, (event) => {
     mutable(event);
     const s = find(event, sid);
+    if (event.config.settings?.submissionForm === "makermods-physical-ai" && isHillClimb(s))
+      throw new ConflictError("Hill Climb uses the relay rubric. Open the Hill Climb judging section.");
     const previous = s.reviews.find((r) => r.judgeName === judge);
     if (previous) {
       if (

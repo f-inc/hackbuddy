@@ -1,0 +1,54 @@
+.hill-run-form {
+  max-width: 800px;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+.hill-run-form h2,
+.hill-run-form p {
+  margin: 0;
+}
+.hill-run-form h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+.hill-run-form h3 {
+  margin: 16px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+.hill-run-form p,
+.hill-run-form small {
+  color: var(--muted);
+  line-height: 1.6;
+}
+.hill-run-form .field small {
+  font-weight: 450;
+}
+.hill-run-form fieldset {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.hill-run-form legend {
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+.hill-run-check > span {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.hill-run-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin-top: 2px;
+  padding: 0;
+  accent-color: var(--primary);
+}
+.hill-run-form strong {
+  color: var(--text);
+}
