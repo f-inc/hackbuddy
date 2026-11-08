@@ -17,8 +17,7 @@ Video length and remote-link accessibility cannot be verified automatically.
 
 All MakerMods submissions are Creative Applications. There is no track selector,
 and a demo video link is required. The server sets the track automatically and
-rejects requests for other tracks. Tools are multiselect MakerMods, Dream Labs
-LiveKit and Dimensional, with an optional free-text list of other tools. The event has one
+rejects requests for other tracks. Tools are multiselect Dream-1, LiveKit and Dimensional, with an optional free-text list of other tools. The event has one
 Creative Applications collection and uses HackBuddy's existing judging workflow.
 
 Required answers, field lengths, URL protocols, the event track and email syntax are

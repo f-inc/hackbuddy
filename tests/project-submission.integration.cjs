@@ -34,7 +34,7 @@ function answers(overrides = {}) {
     progressOutline:
       "1. Collected demos. 2. Integrated voice. 3. Tested recovery.",
     track: "Creative Applications",
-    toolsUsed: "MakerMods, Dream Labs, LiveKit, Dimensional, LiveKit",
+    toolsUsed: "Dream-1, LiveKit, Dimensional, LiveKit",
     demoVideoUrl: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
     ...overrides,
   };
@@ -85,7 +85,7 @@ test("MakerMods answers persist with every field mapped and duplicate tools norm
     submissionFields(input, "makermods-physical-ai"),
   ))
     assert.deepEqual(project[key], value, key);
-  assert.deepEqual(project.toolsUsed, ["MakerMods", "Dream Labs", "LiveKit", "Dimensional"]);
+  assert.deepEqual(project.toolsUsed, ["Dream-1", "LiveKit", "Dimensional"]);
   assert.equal(project.status, "available");
   assert.deepEqual(project.reviews, []);
   assert.equal(project.totalScore, null);
