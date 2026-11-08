@@ -34,6 +34,7 @@ export type FinalJudgingState = {
 };
 
 export type SubmissionIdentity = {
+  teamNumber?: string;
   id: string;
   teamName: string;
   projectName: string;

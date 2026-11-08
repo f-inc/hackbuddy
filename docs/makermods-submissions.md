@@ -8,7 +8,7 @@ In the Hackathons editor its submission template is **MakerMods Physical AI**.
 Changing event settings preserves that template.
 
 The form recreates the previous Night Hack submission questions for this event:
-project/team names, builder names, organizer-only contact email, a 50-character
+optional team number (first input), project/team names, builder names, organizer-only contact email, a 50-character
 one-liner, description, progress outline, tools, demo video, project link,
 team photo link, repository, and optional project image. Team photos use direct
 image links rather than the old Tally attachment upload. Videos remain link-only,
@@ -18,7 +18,7 @@ Video length and remote-link accessibility cannot be verified automatically.
 All MakerMods submissions are Creative Applications. There is no track selector,
 and a demo video link is required. The server sets the track automatically and
 rejects requests for other tracks. Tools are multiselect MakerMods, Dream Labs
-and LiveKit, with an optional free-text list of other tools. The event has one
+LiveKit and Dimensional, with an optional free-text list of other tools. The event has one
 Creative Applications collection and uses HackBuddy's existing judging workflow.
 
 Required answers, field lengths, URL protocols, the event track and email syntax are

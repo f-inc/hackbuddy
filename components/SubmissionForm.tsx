@@ -10,6 +10,7 @@ import {
 } from "@/domain/submission-form";
 
 const empty = {
+  teamNumber: "",
   projectName: "",
   teamName: "",
   submitterNames: "",
@@ -289,6 +290,19 @@ export function SubmissionForm({
               gap: 16,
             }}
           >
+            <label className="field">
+              <span>Team number <small>Optional</small></span>
+              <input
+                name="teamNumber"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]{1,10}"
+                maxLength={10}
+                autoComplete="off"
+                value={form.teamNumber}
+                onChange={(e) => update("teamNumber", e.target.value)}
+              />
+            </label>
             {(
               [
                 ["projectName", "Project name"],

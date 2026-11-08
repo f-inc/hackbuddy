@@ -26,6 +26,7 @@ function answers(overrides = {}) {
     requestId: randomUUID(),
     projectName: "Robot helper",
     teamName: "Builders",
+    teamNumber: "007",
     submitterNames: "Alex, Sam, Jo",
     contactEmail: "test@example.com",
     oneLiner: "A voice-controlled robot assistant",
@@ -33,7 +34,7 @@ function answers(overrides = {}) {
     progressOutline:
       "1. Collected demos. 2. Integrated voice. 3. Tested recovery.",
     track: "Creative Applications",
-    toolsUsed: "MakerMods, Dream Labs, LiveKit, LiveKit",
+    toolsUsed: "MakerMods, Dream Labs, LiveKit, Dimensional, LiveKit",
     demoVideoUrl: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
     ...overrides,
   };
@@ -84,7 +85,7 @@ test("MakerMods answers persist with every field mapped and duplicate tools norm
     submissionFields(input, "makermods-physical-ai"),
   ))
     assert.deepEqual(project[key], value, key);
-  assert.deepEqual(project.toolsUsed, ["MakerMods", "Dream Labs", "LiveKit"]);
+  assert.deepEqual(project.toolsUsed, ["MakerMods", "Dream Labs", "LiveKit", "Dimensional"]);
   assert.equal(project.status, "available");
   assert.deepEqual(project.reviews, []);
   assert.equal(project.totalScore, null);
@@ -134,6 +135,11 @@ test("server validates required answers, track, video, lengths, types, email and
     { toolsUsed: ["MakerMods"] },
     { contactEmail: "a".repeat(255) },
     { requestId: "bad" },
+    { teamNumber: "12a" },
+    { teamNumber: "1.5" },
+    { teamNumber: "-2" },
+    { teamNumber: "12345678901" },
+    { teamNumber: 7 },
   ])
     await assert.rejects(saveProject(event, answers(change)), { status: 400 });
   assert.equal((await readEvent(event)).data.submissions.length, 0);
@@ -202,4 +208,15 @@ test("event settings preserve template through editing and reject unknown templa
     /Invalid submission form/,
   );
   assert.equal(parseEventSettings({}).submissionForm, undefined);
+});
+
+test("team numbers preserve leading zeros, remain optional for existing clients, and cannot change under a used token", async () => {
+  const event = await fixture(), input = answers({ teamNumber: "007" });
+  const id = await saveProject(event, input);
+  assert.equal((await readEvent(event)).data.submissions[0].teamNumber, "007");
+  await assert.rejects(saveProject(event, { ...input, teamNumber: "008" }), { status: 409 });
+  await saveProject(event, answers({ teamNumber: undefined }));
+  assert.equal((await readEvent(event)).data.submissions[1].teamNumber, "");
+  await saveProject(event, { ...input, id, teamNumber: "008" }, true);
+  assert.equal((await readEvent(event)).data.submissions[0].teamNumber, "008");
 });
