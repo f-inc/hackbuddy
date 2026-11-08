@@ -128,7 +128,6 @@ test("server validates required answers, track, video, lengths, types, email and
     { oneLiner: "" },
     { oneLiner: "a".repeat(51) },
     { track: "Invalid track" },
-    { track: "" },
     { demoVideoUrl: "" },
     { demoVideoUrl: "javascript:alert(1)" },
     { repositoryUrl: "https://user:password@example.com" },
@@ -139,13 +138,16 @@ test("server validates required answers, track, video, lengths, types, email and
     await assert.rejects(saveProject(event, answers(change)), { status: 400 });
   assert.equal((await readEvent(event)).data.submissions.length, 0);
 });
-test("Hill Climb can submit without a creative demo video", async () => {
+test("MakerMods defaults to Creative Applications without a track selector and requires a video", async () => {
   const event = await fixture();
-  await saveProject(event, answers({ track: "Hill Climb", demoVideoUrl: "" }));
-  assert.equal(
-    (await readEvent(event)).data.submissions[0].track,
-    "Hill Climb",
-  );
+  await saveProject(event, answers({ track: "" }));
+  await saveProject(event, answers({ track: undefined }));
+  const submissions = (await readEvent(event)).data.submissions;
+  assert.equal(submissions.length, 2);
+  assert.ok(submissions.every((project) => project.track === "Creative Applications"));
+  await assert.rejects(saveProject(event, answers({ track: "Hill Climb" })), { status: 400 });
+  await assert.rejects(saveProject(event, answers({ track: "", demoVideoUrl: "" })), { status: 400 });
+  assert.equal((await readEvent(event)).data.submissions.length, 2);
 });
 test("closed, inactive and published events reject new writes while retries confirm prior receipt", async () => {
   for (const close of [

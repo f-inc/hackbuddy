@@ -4,7 +4,7 @@ import type { Submission } from "@/domain/submission";
 import { useEventSettings } from "@/components/EventConfig";
 import {
   MAKERMODS_FORM,
-  MAKERMODS_TRACKS,
+  MAKERMODS_TRACK,
   MAKERMODS_TOOLS,
   SUBMISSION_REQUEST_ID,
 } from "@/domain/submission-form";
@@ -167,6 +167,7 @@ export function SubmissionForm({
         signal: AbortSignal.timeout(30000),
         body: JSON.stringify({
           ...form,
+          ...(makerMods ? { track: MAKERMODS_TRACK } : {}),
           requestId: requestToken.current,
           ...(id ? { id } : {}),
         }),
@@ -217,7 +218,7 @@ export function SubmissionForm({
             Hack<span>Buddy</span>
           </span>
           <h1>{name}</h1>
-          <p>{id ? "Edit project submission" : "Submit your project"}</p>
+          <p>{id ? "Edit project submission" : makerMods ? "Submit your Creative Applications project" : "Submit your project"}</p>
           {makerMods && (
             <p>
               November 7–8, 2026 · Founders Inc., San Francisco ·{" "}
@@ -351,35 +352,17 @@ export function SubmissionForm({
                 onChange={(e) => update("progressOutline", e.target.value)}
               />
             </label>
-            <label className="field">
-              <span>Track{makerMods ? " *" : " (optional)"}</span>
-              {makerMods ? (
-                <select
-                  name="track"
-                  required
-                  value={form.track}
-                  onChange={(e) => update("track", e.target.value)}
-                >
-                  <option value="">Choose your track</option>
-                  {MAKERMODS_TRACKS.map((track) => (
-                    <option key={track}>{track}</option>
-                  ))}
-                </select>
-              ) : (
+            {!makerMods && (
+              <label className="field">
+                <span>Track (optional)</span>
                 <input
                   name="track"
                   maxLength={100}
                   value={form.track}
                   onChange={(e) => update("track", e.target.value)}
                 />
-              )}
-              {makerMods && (
-                <small>
-                  Hill Climb: shared robot challenge. Creative Applications:
-                  your own physical AI project.
-                </small>
-              )}
-            </label>
+              </label>
+            )}
             {makerMods ? (
               <fieldset
                 style={{
@@ -450,7 +433,7 @@ export function SubmissionForm({
             <label className="field">
               <span>
                 60-second demo video link
-                {makerMods && form.track === "Creative Applications"
+                {makerMods
                   ? " *"
                   : " (optional)"}
               </span>
@@ -458,7 +441,7 @@ export function SubmissionForm({
                 name="demoVideoUrl"
                 type="url"
                 maxLength={2000}
-                required={makerMods && form.track === "Creative Applications"}
+                required={makerMods}
                 value={form.demoVideoUrl}
                 onChange={(e) => update("demoVideoUrl", e.target.value)}
               />
