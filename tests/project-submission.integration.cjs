@@ -144,15 +144,19 @@ test("server validates required answers, track, video, lengths, types, email and
     await assert.rejects(saveProject(event, answers(change)), { status: 400 });
   assert.equal((await readEvent(event)).data.submissions.length, 0);
 });
-test("MakerMods defaults to Creative Applications without a track selector and requires a video", async () => {
+test("MakerMods preserves the Creative Applications default and requires its video", async () => {
   const event = await fixture();
   await saveProject(event, answers({ track: "" }));
   await saveProject(event, answers({ track: undefined }));
   const submissions = (await readEvent(event)).data.submissions;
   assert.equal(submissions.length, 2);
-  assert.ok(submissions.every((project) => project.track === "Creative Applications"));
-  await assert.rejects(saveProject(event, answers({ track: "Hill Climb" })), { status: 400 });
-  await assert.rejects(saveProject(event, answers({ track: "", demoVideoUrl: "" })), { status: 400 });
+  assert.ok(
+    submissions.every((project) => project.track === "Creative Applications"),
+  );
+  await assert.rejects(
+    saveProject(event, answers({ track: "", demoVideoUrl: "" })),
+    { status: 400 },
+  );
   assert.equal((await readEvent(event)).data.submissions.length, 2);
 });
 test("closed, inactive and published events reject new writes while retries confirm prior receipt", async () => {
@@ -211,12 +215,71 @@ test("event settings preserve template through editing and reject unknown templa
 });
 
 test("team numbers preserve leading zeros, remain optional for existing clients, and cannot change under a used token", async () => {
-  const event = await fixture(), input = answers({ teamNumber: "007" });
+  const event = await fixture(),
+    input = answers({ teamNumber: "007" });
   const id = await saveProject(event, input);
   assert.equal((await readEvent(event)).data.submissions[0].teamNumber, "007");
-  await assert.rejects(saveProject(event, { ...input, teamNumber: "008" }), { status: 409 });
+  await assert.rejects(saveProject(event, { ...input, teamNumber: "008" }), {
+    status: 409,
+  });
   await saveProject(event, answers({ teamNumber: undefined }));
   assert.equal((await readEvent(event)).data.submissions[1].teamNumber, "");
   await saveProject(event, { ...input, id, teamNumber: "008" }, true);
   assert.equal((await readEvent(event)).data.submissions[0].teamNumber, "008");
+});
+
+test("Hill Climb needs model improvements but no one-liner, video or hackathon progress", async () => {
+  const event = await fixture();
+  const input = answers({
+    track: "Hill Climb",
+    description: "Collected 120 episodes and trained for 5000 steps.",
+    oneLiner: "",
+    demoVideoUrl: "",
+    progressOutline: "",
+    teamPhotoUrl: "https://example.com/team.png",
+  });
+  const id = await saveProject(event, input);
+  const project = (await readEvent(event)).data.submissions.find(
+    (s) => s.id === id,
+  );
+  assert.equal(project.track, "Hill Climb");
+  assert.equal(project.description, input.description);
+  assert.equal(project.teamPhotoUrl, input.teamPhotoUrl);
+  assert.deepEqual(project.toolsUsed, ["Dream-1", "LiveKit", "Dimensional"]);
+  assert.equal(project.teamNumber, "007");
+  for (const key of ["oneLiner", "demoVideoUrl", "progressOutline"])
+    assert.equal(project[key], "");
+  await assert.rejects(
+    saveProject(event, { ...input, requestId: randomUUID(), description: "" }),
+    { status: 400 },
+  );
+  assert.equal(await saveProject(event, input), id);
+});
+test("switching a draft to Hill Climb discards hidden creative answers on the server and cannot change a used receipt", async () => {
+  const event = await fixture();
+  const input = answers({
+    track: "Hill Climb",
+    oneLiner: "x".repeat(100),
+    progressOutline: "Hidden progress",
+    demoVideoUrl: "invalid hidden URL",
+    demoUrl: "invalid hidden URL",
+    repositoryUrl: "invalid hidden URL",
+    previewImageUrl: "invalid hidden URL",
+  });
+  const id = await saveProject(event, input);
+  const project = (await readEvent(event)).data.submissions[0];
+  for (const key of [
+    "oneLiner",
+    "progressOutline",
+    "demoVideoUrl",
+    "demoUrl",
+    "repositoryUrl",
+    "previewImageUrl",
+  ])
+    assert.equal(project[key], "");
+  assert.equal(await saveProject(event, input), id);
+  await assert.rejects(
+    saveProject(event, answers({ requestId: input.requestId })),
+    { status: 409 },
+  );
 });

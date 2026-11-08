@@ -4,6 +4,8 @@ import type { Submission } from "@/domain/submission";
 import {
   MAKERMODS_FORM,
   MAKERMODS_TRACK,
+  MAKERMODS_HILL_TRACK,
+  MAKERMODS_TRACKS,
   SUBMISSION_REQUEST_ID,
   type SubmissionFormTemplate,
 } from "@/domain/submission-form";
@@ -40,14 +42,25 @@ export function submissionFields(
     );
   const teamNumber = text("teamNumber", 10);
   if (teamNumber && !/^[0-9]{1,10}$/.test(teamNumber))
-    throw new ValidationError("Team number must contain digits only (up to 10).");
+    throw new ValidationError(
+      "Team number must contain digits only (up to 10).",
+    );
+  const track =
+    text("track", 100) || (template === MAKERMODS_FORM ? MAKERMODS_TRACK : "");
+  const hillClimb =
+    template === MAKERMODS_FORM && track === MAKERMODS_HILL_TRACK;
+  if (
+    template === MAKERMODS_FORM &&
+    !MAKERMODS_TRACKS.some((option) => option === track)
+  )
+    throw new ValidationError("Select Creative Applications or Hill Climb.");
   const fields = {
     teamNumber,
     projectName,
     teamName,
     submitterNames,
     contactEmail,
-    track: template === MAKERMODS_FORM ? MAKERMODS_TRACK : text("track", 100),
+    track,
     toolsUsed: [
       ...new Set(
         text("toolsUsed", 1000)
@@ -56,20 +69,24 @@ export function submissionFields(
           .filter(Boolean),
       ),
     ],
-    oneLiner: text("oneLiner", template === MAKERMODS_FORM ? 50 : 300),
+    oneLiner: hillClimb
+      ? ""
+      : text("oneLiner", template === MAKERMODS_FORM ? 50 : 300),
     description: text("description", 10000),
-    progressOutline: text("progressOutline", 5000),
-    previewImageUrl: safeUrl(value.previewImageUrl),
+    progressOutline: hillClimb ? "" : text("progressOutline", 5000),
+    previewImageUrl: hillClimb ? "" : safeUrl(value.previewImageUrl),
     teamPhotoUrl: safeUrl(value.teamPhotoUrl),
-    demoUrl: safeUrl(value.demoUrl),
-    demoVideoUrl: safeUrl(value.demoVideoUrl),
-    repositoryUrl: safeUrl(value.repositoryUrl),
+    demoUrl: hillClimb ? "" : safeUrl(value.demoUrl),
+    demoVideoUrl: hillClimb ? "" : safeUrl(value.demoVideoUrl),
+    repositoryUrl: hillClimb ? "" : safeUrl(value.repositoryUrl),
   };
   if (!fields.description)
-    throw new ValidationError("Describe what you built.");
-  if (template === MAKERMODS_FORM) {
-    if (text("track", 100) && text("track", 100) !== MAKERMODS_TRACK)
-      throw new ValidationError("This event accepts Creative Applications submissions only.");
+    throw new ValidationError(
+      hillClimb
+        ? "Describe how you improved the base model."
+        : "Describe what you built.",
+    );
+  if (template === MAKERMODS_FORM && !hillClimb) {
     if (!fields.oneLiner || !fields.progressOutline)
       throw new ValidationError(
         "Add a one-line description and your progress during the hackathon.",
