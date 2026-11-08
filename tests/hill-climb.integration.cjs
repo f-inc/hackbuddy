@@ -64,6 +64,7 @@ async function fixture() {
     teamNumber: "007",
     submitterNames: "Alex",
     contactEmail: "alex@example.com",
+    repositoryUrl: "https://github.com/example/relay",
     track: "Hill Climb",
     description: "Collected 120 episodes and trained for 5000 steps.",
   });
@@ -211,7 +212,7 @@ test("old relay reservations cannot save generic rubric scores or block creative
     event.submissions[0].claimedAt = new Date().toISOString();
   });
   const creativeId = await saveProject(f.config.id, {
-    requestId: randomUUID(), projectName: "Creative robot", teamName: "Creators",
+    requestId: randomUUID(), projectName: "Creative robot", teamName: "Creators", teamNumber: "008", repositoryUrl: "https://github.com/example/creative",
     submitterNames: "Sam", contactEmail: "sam@example.com", track: "Creative Applications",
     oneLiner: "A robot assistant", description: "A creative project", progressOutline: "Built a demo",
     demoVideoUrl: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
