@@ -1,5 +1,7 @@
 "use client";
-import { useManagedEvent, useJudgingPolicy } from "./EventConfig";
+import { useManagedEvent, useJudgingPolicy, useEventSettings } from "./EventConfig";
+import { MAKERMODS_FORM } from "@/domain/submission-form";
+import "./creative-rubric.css";
 
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -42,6 +44,7 @@ export function JudgingView({
   hackathonImageUrl?: string;
 }) {
   const managed = useManagedEvent();
+  const makerMods = useEventSettings().submissionForm === MAKERMODS_FORM;
   const JUDGING_POLICY = useJudgingPolicy();
   const RUBRIC_SCORE_MAX = 3 * JUDGING_POLICY.score.max;
 
@@ -553,6 +556,23 @@ export function JudgingView({
             </div>
           </div>
         </section>
+
+        {makerMods && !finalMode && (
+          <section className="creative-rubric card" aria-labelledby="creative-rubric-title">
+            <header className="creative-rubric-header">
+              <h2 id="creative-rubric-title">Creative Applications rubric</h2>
+              <span>{JUDGING_POLICY.score.min}–{JUDGING_POLICY.score.max} per criterion · {RUBRIC_SCORE_MAX} points per review</span>
+            </header>
+            <div className="creative-rubric-grid">
+              {Object.values(RUBRIC).map((criterion) => (
+                <div key={criterion.key}>
+                  <h3>{criterion.label}</h3>
+                  <p>{criterion.description}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {error && <div className="error-banner page-error">{error}</div>}
 
