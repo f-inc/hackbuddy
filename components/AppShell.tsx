@@ -2,6 +2,7 @@
 import { useEventSettings, useJudgingPolicy } from "./EventConfig";
 
 import Link from "next/link";
+import { MAKERMODS_FORM, MAKERMODS_TRACK } from "@/domain/submission-form";
 import "./mobile-navigation.css";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -82,7 +83,10 @@ export function AppShell({
         }))
       : []),
     ...(hackathon
-      ? settings.collections.map((c) => ({
+      ? settings.collections.filter((collection) =>
+          !(settings.submissionForm === MAKERMODS_FORM &&
+            collection.name.trim().toLowerCase() === MAKERMODS_TRACK.toLowerCase()),
+        ).map((c) => ({
           href: `/${hackathon}/projects?collection=${encodeURIComponent(c.id)}`,
           label: c.name,
           icon: "✦",
