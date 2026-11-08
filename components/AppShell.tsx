@@ -58,6 +58,9 @@ export function AppShell({
   const eventNavigation: AppNavigationItem[] = [
     { href: "/dashboard", label: "Dashboard", icon: "▦" },
     { href: "/judging", label: "First pass judging", icon: "✓" },
+    ...(settings.submissionForm === "makermods-physical-ai"
+      ? [{ href: "/hill-climb", label: "Hill Climb", icon: "↗" }]
+      : []),
     {
       href: "/leaderboard",
       label: `Top ${JUDGING_POLICY.finals.finalistCount}`,
