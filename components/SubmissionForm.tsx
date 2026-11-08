@@ -218,7 +218,7 @@ export function SubmissionForm({
             Hack<span>Buddy</span>
           </span>
           <h1>{name}</h1>
-          <p>{id ? "Edit project submission" : "Submit your project"}</p>
+          <p>{id ? "Edit project submission" : makerMods ? "Submit your Creative Applications project" : "Submit your project"}</p>
           {makerMods && (
             <p>
               November 7–8, 2026 · Founders Inc., San Francisco ·{" "}
