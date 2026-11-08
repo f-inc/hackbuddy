@@ -28,6 +28,7 @@ const {
 const { saveProject } = require("../application/project-submission.ts");
 const {
   getAllSubmissions,
+  completeSubmission,
   claimNextSubmission,
   getQueueStats,
 } = require("../lib/airtable.ts");
@@ -201,4 +202,25 @@ test("non-MakerMods and historical events cannot use relay scoring", async () =>
     },
     () => assert.rejects(hillClimbTeams("alex"), { status: 404 }),
   );
+});
+
+test("old relay reservations cannot save generic rubric scores or block creative judging", async () => {
+  const f = await fixture();
+  await changeEvent(f.config.id, (event) => {
+    event.submissions[0].claimedBy = "alex";
+    event.submissions[0].claimedAt = new Date().toISOString();
+  });
+  const creativeId = await saveProject(f.config.id, {
+    requestId: randomUUID(), projectName: "Creative robot", teamName: "Creators",
+    submitterNames: "Sam", contactEmail: "sam@example.com", track: "Creative Applications",
+    oneLiner: "A robot assistant", description: "A creative project", progressOutline: "Built a demo",
+    demoVideoUrl: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+  });
+  await f.inEvent(async () => {
+    await assert.rejects(completeSubmission(f.sid, "alex", {
+      progress: 5, practicality: 5, complexity: 5, notes: "",
+    }), { status: 409 });
+    assert.equal((await claimNextSubmission("alex")).id, creativeId);
+    assert.equal((await readEvent(f.config.id)).data.submissions[0].reviews.length, 0);
+  });
 });
