@@ -44,6 +44,18 @@ export function EventSettingsFields({
         </label>
       </div>
       <label className="field">
+        <span>Submission form</span>
+        <select
+          value={value.submissionForm || "standard"}
+          onChange={(e) => onChange({
+            ...value, submissionForm: e.target.value as EventSettings["submissionForm"],
+          })}
+        >
+          <option value="standard">Standard project submission</option>
+          <option value="makermods-physical-ai">MakerMods Physical AI</option>
+        </select>
+      </label>
+      <label className="field">
         <span>
           <input
             type="checkbox"

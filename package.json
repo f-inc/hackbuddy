@@ -16,7 +16,8 @@
     "setup:hackathons": "node scripts/setup-hackathons-table.mjs",
     "setup:reviews": "node scripts/setup-reviews-table.mjs",
     "check:database": "node scripts/check-database.mjs",
-    "migrate:airtable": "node scripts/migrate-airtable.cjs"
+    "migrate:airtable": "node scripts/migrate-airtable.cjs",
+    "test:submissions": "node -r ./scripts/register-test-typescript.cjs scripts/test-submissions.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1162.0",
