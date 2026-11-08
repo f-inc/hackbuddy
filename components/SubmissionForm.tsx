@@ -5,6 +5,8 @@ import { useEventSettings } from "@/components/EventConfig";
 import {
   MAKERMODS_FORM,
   MAKERMODS_TRACK,
+  MAKERMODS_HILL_TRACK,
+  MAKERMODS_TRACKS,
   MAKERMODS_TOOLS,
   SUBMISSION_REQUEST_ID,
 } from "@/domain/submission-form";
@@ -69,6 +71,8 @@ export function SubmissionForm({
     [loading, setLoading] = useState(true),
     [loadFailed, setLoadFailed] = useState(false),
     [draftMessage, setDraftMessage] = useState("");
+  const selectedTrack = form.track || MAKERMODS_TRACK;
+  const hillClimb = makerMods && selectedTrack === MAKERMODS_HILL_TRACK;
   function persist(fields: Fields, uncertain = pending, received = receipt) {
     if (id) return;
     try {
@@ -168,7 +172,7 @@ export function SubmissionForm({
         signal: AbortSignal.timeout(30000),
         body: JSON.stringify({
           ...form,
-          ...(makerMods ? { track: MAKERMODS_TRACK } : {}),
+          ...(makerMods ? { track: selectedTrack } : {}),
           requestId: requestToken.current,
           ...(id ? { id } : {}),
         }),
@@ -219,7 +223,7 @@ export function SubmissionForm({
             Hack<span>Buddy</span>
           </span>
           <h1>{name}</h1>
-          <p>{id ? "Edit project submission" : makerMods ? "Submit your Creative Applications project" : "Submit your project"}</p>
+          <p>{id ? "Edit project submission" : "Submit your project"}</p>
           {makerMods && (
             <p>
               November 7–8, 2026 · Founders Inc., San Francisco ·{" "}
@@ -291,7 +295,9 @@ export function SubmissionForm({
             }}
           >
             <label className="field">
-              <span>Team number <small>Optional</small></span>
+              <span>
+                Team number <small>Optional</small>
+              </span>
               <input
                 name="teamNumber"
                 type="text"
@@ -303,6 +309,26 @@ export function SubmissionForm({
                 onChange={(e) => update("teamNumber", e.target.value)}
               />
             </label>
+            {makerMods && (
+              <label className="field">
+                <span>Track *</span>
+                <select
+                  name="track"
+                  required
+                  value={selectedTrack}
+                  onChange={(e) => update("track", e.target.value)}
+                >
+                  {MAKERMODS_TRACKS.map((track) => (
+                    <option key={track}>{track}</option>
+                  ))}
+                </select>
+                {hillClimb && (
+                  <small>
+                    Hill Climb is evaluated in person. No demo video is needed.
+                  </small>
+                )}
+              </label>
+            )}
             {(
               [
                 ["projectName", "Project name"],
@@ -311,38 +337,44 @@ export function SubmissionForm({
                 ["contactEmail", "Contact email"],
                 ["oneLiner", "One-line description"],
               ] as const
-            ).map(([key, label]) => (
-              <label className="field" key={key}>
-                <span>
-                  {label}
-                  {key !== "oneLiner" || makerMods ? " *" : " (optional)"}
-                </span>
-                <input
-                  name={key}
-                  required={key !== "oneLiner" || makerMods}
-                  type={key === "contactEmail" ? "email" : "text"}
-                  autoComplete={key === "contactEmail" ? "email" : "off"}
-                  maxLength={
-                    key === "projectName" || key === "teamName"
-                      ? 120
-                      : key === "oneLiner"
-                        ? makerMods
-                          ? 50
-                          : 300
-                        : key === "contactEmail"
-                          ? 254
-                          : 500
-                  }
-                  value={form[key]}
-                  onChange={(e) => update(key, e.target.value)}
-                />
-                {key === "oneLiner" && makerMods && (
-                  <small>50 characters maximum.</small>
-                )}
-              </label>
-            ))}
+            )
+              .filter(([key]) => !hillClimb || key !== "oneLiner")
+              .map(([key, label]) => (
+                <label className="field" key={key}>
+                  <span>
+                    {label}
+                    {key !== "oneLiner" || makerMods ? " *" : " (optional)"}
+                  </span>
+                  <input
+                    name={key}
+                    required={key !== "oneLiner" || makerMods}
+                    type={key === "contactEmail" ? "email" : "text"}
+                    autoComplete={key === "contactEmail" ? "email" : "off"}
+                    maxLength={
+                      key === "projectName" || key === "teamName"
+                        ? 120
+                        : key === "oneLiner"
+                          ? makerMods
+                            ? 50
+                            : 300
+                          : key === "contactEmail"
+                            ? 254
+                            : 500
+                    }
+                    value={form[key]}
+                    onChange={(e) => update(key, e.target.value)}
+                  />
+                  {key === "oneLiner" && makerMods && (
+                    <small>50 characters maximum.</small>
+                  )}
+                </label>
+              ))}
             <label className="field">
-              <span>What did you build? *</span>
+              <span>
+                {hillClimb
+                  ? "What did you do to improve the base model? *"
+                  : "What did you build? *"}
+              </span>
               <textarea
                 name="description"
                 required
@@ -351,21 +383,31 @@ export function SubmissionForm({
                 value={form.description}
                 onChange={(e) => update("description", e.target.value)}
               />
+              {hillClimb && (
+                <small>
+                  For example: how many episodes you collected, how many
+                  training steps you ran, and any changes you made to the data
+                  or training setup.
+                </small>
+              )}
             </label>
-            <label className="field">
-              <span>
-                Progress during the hackathon{makerMods ? " *" : " (optional)"}
-              </span>
-              <textarea
-                name="progressOutline"
-                required={makerMods}
-                rows={4}
-                maxLength={5000}
-                placeholder="In 3–5 points, outline what you built, integrated, tested, or improved during the hackathon."
-                value={form.progressOutline}
-                onChange={(e) => update("progressOutline", e.target.value)}
-              />
-            </label>
+            {!hillClimb && (
+              <label className="field">
+                <span>
+                  Progress during the hackathon
+                  {makerMods ? " *" : " (optional)"}
+                </span>
+                <textarea
+                  name="progressOutline"
+                  required={makerMods}
+                  rows={4}
+                  maxLength={5000}
+                  placeholder="In 3–5 points, outline what you built, integrated, tested, or improved during the hackathon."
+                  value={form.progressOutline}
+                  onChange={(e) => update("progressOutline", e.target.value)}
+                />
+              </label>
+            )}
             {!makerMods && (
               <label className="field">
                 <span>Track (optional)</span>
@@ -444,41 +486,43 @@ export function SubmissionForm({
                 />
               </label>
             )}
-            <label className="field">
-              <span>
-                60-second demo video link
-                {makerMods
-                  ? " *"
-                  : " (optional)"}
-              </span>
-              <input
-                name="demoVideoUrl"
-                type="url"
-                maxLength={2000}
-                required={makerMods}
-                value={form.demoVideoUrl}
-                onChange={(e) => update("demoVideoUrl", e.target.value)}
-              />
-              <small>
-                Upload your video to YouTube, set it to Public or Unlisted, and
-                paste the link. Keep it to 60 seconds and make sure judges can
-                watch without requesting access.
-              </small>
-            </label>
-            <label className="field">
-              <span>Live project / website link (optional)</span>
-              <input
-                name="demoUrl"
-                type="url"
-                maxLength={2000}
-                value={form.demoUrl}
-                onChange={(e) => update("demoUrl", e.target.value)}
-              />
-              <small>
-                For a physical project, you may link a short demonstration of
-                your robot in action.
-              </small>
-            </label>
+            {!hillClimb && (
+              <label className="field">
+                <span>
+                  60-second demo video link
+                  {makerMods ? " *" : " (optional)"}
+                </span>
+                <input
+                  name="demoVideoUrl"
+                  type="url"
+                  maxLength={2000}
+                  required={makerMods}
+                  value={form.demoVideoUrl}
+                  onChange={(e) => update("demoVideoUrl", e.target.value)}
+                />
+                <small>
+                  Upload your video to YouTube, set it to Public or Unlisted,
+                  and paste the link. Keep it to 60 seconds and make sure judges
+                  can watch without requesting access.
+                </small>
+              </label>
+            )}
+            {!hillClimb && (
+              <label className="field">
+                <span>Live project / website link (optional)</span>
+                <input
+                  name="demoUrl"
+                  type="url"
+                  maxLength={2000}
+                  value={form.demoUrl}
+                  onChange={(e) => update("demoUrl", e.target.value)}
+                />
+                <small>
+                  For a physical project, you may link a short demonstration of
+                  your robot in action.
+                </small>
+              </label>
+            )}
             <label className="field">
               <span>Team photo link (optional)</span>
               <input
@@ -493,29 +537,33 @@ export function SubmissionForm({
                 requesting access.
               </small>
             </label>
-            <label className="field">
-              <span>GitHub repository link (optional, preferred)</span>
-              <input
-                name="repositoryUrl"
-                type="url"
-                maxLength={2000}
-                value={form.repositoryUrl}
-                onChange={(e) => update("repositoryUrl", e.target.value)}
-              />
-            </label>
-            <details>
-              <summary>Project image (optional)</summary>
-              <label className="field" style={{ marginTop: 12 }}>
-                <span>Project image URL</span>
+            {!hillClimb && (
+              <label className="field">
+                <span>GitHub repository link (optional, preferred)</span>
                 <input
-                  name="previewImageUrl"
+                  name="repositoryUrl"
                   type="url"
                   maxLength={2000}
-                  value={form.previewImageUrl}
-                  onChange={(e) => update("previewImageUrl", e.target.value)}
+                  value={form.repositoryUrl}
+                  onChange={(e) => update("repositoryUrl", e.target.value)}
                 />
               </label>
-            </details>
+            )}
+            {!hillClimb && (
+              <details>
+                <summary>Project image (optional)</summary>
+                <label className="field" style={{ marginTop: 12 }}>
+                  <span>Project image URL</span>
+                  <input
+                    name="previewImageUrl"
+                    type="url"
+                    maxLength={2000}
+                    value={form.previewImageUrl}
+                    onChange={(e) => update("previewImageUrl", e.target.value)}
+                  />
+                </label>
+              </details>
+            )}
           </fieldset>
           <button className="primary-button" type="submit" disabled={busy}>
             {busy

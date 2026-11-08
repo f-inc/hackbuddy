@@ -118,10 +118,18 @@ async function run() {
       409,
     );
     assert.equal((await post({ ...input, id: receipt })).status, 400);
-    const creative = answers({ track: "" });
-    assert.equal((await post(creative)).status, 201);
-    assert.equal((await post(answers({ track: "Hill Climb" }))).status, 400);
-    assert.equal((await post(answers({ track: "", demoVideoUrl: "" }))).status, 400);
+    const hill = answers({
+      track: "Hill Climb",
+      oneLiner: "",
+      demoVideoUrl: "",
+      progressOutline: "",
+      description: "Collected 120 episodes and trained for 5000 steps.",
+    });
+    assert.equal((await post(hill)).status, 201);
+    assert.equal(
+      (await post(answers({ track: "", demoVideoUrl: "" }))).status,
+      400,
+    );
     const concurrent = Array.from({ length: 8 }, (_, i) =>
       answers({ projectName: "TEST ONLY — Concurrent " + i }),
     );
@@ -139,7 +147,27 @@ async function run() {
       )
     ).rows[0];
     assert.equal(row.data.submissions.length, 10);
-    assert.ok(row.data.submissions.every((project) => project.track === "Creative Applications"));
+    assert.equal(
+      row.data.submissions.filter(
+        (project) => project.track === "Creative Applications",
+      ).length,
+      9,
+    );
+    const hillProject = row.data.submissions.find(
+      (project) => project.id === hill.requestId,
+    );
+    assert.equal(hillProject.track, "Hill Climb");
+    assert.equal(hillProject.description, hill.description);
+    assert.equal(hillProject.teamPhotoUrl, hill.teamPhotoUrl);
+    assert.deepEqual(hillProject.toolsUsed, [
+      "Dream-1",
+      "LiveKit",
+      "Dimensional",
+      "Python",
+      "ROS 2",
+    ]);
+    for (const key of ["oneLiner", "demoVideoUrl", "progressOutline"])
+      assert.equal(hillProject[key], "");
     const project = row.data.submissions.find((s) => s.id === receipt);
     for (const key of [
       "projectName",
@@ -198,7 +226,7 @@ async function run() {
     const before = (await readEvent(eventId)).data.submissions.length;
     assert.equal(before, 10);
     console.log(
-      "Submission HTTP + Supabase checks passed: Creative Applications only, 10 persisted projects, 8 concurrent writes, retries, validation, origin checks, private contacts, closed events. Every form field matched the database.",
+      "Submission HTTP + Supabase checks passed: both dynamic tracks, 10 persisted projects, 8 concurrent writes, retries, validation, origin checks, private contacts, closed events. Every form field matched the database.",
     );
   } finally {
     await pool.query(

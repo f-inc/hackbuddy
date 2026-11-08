@@ -15,10 +15,20 @@ image links rather than the old Tally attachment upload. Videos remain link-only
 with instructions for a Public or Unlisted YouTube video of at most 60 seconds.
 Video length and remote-link accessibility cannot be verified automatically.
 
-All MakerMods submissions are Creative Applications. There is no track selector,
-and a demo video link is required. The server sets the track automatically and
-rejects requests for other tracks. Tools are multiselect Dream-1, LiveKit and Dimensional, with an optional free-text list of other tools. The event has one
-Creative Applications collection and uses HackBuddy's existing judging workflow.
+The same form has a track selector, defaulting to Creative Applications for
+compatibility with existing drafts and clients. Creative Applications keeps its
+one-liner, project description, hackathon progress and required demo video.
+
+Hill Climb is evaluated in person. It keeps team/project names, team number,
+builders, contact email, the same tools and team photo. Its required description
+asks how the base model was improved, with episodes collected and training steps
+as examples. It hides the one-liner, progress, demo video, website, repository and
+project-image inputs. Switching tracks preserves unsent draft answers, but the
+server discards creative-only fields when saving a Hill Climb project. No new
+Hill Climb evaluation or leaderboard is implemented by this form change.
+
+Tools are multiselect Dream-1, LiveKit and Dimensional, with an optional free-text
+list of other tools. Existing project records are unchanged.
 
 Required answers, field lengths, URL protocols, the event track and email syntax are
 validated on the server. Browser drafts recover after reload. A request token is
@@ -35,7 +45,7 @@ Drafts are local to the browser and event, not shared across devices.
   event isolation, closure and publication locks.
 - `npm run test:submissions`: requires the local app on port 3010, configured
   Supabase and local judge/admin credentials. It creates a uniquely named QA
-  event, makes real HTTP submissions for Creative Applications (including concurrent
+  event, makes real HTTP submissions for both tracks (including concurrent
   writes), queries Supabase to verify every mapped answer, checks contact
   privacy and closure, and deletes only that QA event in a finally block.
   Never targets the public production URL.
