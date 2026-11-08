@@ -41,6 +41,8 @@ export function submissionFields(
       "Enter a project name, team, builders and valid contact email.",
     );
   const teamNumber = text("teamNumber", 10);
+  if (template === MAKERMODS_FORM && !teamNumber)
+    throw new ValidationError("Enter your team number.");
   if (teamNumber && !/^[0-9]{1,10}$/.test(teamNumber))
     throw new ValidationError(
       "Team number must contain digits only (up to 10).",

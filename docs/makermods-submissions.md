@@ -8,7 +8,7 @@ In the Hackathons editor its submission template is **MakerMods Physical AI**.
 Changing event settings preserves that template.
 
 The form recreates the previous Night Hack submission questions for this event:
-optional team number (first input), project/team names, builder names, organizer-only contact email, a 50-character
+required team number (first input for both tracks), project/team names, builder names, organizer-only contact email, a 50-character
 one-liner, description, progress outline, tools, demo video, project link,
 team photo link, repository, and optional project image. Team photos use direct
 image links rather than the old Tally attachment upload. Videos remain link-only,

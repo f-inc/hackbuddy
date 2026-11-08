@@ -296,10 +296,11 @@ export function SubmissionForm({
           >
             <label className="field">
               <span>
-                Team number <small>Optional</small>
+                Team number {makerMods ? "*" : <small>Optional</small>}
               </span>
               <input
                 name="teamNumber"
+                required={makerMods}
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]{1,10}"
