@@ -40,6 +40,7 @@ type SubmissionDetailData = Pick<
   | "liveDemoUrl"
   | "projectName"
   | "teamName"
+  | "teamNumber"
   | "repositoryUrl"
   | "demoType"
   | "demoUrl"
@@ -179,6 +180,11 @@ export function SubmissionDetails({ submission }: { submission: SubmissionDetail
         </section>
 
         <section className="submission-details">
+          {submission.teamNumber && (
+            <div className="detail-item">
+              <div><span>Team number</span><p>{submission.teamNumber}</p></div>
+            </div>
+          )}
           <div className="detail-item builders">
             {submission.teamPhotoUrl ? (
               <button

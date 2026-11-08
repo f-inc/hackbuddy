@@ -22,6 +22,7 @@ function answers(overrides = {}) {
     requestId: randomUUID(),
     projectName: "TEST ONLY — Robot helper",
     teamName: "TEST ONLY — Builders",
+    teamNumber: "007",
     submitterNames: "Test Alex, Test Sam, Test Jo",
     contactEmail: "submission-test@example.com",
     oneLiner: "A voice-controlled sorting robot",
@@ -30,7 +31,7 @@ function answers(overrides = {}) {
     progressOutline:
       "1. Collected demonstrations. 2. Integrated voice. 3. Tested recovery.",
     track: "Creative Applications",
-    toolsUsed: "MakerMods, Dream Labs, LiveKit, Python, ROS 2",
+    toolsUsed: "Dream-1, LiveKit, Dimensional, Python, ROS 2",
     demoVideoUrl: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
     demoUrl: "https://example.com/demo",
     repositoryUrl: "https://github.com/example/robot",
@@ -143,6 +144,7 @@ async function run() {
     for (const key of [
       "projectName",
       "teamName",
+      "teamNumber",
       "submitterNames",
       "contactEmail",
       "oneLiner",
@@ -156,9 +158,9 @@ async function run() {
     ])
       assert.equal(project[key], input[key], key + " round-trip");
     assert.deepEqual(project.toolsUsed, [
-      "MakerMods",
-      "Dream Labs",
+      "Dream-1",
       "LiveKit",
+      "Dimensional",
       "Python",
       "ROS 2",
     ]);

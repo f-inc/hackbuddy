@@ -38,7 +38,11 @@ export function submissionFields(
     throw new ValidationError(
       "Enter a project name, team, builders and valid contact email.",
     );
+  const teamNumber = text("teamNumber", 10);
+  if (teamNumber && !/^[0-9]{1,10}$/.test(teamNumber))
+    throw new ValidationError("Team number must contain digits only (up to 10).");
   const fields = {
+    teamNumber,
     projectName,
     teamName,
     submitterNames,
