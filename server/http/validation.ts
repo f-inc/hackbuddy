@@ -218,6 +218,11 @@ export function parseUpdateHackathonRequest(value: unknown) {
 export function parseEventSettings(value: unknown): EventSettings {
   const body = record(value, "Settings must be an object.");
   const defaults = eventSettings();
+  if (
+    body.submissionForm !== undefined &&
+    body.submissionForm !== "standard" &&
+    body.submissionForm !== "makermods-physical-ai"
+  ) throw new ValidationError("Invalid submission form template.");
   const whole = (key: string, min: number, max: number) => {
     const n = Number(body[key] ?? defaults[key as keyof EventSettings]);
     if (!Number.isInteger(n) || n < min || n > max)
@@ -259,6 +264,9 @@ export function parseEventSettings(value: unknown): EventSettings {
     throw new ValidationError("Sponsor IDs must be unique.");
   return {
     ...(body.sponsors === undefined ? {} : { sponsors }),
+    ...(body.submissionForm === undefined
+      ? {}
+      : { submissionForm: body.submissionForm as EventSettings["submissionForm"] }),
     requiredReviews: whole("requiredReviews", 1, 20),
     finalistCount: whole("finalistCount", 5, 20),
     scoreMax,

@@ -14,6 +14,7 @@ export default async function SubmitPage({
   if (!event || event.storage !== "database") notFound();
   return (
     <SubmissionForm
+      key={`${event.id}:${id || ""}`}
       id={id}
       slug={event.slug}
       name={event.name}

@@ -9,6 +9,7 @@ export type Collection = {
 };
 export type Sponsor = { id: string; name: string; logo: string };
 export type EventSettings = {
+  submissionForm?: import("./submission-form").SubmissionFormTemplate;
   requiredReviews: number;
   finalistCount: number;
   scoreMax: 5 | 10;
@@ -35,6 +36,7 @@ export function matchesCollection(
       (project.toolsUsed || []).some(
         (tool) => tool.toLowerCase() === collection.tool.toLowerCase(),
       )) &&
-    (!collection.track || project.track.toLowerCase() === collection.track.toLowerCase())
+    (!collection.track ||
+      project.track.toLowerCase() === collection.track.toLowerCase())
   );
 }
