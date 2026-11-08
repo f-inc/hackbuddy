@@ -41,6 +41,8 @@ export function submissionFields(
       "Enter a project name, team, builders and valid contact email.",
     );
   const teamNumber = text("teamNumber", 10);
+  if (template === MAKERMODS_FORM && !teamNumber)
+    throw new ValidationError("Enter your team number.");
   if (teamNumber && !/^[0-9]{1,10}$/.test(teamNumber))
     throw new ValidationError(
       "Team number must contain digits only (up to 10).",
@@ -78,8 +80,10 @@ export function submissionFields(
     teamPhotoUrl: safeUrl(value.teamPhotoUrl),
     demoUrl: hillClimb ? "" : safeUrl(value.demoUrl),
     demoVideoUrl: hillClimb ? "" : safeUrl(value.demoVideoUrl),
-    repositoryUrl: hillClimb ? "" : safeUrl(value.repositoryUrl),
+    repositoryUrl: safeUrl(value.repositoryUrl),
   };
+  if (template === MAKERMODS_FORM && !fields.repositoryUrl)
+    throw new ValidationError("Add your GitHub repository link.");
   if (!fields.description)
     throw new ValidationError(
       hillClimb

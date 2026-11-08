@@ -36,6 +36,7 @@ function answers(overrides = {}) {
     track: "Creative Applications",
     toolsUsed: "Dream-1, LiveKit, Dimensional, LiveKit",
     demoVideoUrl: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+    repositoryUrl: "https://github.com/example/robot",
     ...overrides,
   };
 }
@@ -214,7 +215,7 @@ test("event settings preserve template through editing and reject unknown templa
   assert.equal(parseEventSettings({}).submissionForm, undefined);
 });
 
-test("team numbers preserve leading zeros, remain optional for existing clients, and cannot change under a used token", async () => {
+test("team numbers preserve leading zeros, are required for both MakerMods tracks, and cannot change under a used token", async () => {
   const event = await fixture(),
     input = answers({ teamNumber: "007" });
   const id = await saveProject(event, input);
@@ -222,8 +223,12 @@ test("team numbers preserve leading zeros, remain optional for existing clients,
   await assert.rejects(saveProject(event, { ...input, teamNumber: "008" }), {
     status: 409,
   });
-  await saveProject(event, answers({ teamNumber: undefined }));
-  assert.equal((await readEvent(event)).data.submissions[1].teamNumber, "");
+  for (const track of ["Creative Applications", "Hill Climb"]) {
+    for (const teamNumber of [undefined, "", "   "]) {
+      await assert.rejects(saveProject(event, answers({ track, teamNumber })), { status: 400 });
+    }
+  }
+  assert.equal((await readEvent(event)).data.submissions.length, 1);
   await saveProject(event, { ...input, id, teamNumber: "008" }, true);
   assert.equal((await readEvent(event)).data.submissions[0].teamNumber, "008");
 });
@@ -263,7 +268,6 @@ test("switching a draft to Hill Climb discards hidden creative answers on the se
     progressOutline: "Hidden progress",
     demoVideoUrl: "invalid hidden URL",
     demoUrl: "invalid hidden URL",
-    repositoryUrl: "invalid hidden URL",
     previewImageUrl: "invalid hidden URL",
   });
   const id = await saveProject(event, input);
@@ -273,7 +277,6 @@ test("switching a draft to Hill Climb discards hidden creative answers on the se
     "progressOutline",
     "demoVideoUrl",
     "demoUrl",
-    "repositoryUrl",
     "previewImageUrl",
   ])
     assert.equal(project[key], "");
@@ -282,4 +285,21 @@ test("switching a draft to Hill Climb discards hidden creative answers on the se
     saveProject(event, answers({ requestId: input.requestId })),
     { status: 409 },
   );
+});
+
+test("standard events keep accepting submissions without a team number", async () => {
+  const event = await fixture({ submissionForm: "standard" });
+  const id = await saveProject(event, answers({ teamNumber: undefined, repositoryUrl: undefined }));
+  assert.equal((await readEvent(event)).data.submissions.find((s) => s.id === id).teamNumber, "");
+});
+
+test("GitHub repository links are required and retained for both MakerMods tracks", async () => {
+  const event = await fixture();
+  for (const track of ["Creative Applications", "Hill Climb"]) {
+    for (const repositoryUrl of [undefined, "", "   "])
+      await assert.rejects(saveProject(event, answers({ track, repositoryUrl })), { status: 400 });
+    const input = answers({ track, repositoryUrl: "https://github.com/example/robot" });
+    const id = await saveProject(event, input);
+    assert.equal((await readEvent(event)).data.submissions.find((s) => s.id === id).repositoryUrl, input.repositoryUrl);
+  }
 });
