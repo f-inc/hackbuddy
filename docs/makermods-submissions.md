@@ -9,19 +9,19 @@ Changing event settings preserves that template.
 
 The form recreates the previous Night Hack submission questions for this event:
 project/team names, builder names, organizer-only contact email, a 50-character
-one-liner, description, progress outline, track, tools, demo video, project link,
+one-liner, description, progress outline, tools, demo video, project link,
 team photo link, repository, and optional project image. Team photos use direct
 image links rather than the old Tally attachment upload. Videos remain link-only,
 with instructions for a Public or Unlisted YouTube video of at most 60 seconds.
 Video length and remote-link accessibility cannot be verified automatically.
 
-Tracks are Hill Climb and Creative Applications. The latter requires a demo
-video link; Hill Climb does not. Tools are multiselect MakerMods, Dream Labs and
-LiveKit, with an optional free-text list of other tools. These are submission
-categories; this change does not implement the external Hill Climb evaluation
-leaderboard or replace the creative judging rubric.
+All MakerMods submissions are Creative Applications. There is no track selector,
+and a demo video link is required. The server sets the track automatically and
+rejects requests for other tracks. Tools are multiselect MakerMods, Dream Labs
+and LiveKit, with an optional free-text list of other tools. The event has one
+Creative Applications collection and uses HackBuddy's existing judging workflow.
 
-Required answers, field lengths, URL protocols, track names and email syntax are
+Required answers, field lengths, URL protocols, the event track and email syntax are
 validated on the server. Browser drafts recover after reload. A request token is
 saved with the draft before sending; a lost response can be retried after reload
 without creating another project. Answers are held while receipt is uncertain.
@@ -36,7 +36,7 @@ Drafts are local to the browser and event, not shared across devices.
   event isolation, closure and publication locks.
 - `npm run test:submissions`: requires the local app on port 3010, configured
   Supabase and local judge/admin credentials. It creates a uniquely named QA
-  event, makes real HTTP submissions for both tracks (including concurrent
+  event, makes real HTTP submissions for Creative Applications (including concurrent
   writes), queries Supabase to verify every mapped answer, checks contact
   privacy and closure, and deletes only that QA event in a finally block.
   Never targets the public production URL.

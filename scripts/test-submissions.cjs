@@ -117,8 +117,10 @@ async function run() {
       409,
     );
     assert.equal((await post({ ...input, id: receipt })).status, 400);
-    const hill = answers({ track: "Hill Climb", demoVideoUrl: "" });
-    assert.equal((await post(hill)).status, 201);
+    const creative = answers({ track: "" });
+    assert.equal((await post(creative)).status, 201);
+    assert.equal((await post(answers({ track: "Hill Climb" }))).status, 400);
+    assert.equal((await post(answers({ track: "", demoVideoUrl: "" }))).status, 400);
     const concurrent = Array.from({ length: 8 }, (_, i) =>
       answers({ projectName: "TEST ONLY — Concurrent " + i }),
     );
@@ -136,6 +138,7 @@ async function run() {
       )
     ).rows[0];
     assert.equal(row.data.submissions.length, 10);
+    assert.ok(row.data.submissions.every((project) => project.track === "Creative Applications"));
     const project = row.data.submissions.find((s) => s.id === receipt);
     for (const key of [
       "projectName",
@@ -193,7 +196,7 @@ async function run() {
     const before = (await readEvent(eventId)).data.submissions.length;
     assert.equal(before, 10);
     console.log(
-      "Submission HTTP + Supabase checks passed: both tracks, 10 persisted projects, 8 concurrent writes, retries, validation, origin checks, private contacts, closed events. Every form field matched the database.",
+      "Submission HTTP + Supabase checks passed: Creative Applications only, 10 persisted projects, 8 concurrent writes, retries, validation, origin checks, private contacts, closed events. Every form field matched the database.",
     );
   } finally {
     await pool.query(

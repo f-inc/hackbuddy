@@ -3,7 +3,7 @@ import { changeEvent } from "@/infrastructure/database/events";
 import type { Submission } from "@/domain/submission";
 import {
   MAKERMODS_FORM,
-  MAKERMODS_TRACKS,
+  MAKERMODS_TRACK,
   SUBMISSION_REQUEST_ID,
   type SubmissionFormTemplate,
 } from "@/domain/submission-form";
@@ -43,7 +43,7 @@ export function submissionFields(
     teamName,
     submitterNames,
     contactEmail,
-    track: text("track", 100),
+    track: template === MAKERMODS_FORM ? MAKERMODS_TRACK : text("track", 100),
     toolsUsed: [
       ...new Set(
         text("toolsUsed", 1000)
@@ -64,13 +64,13 @@ export function submissionFields(
   if (!fields.description)
     throw new ValidationError("Describe what you built.");
   if (template === MAKERMODS_FORM) {
-    if (!MAKERMODS_TRACKS.some((track) => track === fields.track))
-      throw new ValidationError("Select Hill Climb or Creative Applications.");
+    if (text("track", 100) && text("track", 100) !== MAKERMODS_TRACK)
+      throw new ValidationError("This event accepts Creative Applications submissions only.");
     if (!fields.oneLiner || !fields.progressOutline)
       throw new ValidationError(
         "Add a one-line description and your progress during the hackathon.",
       );
-    if (fields.track === "Creative Applications" && !fields.demoVideoUrl)
+    if (!fields.demoVideoUrl)
       throw new ValidationError(
         "Add a demo video link for Creative Applications.",
       );
