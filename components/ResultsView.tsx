@@ -583,8 +583,9 @@ export function ResultsView({
             <div>
               <h2>Awaiting reviews</h2>
               <p>
-                Open any submission to view its project details. Rankings appear when reviews are
-                complete.
+                {JUDGING_POLICY.creative && !publishedAt
+                  ? "Provisional averages use submitted reviews so far. Completed rankings appear when the review target is met."
+                  : "Open any submission to view its project details. Rankings appear when reviews are complete."}
               </p>
             </div>
           </div>
@@ -597,6 +598,7 @@ export function ResultsView({
                     <th>Builders</th>
                     <th>Status</th>
                     <th>Reviews</th>
+                    {JUDGING_POLICY.creative && !publishedAt && <th>Provisional average /100</th>}
                     <th>Submission</th>
                   </tr>
                 </thead>
@@ -637,6 +639,10 @@ export function ResultsView({
                       <td>
                         {submission.reviewCount}/{JUDGING_POLICY.preliminary.requiredReviews}
                       </td>
+                      {JUDGING_POLICY.creative && !publishedAt && <td>
+                        <span className="result-total">{submission.provisionalScore == null ? "—" : submission.provisionalScore.toFixed(2)}</span>
+                        {submission.provisionalScore != null && <div className="field-hint">Provisional</div>}
+                      </td>}
                       <td>
                         <button
                           type="button"

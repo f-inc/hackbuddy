@@ -42,7 +42,7 @@ const repository: SubmissionRepositoryProvider = () => {
 };
 const queue = new QueueService(repository);
 const dashboard = new DashboardQuery(repository, currentEventSettings);
-const results = new ResultsQuery(repository);
+const results = new ResultsQuery(repository, currentEventSettings);
 const judged = new JudgedProjectsQuery(repository, currentEventSettings);
 const finals = new FinalsService(repository, currentEventSettings);
 const admin = new AdminSubmissionService(repository);
