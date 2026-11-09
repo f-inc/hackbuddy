@@ -174,16 +174,21 @@ export function ResultsView({
   }
 
   const summary = useMemo(() => {
-    const total = results.reduce((sum, result) => sum + result.totalScore, 0);
+    const scores = [...results.map(result => result.totalScore),
+      ...(JUDGING_POLICY.creative && !publishedAt
+        ? pendingSubmissions.flatMap(result => result.provisionalScore == null ? [] : [result.provisionalScore]) : [])];
+    const total = scores.reduce((sum, score) => sum + score, 0);
     const judges = new Set(
       results.flatMap((result) => result.reviews.map((review) => review.judgeName)),
     );
     return {
-      average: results.length ? Math.round((total / results.length) * 10) / 10 : 0,
+      average: scores.length ? Math.round((total / scores.length) * 100) / 100 : 0,
+      scoredProjects: scores.length,
+      submittedReviews: results.reduce((sum, result) => sum + result.reviews.length, 0) + pendingSubmissions.reduce((sum, result) => sum + result.reviewCount, 0),
       judges: judges.size,
-      highest: Math.max(0, ...results.map((result) => result.totalScore)),
+      highest: Math.max(0, ...scores),
     };
-  }, [results]);
+  }, [results, pendingSubmissions, JUDGING_POLICY.creative, publishedAt]);
 
   const query = search.trim().toLocaleLowerCase();
   function matchesSearch(
@@ -240,7 +245,7 @@ export function ResultsView({
         <section className="results-summary" aria-label="Results summary">
           <article className="card">
             <span>Scored projects</span>
-            <strong>{results.length}</strong>
+            <strong>{summary.scoredProjects}</strong>
           </article>
           <article className="card">
             <span>Average raw score</span>
@@ -257,8 +262,8 @@ export function ResultsView({
             </strong>
           </article>
           <article className="card">
-            <span>Judges represented</span>
-            <strong>{summary.judges}</strong>
+            <span>{JUDGING_POLICY.creative && !publishedAt ? "Submitted reviews" : "Judges represented"}</span>
+            <strong>{JUDGING_POLICY.creative && !publishedAt ? summary.submittedReviews : summary.judges}</strong>
           </article>
         </section>
 
@@ -583,8 +588,9 @@ export function ResultsView({
             <div>
               <h2>Awaiting reviews</h2>
               <p>
-                Open any submission to view its project details. Rankings appear when reviews are
-                complete.
+                {JUDGING_POLICY.creative && !publishedAt
+                  ? "Provisional averages use submitted reviews so far. Completed rankings appear when the review target is met."
+                  : "Open any submission to view its project details. Rankings appear when reviews are complete."}
               </p>
             </div>
           </div>
@@ -597,6 +603,7 @@ export function ResultsView({
                     <th>Builders</th>
                     <th>Status</th>
                     <th>Reviews</th>
+                    {JUDGING_POLICY.creative && !publishedAt && <th>Provisional average /100</th>}
                     <th>Submission</th>
                   </tr>
                 </thead>
@@ -637,6 +644,10 @@ export function ResultsView({
                       <td>
                         {submission.reviewCount}/{JUDGING_POLICY.preliminary.requiredReviews}
                       </td>
+                      {JUDGING_POLICY.creative && !publishedAt && <td>
+                        <span className="result-total">{submission.provisionalScore == null ? "—" : submission.provisionalScore.toFixed(2)}</span>
+                        {submission.provisionalScore != null && <div className="field-hint">Provisional</div>}
+                      </td>}
                       <td>
                         <button
                           type="button"

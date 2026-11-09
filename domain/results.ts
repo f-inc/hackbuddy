@@ -23,7 +23,7 @@ export type ResultEntry = {
 export type PendingResultEntry = Pick<
   Submission,
   "id" | "projectName" | "teamName" | "oneLiner" | "submitterNames" | "track" | "status"
-> & { reviewCount: number };
+> & { reviewCount: number; provisionalScore?: number | null };
 
 export type FinalistEntry = ResultEntry & {
   votePoints?: number;

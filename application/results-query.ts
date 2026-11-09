@@ -1,3 +1,6 @@
+import { provisionalAverage } from "@/domain/live-scores";
+import { creativeScoring } from "@/domain/creative-rubric";
+import { DEFAULT_EVENT_SETTINGS, type EventSettings } from "@/domain/event-settings";
 import type { ScoringPolicy } from "@/domain/event-scoring";
 import type { PublishedResults } from "@/domain/publication";
 import type { Submission } from "@/domain/submission";
@@ -7,7 +10,10 @@ import type { ResultEntry } from "@/lib/types";
 import type { PendingResultEntry } from "@/domain/results";
 
 export class ResultsQuery {
-  constructor(private readonly repository: SubmissionRepositoryProvider) {}
+  constructor(
+    private readonly repository: SubmissionRepositoryProvider,
+    private readonly settings: () => EventSettings = () => DEFAULT_EVENT_SETTINGS,
+  ) {}
 
   async execute(policy: ScoringPolicy = "raw-v1"): Promise<ResultEntry[]> {
     return (await this.report(policy)).results;
@@ -44,6 +50,8 @@ export class ResultsQuery {
         track: submission.track,
         status: submission.status,
         reviewCount: submission.reviews.length,
+        ...(!publication && creativeScoring(this.settings())
+          ? { provisionalScore: provisionalAverage(submission) } : {}),
       }))
       .sort((a, b) => a.projectName.localeCompare(b.projectName));
     if (publication)

@@ -1,3 +1,4 @@
+import { liveCreativeScores } from "@/domain/live-scores";
 import { creativeScoring } from "@/domain/creative-rubric";
 import { DEFAULT_EVENT_SETTINGS, type EventSettings } from "@/domain/event-settings";
 import type { ScoringPolicy } from "@/domain/event-scoring";
@@ -58,6 +59,8 @@ export class DashboardQuery {
   ) {
     const submissions = await this.repository().list();
     const completed = submissions.filter((submission) => submission.status === "completed");
+    const scoreSources = !publication && creativeScoring(this.settings())
+      ? submissions.filter(s => s.reviews.length > 0) : completed;
     const ranked =
       publication?.results ??
       (policy === "raw-v1"
@@ -104,9 +107,11 @@ export class DashboardQuery {
       publishedAt: publication?.publishedAt ?? "",
       stats: queueStats(submissions),
       leaderboard,
+      liveScores: !publication && creativeScoring(this.settings())
+        ? liveCreativeScores(submissions, this.settings().requiredReviews) : [],
       activeSessions,
       scoreDistribution: scoreDistribution(
-        publication?.results ?? completed,
+        publication?.results ?? scoreSources,
         this.settings().scoreMax,
         creativeScoring(this.settings()),
       ),
@@ -115,7 +120,7 @@ export class DashboardQuery {
         (submission) => submission.status === "in progress" && submission.claimedBy === judgeName,
       ),
       averageScore: average(
-        (publication?.results ?? completed).flatMap((submission) =>
+        (publication?.results ?? scoreSources).flatMap((submission) =>
           submission.reviews.map((review) => review.totalScore),
         ),
       ),

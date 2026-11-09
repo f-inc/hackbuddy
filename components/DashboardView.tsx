@@ -1,4 +1,6 @@
 "use client";
+import { LiveCreativeScores } from "./LiveCreativeScores";
+import type { LiveCreativeScore } from "@/domain/live-scores";
 import { useJudgingPolicy } from "./EventConfig";
 
 import { formatNormalizedScore } from "@/domain/normalization";
@@ -18,6 +20,7 @@ type DashboardData = {
   publishedAt: string;
   stats: QueueStats;
   leaderboard: LeaderboardEntry[];
+  liveScores: LiveCreativeScore[];
   activeSessions: ActiveSession[];
   scoreDistribution: ScoreDistributionBucket[];
   averageScore: number;
@@ -34,6 +37,7 @@ const emptyData: DashboardData = {
   publishedAt: "",
   stats: { total: 0, available: 0, inProgress: 0, completed: 0 },
   leaderboard: [],
+  liveScores: [],
   activeSessions: [],
   scoreDistribution: [],
   averageScore: 0,
@@ -183,6 +187,10 @@ export function DashboardView({
 
         {error && <div className="error-banner page-error">{error}</div>}
 
+        {JUDGING_POLICY.creative && !data.publishedAt && (
+          <LiveCreativeScores scores={data.liveScores || []} />
+        )}
+
         {role === "admin" ? (
           <>
             <section className="score-overview card">
@@ -197,7 +205,7 @@ export function DashboardView({
                 </div>
                 <p>
                   {scoredSubmissionCount
-                    ? `Across ${scoredSubmissionCount} completed ${
+                    ? `Across ${scoredSubmissionCount} ${JUDGING_POLICY.creative && !data.publishedAt ? "scored" : "completed"} ${
                         scoredSubmissionCount === 1 ? "submission" : "submissions"
                       }`
                     : "Scores will appear as reviews are completed"}
@@ -241,9 +249,10 @@ export function DashboardView({
               <article className="metric-card card">
                 <span>Completed reviews</span>
                 <div>
-                  <strong>{scoredSubmissionCount}</strong>
+                  <strong>{JUDGING_POLICY.creative && !data.publishedAt
+                    ? (data.liveScores || []).reduce((sum, score) => sum + score.reviewCount, 0) : scoredSubmissionCount}</strong>
                 </div>
-                <p>Scores included in the distribution</p>
+                <p>{JUDGING_POLICY.creative && !data.publishedAt ? "Submitted judge scorecards" : "Scores included in the distribution"}</p>
               </article>
               <article className="metric-card card">
                 <span>Collective queue progress</span>
@@ -359,8 +368,8 @@ export function DashboardView({
                 ) : (
                   <div className="panel-empty compact">
                     <span>—</span>
-                    <h3>No scores yet</h3>
-                    <p>Scores appear after the first completed review.</p>
+                    <h3>{JUDGING_POLICY.creative ? "No completed projects yet" : "No scores yet"}</h3>
+                    <p>{JUDGING_POLICY.creative ? "See provisional scores and review progress above." : "Scores appear after the first completed review."}</p>
                   </div>
                 )}
               </article>
