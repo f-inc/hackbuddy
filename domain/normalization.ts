@@ -102,6 +102,9 @@ export function createNormalizer(reviewGroups: SubmissionReview[][]) {
 
   function score(reviews: SubmissionReview[]) {
     if (!reviews.length) return 0;
+    // The MakerMods rubric uses its explicit weighted total, without judge calibration.
+    if (reviews.some((review) => review.creative))
+      return reviews.reduce((sum, review) => sum + review.totalScore, 0) / reviews.length;
     const total = reviews.reduce((sum, review) => {
       const judge = stats.get(judgeKey(review.judgeName));
       if (!judge || judge.reviewCount < 2) return sum;

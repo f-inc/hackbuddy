@@ -3,6 +3,8 @@ import { useManagedEvent, useJudgingPolicy, useEventSettings } from "./EventConf
 import { MAKERMODS_FORM } from "@/domain/submission-form";
 import "./creative-rubric.css";
 
+import { CREATIVE_RUBRIC, EMPTY_CREATIVE, creativeError, creativeTotal, type CreativeScores } from "@/domain/creative-rubric";
+import { CreativeScoreFields } from "./CreativeScoreFields";
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { ScoreControl } from "@/components/ScoreControl";
@@ -46,7 +48,7 @@ export function JudgingView({
   const managed = useManagedEvent();
   const makerMods = useEventSettings().submissionForm === MAKERMODS_FORM;
   const JUDGING_POLICY = useJudgingPolicy();
-  const RUBRIC_SCORE_MAX = 3 * JUDGING_POLICY.score.max;
+  const RUBRIC_SCORE_MAX = JUDGING_POLICY.reviewMax;
 
   const apiBase = hackathon ? `/api/hackathons/${hackathon}` : "/api";
   const pageBase = hackathon ? `/${hackathon}` : "";
@@ -62,6 +64,7 @@ export function JudgingView({
   const [progress, setProgress] = useState(0);
   const [practicality, setPracticality] = useState(0);
   const [complexity, setComplexity] = useState(0);
+  const [creative, setCreative] = useState<CreativeScores>({ ...EMPTY_CREATIVE });
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -98,6 +101,7 @@ export function JudgingView({
           if (saved && (!draft || saved.updatedAt > draft.updatedAt)) draft = saved;
         } catch {}
       }
+      setCreative(draft?.scores.creative || { ...EMPTY_CREATIVE });
       setProgress(draft?.scores.progress || 0);
       setPracticality(draft?.scores.practicality || 0);
       setComplexity(draft?.scores.complexity || 0);
@@ -118,6 +122,7 @@ export function JudgingView({
     )
       return;
     const scores = {
+      ...(makerMods ? { creative } : {}),
       ...(progress ? { progress } : {}),
       ...(practicality ? { practicality } : {}),
       ...(complexity ? { complexity } : {}),
@@ -168,6 +173,8 @@ export function JudgingView({
     practicality,
     complexity,
     notes,
+    creative,
+    makerMods,
     hackathon,
     name,
     managed,
@@ -254,6 +261,7 @@ export function JudgingView({
         setDemoMode(result.demoMode);
         if (result.existingReview) {
           setEditingFinalReview(true);
+          setCreative(result.existingReview.creative || { ...EMPTY_CREATIVE });
           setProgress(result.existingReview.progressScore);
           setPracticality(result.existingReview.practicalityScore);
           setComplexity(result.existingReview.complexityScore);
@@ -282,6 +290,7 @@ export function JudgingView({
         setDemoMode(result.demoMode);
         if (selectedReviewIndex !== null && result.submission?.reviews[selectedReviewIndex]) {
           const selectedReview = result.submission.reviews[selectedReviewIndex];
+          setCreative(selectedReview.creative || { ...EMPTY_CREATIVE });
           setProgress(selectedReview.progressScore);
           setPracticality(selectedReview.practicalityScore);
           setComplexity(selectedReview.complexityScore);
@@ -326,7 +335,8 @@ export function JudgingView({
               ...(progress ? { progress } : {}),
               ...(practicality ? { practicality } : {}),
               ...(complexity ? { complexity } : {}),
-              notes,
+              ...(makerMods ? { creative } : {}),
+          notes,
             },
           }),
         });
@@ -354,8 +364,8 @@ export function JudgingView({
 
   async function submitScore() {
     if (submitting || skipping) return;
-    if (!submission || !progress || !practicality || !complexity) {
-      setError("Choose a score for all three rubric categories.");
+    if (!submission || (makerMods ? !!creativeError(creative) : (!progress || !practicality || !complexity))) {
+      setError(makerMods ? creativeError(creative) || "Score all five axes." : "Choose a score for all three rubric categories.");
       return;
     }
 
@@ -373,6 +383,7 @@ export function JudgingView({
           progress,
           practicality,
           complexity,
+          ...(makerMods ? { creative } : {}),
           notes,
           skippedIds,
         }),
@@ -430,8 +441,8 @@ export function JudgingView({
   }
 
   async function updateSelectedReview() {
-    if (!submission || !progress || !practicality || !complexity) {
-      setError("Choose a score for all three rubric categories.");
+    if (!submission || (makerMods ? !!creativeError(creative) : (!progress || !practicality || !complexity))) {
+      setError(makerMods ? creativeError(creative) || "Score all five axes." : "Choose a score for all three rubric categories.");
       return;
     }
 
@@ -447,6 +458,7 @@ export function JudgingView({
           progress,
           practicality,
           complexity,
+          ...(makerMods ? { creative } : {}),
           notes,
         }),
       });
@@ -462,8 +474,8 @@ export function JudgingView({
   }
 
   async function submitFinalScore() {
-    if (!submission || !progress || !practicality || !complexity) {
-      setError("Choose a score for all three rubric categories.");
+    if (!submission || (makerMods ? !!creativeError(creative) : (!progress || !practicality || !complexity))) {
+      setError(makerMods ? creativeError(creative) || "Score all five axes." : "Choose a score for all three rubric categories.");
       return;
     }
 
@@ -480,6 +492,7 @@ export function JudgingView({
           progress,
           practicality,
           complexity,
+          ...(makerMods ? { creative } : {}),
           notes,
         }),
       });
@@ -507,7 +520,7 @@ export function JudgingView({
   const total = finalMode
     ? (finalsState?.finalists.length ?? JUDGING_POLICY.finals.finalistCount)
     : (stats?.total ?? 0);
-  const totalScore = progress + practicality + complexity;
+  const totalScore = makerMods ? creativeTotal(creative) : progress + practicality + complexity;
   return (
     <AppShell
       hackathon={hackathon}
@@ -561,13 +574,14 @@ export function JudgingView({
           <section className="creative-rubric card" aria-labelledby="creative-rubric-title">
             <header className="creative-rubric-header">
               <h2 id="creative-rubric-title">Creative Applications rubric</h2>
-              <span>{JUDGING_POLICY.score.min}–{JUDGING_POLICY.score.max} per criterion · {RUBRIC_SCORE_MAX} points per review</span>
+              <span>1–5 per axis · weighted total out of 100</span>
             </header>
+            <p>3-minute robot demo, then 2 minutes of questions. Video demos are capped at 3 for Demo quality. Teams stay at their stations; top 5 present before awards.</p>
             <div className="creative-rubric-grid">
-              {Object.values(RUBRIC).map((criterion) => (
+              {CREATIVE_RUBRIC.map((criterion) => (
                 <div key={criterion.key}>
-                  <h3>{criterion.label}</h3>
-                  <p>{criterion.description}</p>
+                  <h3>{criterion.label} · {criterion.weight}%</h3>
+                  <p>1: {criterion.low} · 3: {criterion.middle} · 5: {criterion.high}</p>
                 </div>
               ))}
             </div>
@@ -709,6 +723,7 @@ export function JudgingView({
                     </div>
                   </header>
 
+                  {makerMods ? <CreativeScoreFields value={creative} onChange={setCreative} /> : <>
                   <ScoreControl
                     max={JUDGING_POLICY.score.max}
                     highAnchor="Exceptional progress tonight"
@@ -733,6 +748,8 @@ export function JudgingView({
                     onChange={setComplexity}
                     value={complexity}
                   />
+
+                  </>}
 
                   <label className="field compact-notes">
                     <span>

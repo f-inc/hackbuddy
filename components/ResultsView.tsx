@@ -2,6 +2,8 @@
 import { useJudgingPolicy } from "./EventConfig";
 
 import { scoringPolicyLabel, type ScoringPolicy } from "@/domain/event-scoring";
+import { CREATIVE_RUBRIC } from "@/domain/creative-rubric";
+import { CreativeBreakdown } from "./CreativeScoreFields";
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SubmissionDetails } from "@/components/SubmissionDetails";
@@ -45,8 +47,8 @@ export function ResultsView({
   hackathonImageUrl?: string;
 }) {
   const JUDGING_POLICY = useJudgingPolicy();
-  const RUBRIC_SCORE_MAX = 3 * JUDGING_POLICY.score.max;
-  const PRELIMINARY_SCORE_MAX = RUBRIC_SCORE_MAX * JUDGING_POLICY.preliminary.requiredReviews;
+  const RUBRIC_SCORE_MAX = JUDGING_POLICY.reviewMax;
+  const PRELIMINARY_SCORE_MAX = (JUDGING_POLICY.creative ? 100 : RUBRIC_SCORE_MAX * JUDGING_POLICY.preliminary.requiredReviews);
 
   const apiBase = hackathon ? `/api/hackathons/${hackathon}` : "/api";
   const pageBase = hackathon ? `/${hackathon}` : "";
@@ -411,10 +413,10 @@ export function ResultsView({
                     )}
                     <th>Builders</th>
                     <th>Judge</th>
-                    <th>{RUBRIC.progress.label}</th>
-                    <th>{RUBRIC.practicality.label}</th>
-                    <th>{RUBRIC.complexity.label}</th>
-                    <th>Raw total</th>
+                    {JUDGING_POLICY.creative ? CREATIVE_RUBRIC.map((axis) => <th key={axis.key}>{axis.label} ({axis.weight}%)</th>) : <>
+                    <th>{RUBRIC.progress.label}</th><th>{RUBRIC.practicality.label}</th><th>{RUBRIC.complexity.label}</th>
+                    </>}
+                    <th>{JUDGING_POLICY.creative ? "Weighted mean /100" : "Raw total"}</th>
                     <th>Completed</th>
                     {role === "admin" && !publishedAt && <th>Admin</th>}
                   </tr>
@@ -505,6 +507,10 @@ export function ResultsView({
                           ))}
                         </div>
                       </td>
+                      {JUDGING_POLICY.creative ? CREATIVE_RUBRIC.map((axis) => {
+                        const reviews = result.reviews.filter((review) => review.creative);
+                        return <td key={axis.key}>{reviews.length ? (reviews.reduce((sum, review) => sum + review.creative![axis.key], 0) / reviews.length).toFixed(1) : "—"} /5</td>;
+                      }) : <>
                       <td>
                         <span className="rubric-score">
                           {result.progressScore}
@@ -529,6 +535,7 @@ export function ResultsView({
                           </small>
                         </span>
                       </td>
+                      </>}
                       <td>
                         <span className="result-total">
                           {result.totalScore}
@@ -767,7 +774,8 @@ export function ResultsView({
                     <small>Review {index + 1}</small>
                     <strong>{review.judgeName || "Unknown judge"}</strong>
                   </span>
-                  <span className="review-picker-breakdown">
+                  <span className="review-picker-breakdown">{review.creative ? <CreativeBreakdown value={review.creative} /> : <>
+
                     <span>
                       {RUBRIC.progress.label} <strong>{review.progressScore}</strong>
                     </span>
@@ -777,7 +785,7 @@ export function ResultsView({
                     <span>
                       {RUBRIC.complexity.label} <strong>{review.complexityScore}</strong>
                     </span>
-                  </span>
+                                    </>}</span>
                   <span className="review-picker-total">
                     <strong>{review.totalScore}</strong>
                     <small>/{RUBRIC_SCORE_MAX}</small>

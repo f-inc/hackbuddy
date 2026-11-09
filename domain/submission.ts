@@ -11,6 +11,7 @@ export type QueueStatus = "available" | "in progress" | "completed";
 export type ReviewPhase = "preliminary" | "final";
 
 export type ReviewScores = {
+  creative?: import("./creative-rubric").CreativeScores;
   progress: number;
   practicality: number;
   complexity: number;
@@ -18,6 +19,7 @@ export type ReviewScores = {
 };
 
 export type SubmissionReview = {
+  creative?: import("./creative-rubric").CreativeScores;
   judgeName: string;
   progressScore: number;
   practicalityScore: number;

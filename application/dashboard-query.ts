@@ -1,3 +1,4 @@
+import { creativeScoring } from "@/domain/creative-rubric";
 import { DEFAULT_EVENT_SETTINGS, type EventSettings } from "@/domain/event-settings";
 import type { ScoringPolicy } from "@/domain/event-scoring";
 import type { PublishedResults } from "@/domain/publication";
@@ -16,9 +17,10 @@ function average(values: number[]) {
 function scoreDistribution(
   submissions: Pick<Submission, "totalScore" | "reviews">[],
   scoreMax = 10,
+  creative = false,
 ) {
-  const rubricMaximum = 3 * scoreMax;
-  const rubricMinimum = JUDGING_POLICY.rubric.length * JUDGING_POLICY.score.min;
+  const rubricMaximum = creative ? 100 : 3 * scoreMax;
+  const rubricMinimum = creative ? 20 : JUDGING_POLICY.rubric.length * JUDGING_POLICY.score.min;
   const buckets: ScoreDistributionBucket[] = Array.from(
     { length: Math.ceil((rubricMaximum - rubricMinimum + 1) / 2) },
     (_, index) => {
@@ -33,7 +35,7 @@ function scoreDistribution(
   );
   for (const submission of submissions) {
     if (submission.totalScore === null || !submission.reviews.length) continue;
-    const score = submission.totalScore / submission.reviews.length;
+    const score = creative ? submission.totalScore : submission.totalScore / submission.reviews.length;
     const bucketIndex = Math.min(
       buckets.length - 1,
       Math.max(0, Math.floor((score - rubricMinimum) / 2)),
@@ -106,6 +108,7 @@ export class DashboardQuery {
       scoreDistribution: scoreDistribution(
         publication?.results ?? completed,
         this.settings().scoreMax,
+        creativeScoring(this.settings()),
       ),
       eligibleAvailable,
       hasActiveReview: submissions.some(

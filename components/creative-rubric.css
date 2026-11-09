@@ -20,7 +20,7 @@
 }
 .creative-rubric-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px 24px;
   margin-top: 12px;
 }
@@ -39,3 +39,5 @@
     grid-template-columns: 1fr;
   }
 }
+
+.creative-rubric > p { font-size: 12px; color: var(--muted); margin: 8px 0 0; }

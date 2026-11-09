@@ -4,6 +4,7 @@ import { useJudgingPolicy } from "./EventConfig";
 import { formatNormalizedScore } from "@/domain/normalization";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { CreativeScoreFields } from "./CreativeScoreFields";
 import { AppShell } from "./AppShell";
 import { LoadingScreen } from "./LoadingScreen";
 import { ScoreControl } from "./ScoreControl";
@@ -95,7 +96,7 @@ export function JudgedProjectsView({
   initialPhase?: ReviewPhase;
 }) {
   const JUDGING_POLICY = useJudgingPolicy();
-  const RUBRIC_SCORE_MAX = 3 * JUDGING_POLICY.score.max;
+  const RUBRIC_SCORE_MAX = JUDGING_POLICY.reviewMax;
 
   const [session, setSession] = useState<Session | null>(null);
   const [data, setData] = useState<HistoryResponse | null>(null);
@@ -245,6 +246,7 @@ export function JudgedProjectsView({
                     <span>/{RUBRIC_SCORE_MAX}</span>
                   </div>
                 </header>
+                {selected.review.creative ? <CreativeScoreFields value={selected.review.creative} readOnly /> : <>
                 <ScoreControl
                   max={JUDGING_POLICY.score.max}
                   label={RUBRIC.progress.label}
@@ -269,6 +271,7 @@ export function JudgedProjectsView({
                   value={selected.review.complexityScore}
                   readOnly
                 />
+                </>}
                 <label className="field compact-notes">
                   <span>Your private notes</span>
                   <textarea

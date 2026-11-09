@@ -1,3 +1,4 @@
+import { creativeScoring, creativeError, type CreativeScores } from "@/domain/creative-rubric";
 import { currentEventSettings } from "@/lib/event-context";
 import { eventSettings, type EventSettings } from "@/domain/event-settings";
 import { validPicks } from "@/domain/final-ballot";
@@ -48,6 +49,14 @@ export function parseReviewRequest(value: unknown): {
   scores: ReviewScores;
 } {
   const body = record(value, "The review request must be an object.");
+  if (creativeScoring(currentEventSettings())) {
+    const error = creativeError(body.creative);
+    if (error) throw new ValidationError(error);
+    return { id: requiredString(body.id, "Submission ID is required.", 100),
+      scores: { progress: 0, practicality: 0, complexity: 0,
+        creative: structuredClone(body.creative as CreativeScores),
+        notes: optionalString(body.notes, "Judge notes must be text up to 5,000 characters.") } };
+  }
   if (
     !isValidRubricScore(body.progress) ||
     Number(body.progress) > currentEventSettings().scoreMax ||
