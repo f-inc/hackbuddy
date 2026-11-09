@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { changeEvent } from "@/infrastructure/database/events";
+import { createHash, randomUUID } from "node:crypto";
+import { readEvent, changeEvent } from "@/infrastructure/database/events";
 import type { Submission } from "@/domain/submission";
 import {
   MAKERMODS_FORM,
@@ -7,12 +7,14 @@ import {
   MAKERMODS_HILL_TRACK,
   MAKERMODS_TRACKS,
   SUBMISSION_REQUEST_ID,
+  SUBMISSION_EDIT_TOKEN,
   type SubmissionFormTemplate,
 } from "@/domain/submission-form";
 import {
   ValidationError,
   ConflictError,
   NotFoundError,
+  ForbiddenError,
 } from "@/server/http/errors";
 import { safeUrl } from "@/server/http/validation";
 
@@ -103,6 +105,42 @@ export function submissionFields(
   return fields;
 }
 
+function editKey(token: unknown): string {
+  if (typeof token !== "string" || !SUBMISSION_EDIT_TOKEN.test(token))
+    throw new ForbiddenError(
+      "Use your private edit link to access this submission.",
+    );
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function authorizeEdit(
+  keys: Record<string, string> | undefined,
+  id: string,
+  token: unknown,
+) {
+  if (keys?.[id] !== editKey(token))
+    throw new ForbiddenError(
+      "Use your private edit link to access this submission.",
+    );
+}
+
+export async function loadEditableProject(
+  eventId: string,
+  id: string,
+  token: unknown,
+) {
+  const row = await readEvent(eventId);
+  authorizeEdit(row?.data.submissionEditKeys, id, token);
+  const submission = row?.data.submissions.find((s) => s.id === id);
+  if (!submission) throw new NotFoundError("Submission not found.");
+  // Return form answers only, never judging notes or other participants' data.
+  const fields = submissionFields(
+    { ...submission, toolsUsed: (submission.toolsUsed || []).join(", ") },
+    row!.data.config.settings?.submissionForm,
+  );
+  return { id, ...fields };
+}
+
 export async function saveProject(
   eventId: string,
   input: Record<string, unknown>,
@@ -118,9 +156,15 @@ export async function saveProject(
     typeof input.requestId === "string" ? input.requestId : randomUUID();
   if (input.id !== undefined && (typeof input.id !== "string" || !input.id))
     throw new ValidationError("Invalid submission ID.");
-  if (input.id && !admin)
-    throw new ValidationError("Only organizers can edit submitted projects.");
+  if (input.id && !admin && input.editToken === undefined)
+    throw new ValidationError(
+      "Only organizers can edit submitted projects without a private edit link.",
+    );
+  const key =
+    input.editToken === undefined ? undefined : editKey(input.editToken);
   return changeEvent(eventId, (event) => {
+    if (typeof input.id === "string" && !admin)
+      authorizeEdit(event.submissionEditKeys, input.id, input.editToken);
     const fields = submissionFields(
       input,
       event.config.settings?.submissionForm,
@@ -133,6 +177,9 @@ export async function saveProject(
     if (!existing) {
       const duplicate = event.submissions.find((s) => s.id === requestId);
       if (duplicate) {
+        // A public receipt cannot be used to claim an older submission.
+        if (key && event.submissionEditKeys?.[duplicate.id] !== key)
+          throw new ForbiddenError("Use your original private edit link.");
         // A retry confirms the original write, even after the event closes.
         // Reusing a token with changed answers must never silently drop those answers.
         if (
@@ -180,6 +227,7 @@ export async function saveProject(
       reviews: [],
       finalJudging: null,
     };
+    if (key) (event.submissionEditKeys ||= {})[submission.id] = key;
     event.submissions.push(submission);
     return submission.id;
   });

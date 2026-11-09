@@ -8,6 +8,7 @@ import type { PublishedResults } from "@/domain/publication";
 import { ConfigurationError, ConflictError, NotFoundError } from "@/server/http/errors";
 export type SavedDraft = { scores: Partial<ReviewScores>; updatedAt: string };
 export type EventRecord = {
+  submissionEditKeys?: Record<string, string>;
   hillClimbGrades?: Record<string, Record<string, import("@/domain/hill-climb").HillClimbGrade>>;
   config: HackathonConfig;
   submissions: Submission[];

@@ -370,3 +370,16 @@ per submission and cause a nonzero exit status.
 - Run `npm run dev` in the normal checkout; its development script sets port **3010** explicitly. Do not use localhost:3000 or silently increment ports.
 - Reuse an existing server for this checkout. If the assigned port is occupied by an unrelated process, inspect ownership rather than stopping another project's server.
 - Port changes must update the development script, README, environment examples, and local integration/callback URLs together. Keep real credentials in ignored local environment files; never commit them or change production URLs for local development.
+
+### Editing a submitted project
+
+New form submissions receive a private edit link on the confirmation screen.
+Save that link to reopen the database-backed answers on any device; returning
+to the submission form on the original browser also restores the receipt and link.
+Anyone with the link can read and update the form while the event is active and
+submissions are open. Published events remain locked. Organizer editing still works.
+Older submissions without an edit link require an organizer's help; a public
+submission reference alone never grants editing access. Edit credentials are
+stored as hashes separately from project/judging data and are not included in
+public or judge responses. Drafts and private links stored in the browser are
+specific to the event; clearing browser storage removes local recovery.

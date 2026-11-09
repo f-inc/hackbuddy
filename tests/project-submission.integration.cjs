@@ -18,6 +18,7 @@ const {
 const {
   saveProject,
   submissionFields,
+  loadEditableProject,
 } = require("../application/project-submission.ts");
 const { parseEventSettings } = require("../server/http/validation.ts");
 after(() => rmSync(directory, { recursive: true, force: true }));
@@ -225,7 +226,9 @@ test("team numbers preserve leading zeros, are required for both MakerMods track
   });
   for (const track of ["Creative Applications", "Hill Climb"]) {
     for (const teamNumber of [undefined, "", "   "]) {
-      await assert.rejects(saveProject(event, answers({ track, teamNumber })), { status: 400 });
+      await assert.rejects(saveProject(event, answers({ track, teamNumber })), {
+        status: 400,
+      });
     }
   }
   assert.equal((await readEvent(event)).data.submissions.length, 1);
@@ -289,17 +292,165 @@ test("switching a draft to Hill Climb discards hidden creative answers on the se
 
 test("standard events keep accepting submissions without a team number", async () => {
   const event = await fixture({ submissionForm: "standard" });
-  const id = await saveProject(event, answers({ teamNumber: undefined, repositoryUrl: undefined }));
-  assert.equal((await readEvent(event)).data.submissions.find((s) => s.id === id).teamNumber, "");
+  const id = await saveProject(
+    event,
+    answers({ teamNumber: undefined, repositoryUrl: undefined }),
+  );
+  assert.equal(
+    (await readEvent(event)).data.submissions.find((s) => s.id === id)
+      .teamNumber,
+    "",
+  );
 });
 
 test("GitHub repository links are required and retained for both MakerMods tracks", async () => {
   const event = await fixture();
   for (const track of ["Creative Applications", "Hill Climb"]) {
     for (const repositoryUrl of [undefined, "", "   "])
-      await assert.rejects(saveProject(event, answers({ track, repositoryUrl })), { status: 400 });
-    const input = answers({ track, repositoryUrl: "https://github.com/example/robot" });
+      await assert.rejects(
+        saveProject(event, answers({ track, repositoryUrl })),
+        { status: 400 },
+      );
+    const input = answers({
+      track,
+      repositoryUrl: "https://github.com/example/robot",
+    });
     const id = await saveProject(event, input);
-    assert.equal((await readEvent(event)).data.submissions.find((s) => s.id === id).repositoryUrl, input.repositoryUrl);
+    assert.equal(
+      (await readEvent(event)).data.submissions.find((s) => s.id === id)
+        .repositoryUrl,
+      input.repositoryUrl,
+    );
   }
+});
+
+test("private links reopen and update persisted answers without changing judging state", async () => {
+  const event = await fixture(),
+    other = await fixture();
+  const editToken = "a".repeat(64);
+  const input = answers({ editToken });
+  const id = await saveProject(event, input);
+  assert.equal(await saveProject(event, input), id);
+  const stored = (await readEvent(event)).data;
+  assert.notEqual(stored.submissionEditKeys[id], editToken);
+  assert.equal(stored.submissions[0].editToken, undefined);
+  await changeEvent(event, (e) => {
+    Object.assign(e.submissions[0], {
+      notes: "Private judge notes",
+      status: "completed",
+      totalScore: 25,
+      reviews: [{ judgeName: "Judge" }],
+    });
+  });
+  const loaded = await loadEditableProject(event, id, editToken);
+  assert.equal(loaded.contactEmail, input.contactEmail);
+  assert.equal(loaded.notes, undefined);
+  assert.equal(loaded.reviews, undefined);
+  for (const token of [undefined, "b".repeat(64), "bad", 123]) {
+    await assert.rejects(loadEditableProject(event, id, token), {
+      status: 403,
+    });
+  }
+  await assert.rejects(loadEditableProject(other, id, editToken), {
+    status: 403,
+  });
+  await assert.rejects(saveProject(other, { ...input, id }), { status: 403 });
+  await assert.rejects(
+    saveProject(event, { ...input, id, editToken: "b".repeat(64) }),
+    { status: 403 },
+  );
+  await assert.rejects(
+    saveProject(event, { ...input, editToken: "b".repeat(64) }),
+    { status: 403 },
+  );
+  const updated = {
+    ...input,
+    id,
+    description: "Improved robot",
+    teamNumber: "008",
+  };
+  assert.equal(await saveProject(event, updated), id);
+  assert.equal(await saveProject(event, updated), id);
+  const data = (await readEvent(event)).data;
+  assert.equal(data.submissions.length, 1);
+  assert.equal(data.submissions[0].description, updated.description);
+  assert.equal(data.submissions[0].teamNumber, "008");
+  assert.equal(data.submissions[0].notes, "Private judge notes");
+  assert.equal(data.submissions[0].totalScore, 25);
+  assert.equal(data.submissions[0].status, "completed");
+  assert.deepEqual(data.submissions[0].reviews, [{ judgeName: "Judge" }]);
+  assert.equal(data.submissions[0].createdAt, stored.submissions[0].createdAt);
+});
+
+test("private edits honor closed, inactive and published event locks", async () => {
+  for (const close of [
+    (e) => {
+      e.config.settings.submissionsOpen = false;
+    },
+    (e) => {
+      e.config.active = false;
+    },
+    (e) => {
+      e.publication = { publishedAt: new Date().toISOString() };
+    },
+  ]) {
+    const event = await fixture(),
+      input = answers({ editToken: "c".repeat(64) });
+    const id = await saveProject(event, input);
+    await changeEvent(event, close);
+    await assert.rejects(
+      saveProject(event, { ...input, id, description: "Changed" }),
+      { status: 409 },
+    );
+    assert.equal(
+      (await loadEditableProject(event, id, input.editToken)).description,
+      input.description,
+    );
+  }
+});
+
+test("old public receipts cannot be claimed by supplying a new private key", async () => {
+  const event = await fixture(),
+    input = answers();
+  const id = await saveProject(event, input);
+  const editToken = "d".repeat(64);
+  await assert.rejects(saveProject(event, { ...input, editToken }), {
+    status: 403,
+  });
+  await assert.rejects(saveProject(event, { ...input, id, editToken }), {
+    status: 403,
+  });
+  await assert.rejects(loadEditableProject(event, id, editToken), {
+    status: 403,
+  });
+});
+
+test("private read route requires the key, returns form answers only and disables caching", async () => {
+  const {
+    GET,
+  } = require("../app/api/hackathons/[hackathon]/projects/edit/route.ts");
+  const event = await fixture(),
+    editToken = "e".repeat(64);
+  const input = answers({ editToken });
+  const id = await saveProject(event, input);
+  const slug = (await readEvent(event)).data.config.slug;
+  const context = { params: Promise.resolve({ hackathon: slug }) };
+  const url =
+    "http://localhost/api/hackathons/" + slug + "/projects/edit?id=" + id;
+  for (const headers of [{}, { Authorization: "Bearer " + "f".repeat(64) }]) {
+    const response = await GET(new Request(url, { headers }), context);
+    assert.equal(response.status, 403);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+  }
+  const response = await GET(
+    new Request(url, { headers: { Authorization: "Bearer " + editToken } }),
+    context,
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const data = await response.json();
+  assert.equal(data.submission.contactEmail, input.contactEmail);
+  assert.equal(data.submission.reviews, undefined);
+  assert.equal(data.submission.notes, undefined);
+  assert.equal(data.submission.editToken, undefined);
 });
