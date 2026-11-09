@@ -1,3 +1,4 @@
+import { creativeTotal } from "./creative-rubric";
 import { JUDGING_POLICY } from "./judging-policy";
 import type {
   QueueStatus,
@@ -31,7 +32,8 @@ export function createReview(
     progressScore: scores.progress,
     practicalityScore: scores.practicality,
     complexityScore: scores.complexity,
-    totalScore: scores.progress + scores.practicality + scores.complexity,
+    ...(scores.creative ? { creative: structuredClone(scores.creative) } : {}),
+    totalScore: scores.creative ? creativeTotal(scores.creative) : scores.progress + scores.practicality + scores.complexity,
     notes: scores.notes.trim(),
     completedAt,
   };
@@ -53,6 +55,7 @@ export function aggregateReviews(
 
   return {
     ...totals,
+    total: reviews.some((review) => review.creative) ? totals.total / reviews.length : totals.total,
     notes: reviews
       .map((review) =>
         review.notes ? `${review.judgeName}: ${review.notes}` : "",

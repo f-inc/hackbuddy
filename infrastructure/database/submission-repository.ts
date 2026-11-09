@@ -120,7 +120,8 @@ export async function completeDatabaseReview(sid: string, judge: string, scores:
         previous.progressScore === scores.progress &&
         previous.practicalityScore === scores.practicality &&
         previous.complexityScore === scores.complexity &&
-        previous.notes === scores.notes.trim()
+        previous.notes === scores.notes.trim() &&
+        JSON.stringify(previous.creative) === JSON.stringify(scores.creative)
       )
         return;
       throw new ConflictError("You already reviewed this submission.");

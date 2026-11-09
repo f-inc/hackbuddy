@@ -1,3 +1,4 @@
+import { creativeError, creativeScoring, type CreativeScores } from "@/domain/creative-rubric";
 import { NextResponse } from "next/server";
 import { withHackathonRequest } from "@/lib/hackathon-request";
 import { currentEventConfig, currentEventSettings } from "@/lib/event-context";
@@ -18,7 +19,12 @@ export async function POST(
       if (typeof input.id !== "string" || !input.scores || typeof input.scores !== "object")
         throw new ValidationError("Invalid draft.");
       const scores: Partial<import("@/domain/submission").ReviewScores> = {};
-      for (const key of ["progress", "practicality", "complexity"] as const) {
+      if (creativeScoring(currentEventSettings())) {
+        const error = creativeError(input.scores.creative, true);
+        if (error) throw new ValidationError(error);
+        scores.creative = structuredClone(input.scores.creative as CreativeScores);
+      }
+      for (const key of (creativeScoring(currentEventSettings()) ? [] : ["progress", "practicality", "complexity"]) as ("progress" | "practicality" | "complexity")[]) {
         const value = input.scores[key];
         if (value !== undefined) {
           if (!Number.isInteger(value) || value < 1 || value > currentEventSettings().scoreMax)

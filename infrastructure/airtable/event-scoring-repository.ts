@@ -63,7 +63,7 @@ export const eventScoringRepository: EventScoringRepository = {
       if (!record) throw new ConflictError("Event not found.");
       return {
         revision: record.revision,
-        scoringPolicy: record.data.publication?.scoringPolicy || record.data.config.scoringPolicy,
+        scoringPolicy: record.data.publication?.scoringPolicy || (record.data.config.settings?.submissionForm === "makermods-physical-ai" ? "raw-v1" : record.data.config.scoringPolicy),
         publication: record.data.publication,
       };
     }

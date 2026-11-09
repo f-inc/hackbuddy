@@ -62,8 +62,8 @@ export function DashboardView({
   hackathonImageUrl?: string;
 }) {
   const JUDGING_POLICY = useJudgingPolicy();
-  const RUBRIC_SCORE_MAX = 3 * JUDGING_POLICY.score.max;
-  const PRELIMINARY_SCORE_MAX = RUBRIC_SCORE_MAX * JUDGING_POLICY.preliminary.requiredReviews;
+  const RUBRIC_SCORE_MAX = JUDGING_POLICY.reviewMax;
+  const PRELIMINARY_SCORE_MAX = (JUDGING_POLICY.creative ? 100 : RUBRIC_SCORE_MAX * JUDGING_POLICY.preliminary.requiredReviews);
 
   const apiBase = hackathon ? `/api/hackathons/${hackathon}` : "/api";
   const pageBase = hackathon ? `/${hackathon}` : "";

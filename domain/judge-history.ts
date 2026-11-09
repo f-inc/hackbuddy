@@ -1,3 +1,4 @@
+import { reviewMaximum, creativeScoring } from "./creative-rubric";
 import { DEFAULT_EVENT_SETTINGS, type EventSettings } from "./event-settings";
 import { preliminaryRanking, finalRanking } from "./ranking";
 import type { ScoringPolicy } from "./event-scoring";
@@ -99,7 +100,7 @@ export function judgedProjects(
               policy === "normalized-v1"
                 ? (scores.get(submission.id)?.normalizedScore ?? null)
                 : null,
-            maximum: 3 * settings.scoreMax * settings.requiredReviews,
+            maximum: (creativeScoring(settings) ? 100 : reviewMaximum(settings) * settings.requiredReviews),
             rank: ranks.get(submission.id) ?? null,
             complete: ranks.has(submission.id),
           },
