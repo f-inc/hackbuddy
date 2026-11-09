@@ -1,9 +1,8 @@
 "use client";
 import { useManagedEvent, useJudgingPolicy, useEventSettings } from "./EventConfig";
 import { MAKERMODS_FORM } from "@/domain/submission-form";
-import "./creative-rubric.css";
 
-import { CREATIVE_RUBRIC, EMPTY_CREATIVE, creativeError, creativeTotal, type CreativeScores } from "@/domain/creative-rubric";
+import { EMPTY_CREATIVE, creativeError, creativeTotal, type CreativeScores } from "@/domain/creative-rubric";
 import { CreativeScoreFields } from "./CreativeScoreFields";
 import { AppShell } from "@/components/AppShell";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -569,24 +568,6 @@ export function JudgingView({
             </div>
           </div>
         </section>
-
-        {makerMods && !finalMode && (
-          <section className="creative-rubric card" aria-labelledby="creative-rubric-title">
-            <header className="creative-rubric-header">
-              <h2 id="creative-rubric-title">Creative Applications rubric</h2>
-              <span>1–5 per axis · weighted total out of 100</span>
-            </header>
-            <p>3-minute robot demo, then 2 minutes of questions. Video demos are capped at 3 for Demo quality. Teams stay at their stations; top 5 present before awards.</p>
-            <div className="creative-rubric-grid">
-              {CREATIVE_RUBRIC.map((criterion) => (
-                <div key={criterion.key}>
-                  <h3>{criterion.label} · {criterion.weight}%</h3>
-                  <p>1: {criterion.low} · 3: {criterion.middle} · 5: {criterion.high}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
 
         {error && <div className="error-banner page-error">{error}</div>}
 
