@@ -11,6 +11,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "creative-rubric-"));
 process.env.HACKBUDDY_DB = path.join(dir, "test.sqlite");
 after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const {
+  sameCreative,
   creativeTotal,
   creativeError,
   EMPTY_CREATIVE,
@@ -208,4 +209,11 @@ test("five-axis drafts and concurrent judge scores persist and drive weighted ra
       2,
     );
   });
+});
+
+test("Supabase JSON key ordering cannot break identical review retries", () => {
+ const original = creative(5);
+ const reordered = Object.fromEntries(Object.entries(original).reverse());
+ assert.equal(sameCreative(original, reordered), true);
+ assert.equal(sameCreative(original, creative(4)), false);
 });

@@ -84,3 +84,9 @@ export function creativeScoring(settings: Partial<EventSettings>) {
 export function reviewMaximum(settings: EventSettings) {
   return creativeScoring(settings) ? 100 : 3 * settings.scoreMax;
 }
+
+export function sameCreative(a?: CreativeScores, b?: CreativeScores) {
+  if (!a || !b) return a === b;
+  return CREATIVE_RUBRIC.every((axis) => a[axis.key] === b[axis.key]) &&
+    a.demoFormat === b.demoFormat && a.hardwareNotes === b.hardwareNotes;
+}

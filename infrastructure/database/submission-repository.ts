@@ -1,5 +1,6 @@
 import type { SubmissionRepository } from "@/application/ports/submission-repository";
 import type { Submission, ReviewScores } from "@/domain/submission";
+import { sameCreative } from "@/domain/creative-rubric";
 import { isHillClimb } from "@/domain/hill-climb";
 import { aggregateReviews, createReview, hasReviewBy } from "@/domain/scoring";
 import { currentEventConfig } from "@/lib/event-context";
@@ -121,7 +122,7 @@ export async function completeDatabaseReview(sid: string, judge: string, scores:
         previous.practicalityScore === scores.practicality &&
         previous.complexityScore === scores.complexity &&
         previous.notes === scores.notes.trim() &&
-        JSON.stringify(previous.creative) === JSON.stringify(scores.creative)
+        sameCreative(previous.creative, scores.creative)
       )
         return;
       throw new ConflictError("You already reviewed this submission.");
