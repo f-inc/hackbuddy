@@ -38,7 +38,7 @@ export class QueueService {
 
   async claimNext(judgeName: string, skippedIds: string[] = []) {
     const repository = this.repository();
-    const submissions = await repository.list();
+    const submissions = await repository.list(judgeName);
     const existing = submissions.find(
       (submission) =>
         submission.status === "in progress" &&
@@ -68,7 +68,7 @@ export class QueueService {
 
   async skip(id: string, judgeName: string) {
     const repository = this.repository();
-    const submission = await repository.findById(id);
+    const submission = await repository.findById(id, judgeName);
     if (!submission) throw new NotFoundError("Submission not found.");
     if (
       submission.status !== "in progress" ||
@@ -77,12 +77,12 @@ export class QueueService {
     ) {
       throw new ConflictError("This submission is not assigned to you.");
     }
-    await repository.release(id);
+    await repository.release(id, judgeName);
   }
 
   async complete(id: string, judgeName: string, scores: ReviewScores) {
     const repository = this.repository();
-    const submission = await repository.findById(id);
+    const submission = await repository.findById(id, judgeName);
     if (!submission) throw new NotFoundError("Submission not found.");
     if (
       submission.status !== "in progress" ||
@@ -102,7 +102,7 @@ export class QueueService {
       "preliminary",
       createReview(judgeName, scores, completedAt),
     );
-    const persisted = await repository.findById(id);
+    const persisted = await repository.findById(id, judgeName);
     if (!persisted) throw new NotFoundError("Submission not found.");
     await repository.savePreliminaryProjection(
       id,

@@ -8,22 +8,43 @@ import { eventSettings } from "@/domain/event-settings";
 import { changeEvent, readEvent, type EventRecord } from "./events";
 import { ConflictError, NotFoundError } from "@/server/http/errors";
 const expiry = 15 * 60 * 1000;
-function project(event: EventRecord, submission: Submission): Submission {
-  const active = !!submission.claimedBy && Date.parse(submission.claimedAt) + expiry > Date.now();
-  const completed =
-    submission.reviews.length >= eventSettings(event.config.settings).requiredReviews;
+function parallel(event: EventRecord) {
+  return event.config.settings?.submissionForm === "makermods-physical-ai";
+}
+function claims(submission: Submission): Record<string, string> {
+  const all = { ...submission.judgeClaims };
+  // Preserve reservations created before concurrent judging was deployed.
+  if (submission.claimedBy && !all[submission.claimedBy])
+    all[submission.claimedBy] = submission.claimedAt;
+  return Object.fromEntries(Object.entries(all).filter(([judge, at]) =>
+    Date.parse(at) + expiry > Date.now() && !hasReviewBy(submission.reviews, judge)));
+}
+function project(event: EventRecord, submission: Submission, judge?: string): Submission {
+  const activeClaims = parallel(event) ? claims(submission) : {};
+  const owner = parallel(event)
+    ? (judge ? (activeClaims[judge] ? judge : "") : Object.keys(activeClaims)[0] || "")
+    : submission.claimedBy;
+  const at = parallel(event) ? activeClaims[owner] || "" : submission.claimedAt;
+  const active = !!owner && Date.parse(at) + expiry > Date.now();
+  const completed = submission.reviews.length >= eventSettings(event.config.settings).requiredReviews;
   const scores = aggregateReviews(submission.reviews);
   return {
     ...submission,
-    status: completed ? "completed" : active ? "in progress" : "available",
-    claimedBy: active && !completed ? submission.claimedBy : "",
-    claimedAt: active && !completed ? submission.claimedAt : "",
+    status: judge && active ? "in progress" : completed ? "completed" : active ? "in progress" : "available",
+    claimedBy: active && (!completed || !!judge) ? owner : "",
+    claimedAt: active && (!completed || !!judge) ? at : "",
     progressScore: submission.reviews.length ? scores.progress : null,
     practicalityScore: submission.reviews.length ? scores.practicality : null,
     complexityScore: submission.reviews.length ? scores.complexity : null,
     totalScore: submission.reviews.length ? scores.total : null,
     notes: scores.notes,
   };
+}
+function releaseClaim(s: Submission, judge?: string) {
+  if (!judge) { s.judgeClaims = {}; s.claimedBy = ""; s.claimedAt = ""; return; }
+  s.judgeClaims = claims(s);
+  delete s.judgeClaims[judge];
+  if (s.claimedBy === judge) { s.claimedBy = ""; s.claimedAt = ""; }
 }
 function find(event: EventRecord, id: string) {
   const s = event.submissions.find((s) => s.id === id);
@@ -37,30 +58,34 @@ export function databaseSubmissionRepository(): SubmissionRepository {
   const id = currentEventConfig()!.id;
   return {
     demoMode: false,
-    async list() {
+    async list(judge) {
       const row = await readEvent(id);
-      return row ? row.data.submissions.map((s) => project(row.data, s)) : [];
+      return row ? row.data.submissions.map((s) => project(row.data, s, judge)) : [];
     },
-    async findById(sid) {
-      return (await this.list()).find((s) => s.id === sid) || null;
+    async findById(sid, judge) {
+      return (await this.list(judge)).find((s) => s.id === sid) || null;
     },
     async tryClaim(sid, judge) {
       return changeEvent(id, (event) => {
         mutable(event);
         const s = find(event, sid);
-        const current = project(event, s);
+        const current = project(event, s, judge);
         const relay = (entry: Submission) =>
           event.config.settings?.submissionForm === "makermods-physical-ai" && isHillClimb(entry);
         if (
           relay(s) ||
           current.status !== "available" ||
           hasReviewBy(s.reviews, judge) ||
-          event.submissions.some((other) => !relay(other) && project(event, other).claimedBy === judge)
+          event.submissions.some((other) => !relay(other) && project(event, other, judge).claimedBy === judge)
         )
           return null;
-        s.claimedBy = judge;
-        s.claimedAt = new Date().toISOString();
-        return project(event, s);
+        if (parallel(event)) {
+          s.judgeClaims = { ...claims(s), [judge]: new Date().toISOString() };
+        } else {
+          s.claimedBy = judge;
+          s.claimedAt = new Date().toISOString();
+        }
+        return project(event, s, judge);
       });
     },
     async saveReview(sid, phase, review) {
@@ -98,12 +123,11 @@ export function databaseSubmissionRepository(): SubmissionRepository {
         find(event, sid).finalJudging = null;
       });
     },
-    async release(sid) {
+    async release(sid, judge) {
       await changeEvent(id, (event) => {
         mutable(event);
         const s = find(event, sid);
-        s.claimedBy = "";
-        s.claimedAt = "";
+        releaseClaim(s, judge);
       });
     },
   };
@@ -127,14 +151,13 @@ export async function completeDatabaseReview(sid: string, judge: string, scores:
         return;
       throw new ConflictError("You already reviewed this submission.");
     }
-    if (project(event, s).claimedBy !== judge)
+    if (project(event, s, judge).claimedBy !== judge)
       throw new ConflictError(
         "This reservation expired. Reload the queue; your draft is retained.",
       );
     s.completedAt = new Date().toISOString();
     s.reviews.push(createReview(judge, scores, s.completedAt));
-    s.claimedBy = "";
-    s.claimedAt = "";
+    releaseClaim(s, judge);
     delete event.drafts[`${judge}:${sid}`];
   });
 }
@@ -148,9 +171,10 @@ export async function draftDatabaseReview(
   return changeEvent(eventId, (event) => {
     mutable(event);
     const s = find(event, sid);
-    if (project(event, s).claimedBy !== judge)
+    if (project(event, s, judge).claimedBy !== judge)
       throw new ConflictError("This reservation expired. Your local draft is retained.");
-    s.claimedAt = new Date().toISOString();
+    if (parallel(event)) s.judgeClaims = { ...claims(s), [judge]: new Date().toISOString() };
+    else s.claimedAt = new Date().toISOString();
     return (event.drafts[`${judge}:${sid}`] = { scores, updatedAt: new Date().toISOString() });
   });
 }
