@@ -7,4 +7,5 @@ export const MAKERMODS_TRACKS = [
   MAKERMODS_HILL_TRACK,
 ] as const;
 export const MAKERMODS_TOOLS = ["Dream-1", "LiveKit", "Dimensional"] as const;
+export const SUBMISSION_EDIT_TOKEN = /^[a-f0-9]{64}$/;
 export const SUBMISSION_REQUEST_ID = /^[a-zA-Z0-9-]{20,100}$/;

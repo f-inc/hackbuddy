@@ -9,6 +9,7 @@ import {
   MAKERMODS_TRACKS,
   MAKERMODS_TOOLS,
   SUBMISSION_REQUEST_ID,
+  SUBMISSION_EDIT_TOKEN,
 } from "@/domain/submission-form";
 
 const empty = {
@@ -34,6 +35,7 @@ type Draft = {
   requestId: string;
   pending: boolean;
   receipt: string;
+  editToken?: string;
 };
 function readFields(value: unknown): Fields {
   const source =
@@ -62,6 +64,8 @@ export function SubmissionForm({
   const makerMods = useEventSettings().submissionForm === MAKERMODS_FORM;
   const draftKey = `hackbuddy:submission:v1:${slug}`;
   const requestToken = useRef("");
+  const editToken = useRef("");
+  const [privateToken, setPrivateToken] = useState("");
   const submitting = useRef(false);
   const [form, setForm] = useState(empty),
     [error, setError] = useState(""),
@@ -74,15 +78,15 @@ export function SubmissionForm({
   const selectedTrack = form.track || MAKERMODS_TRACK;
   const hillClimb = makerMods && selectedTrack === MAKERMODS_HILL_TRACK;
   function persist(fields: Fields, uncertain = pending, received = receipt) {
-    if (id) return;
     try {
       localStorage.setItem(
-        draftKey,
+        id ? `${draftKey}:draft:${id}` : draftKey,
         JSON.stringify({
           form: fields,
           requestId: requestToken.current,
           pending: uncertain,
           receipt: received,
+          editToken: editToken.current,
         } satisfies Draft),
       );
       setDraftMessage("Draft saved on this device.");
@@ -109,6 +113,13 @@ export function SubmissionForm({
             if (active) {
               setForm(readFields(draft.form));
               if (
+                typeof draft.editToken === "string" &&
+                SUBMISSION_EDIT_TOKEN.test(draft.editToken)
+              ) {
+                editToken.current = draft.editToken;
+                setPrivateToken(draft.editToken);
+              }
+              if (
                 typeof draft.requestId === "string" &&
                 SUBMISSION_REQUEST_ID.test(draft.requestId)
               ) {
@@ -127,21 +138,70 @@ export function SubmissionForm({
         return;
       }
       try {
+        const fragmentToken =
+          new URLSearchParams(window.location.hash.slice(1)).get("edit") || "";
+        if (SUBMISSION_EDIT_TOKEN.test(fragmentToken)) {
+          editToken.current = fragmentToken;
+          setPrivateToken(fragmentToken);
+          // The fragment stays out of server logs and referrer headers.
+          try {
+            localStorage.setItem(`${draftKey}:edit:${id}`, fragmentToken);
+          } catch {}
+        } else {
+          try {
+            editToken.current =
+              localStorage.getItem(`${draftKey}:edit:${id}`) || "";
+          } catch {}
+          setPrivateToken(editToken.current);
+        }
+        const participant = SUBMISSION_EDIT_TOKEN.test(editToken.current);
         const response = await fetch(
-          `/api/hackathons/${slug}/submission?id=${encodeURIComponent(id)}`,
-          { signal: AbortSignal.timeout(20000) },
+          participant
+            ? `/api/hackathons/${slug}/projects/edit?id=${encodeURIComponent(id)}`
+            : `/api/hackathons/${slug}/submission?id=${encodeURIComponent(id)}`,
+          {
+            signal: AbortSignal.timeout(20000),
+            cache: "no-store",
+            ...(participant
+              ? { headers: { Authorization: `Bearer ${editToken.current}` } }
+              : {}),
+          },
         );
         const data = await response.json();
         if (!response.ok)
           throw new Error(data.error || "Project could not be loaded.");
         const submission = data.submission as Submission;
-        if (active)
+        if (active) {
           setForm(
             readFields({
               ...submission,
               toolsUsed: (submission.toolsUsed || []).join(", "),
             }),
           );
+          // Recover unfinished edits separately from the original submission receipt.
+          if (participant) {
+            try {
+              const draft = JSON.parse(
+                localStorage.getItem(`${draftKey}:draft:${id}`) || "null",
+              ) as Draft | null;
+              if (
+                draft &&
+                draft.editToken === editToken.current &&
+                !draft.receipt
+              ) {
+                setForm(readFields(draft.form));
+                setPending(draft.pending === true);
+                if (SUBMISSION_REQUEST_ID.test(draft.requestId))
+                  requestToken.current = draft.requestId;
+                setDraftMessage(
+                  "Your unfinished edits were restored on this device.",
+                );
+              }
+            } catch {
+              // The saved server answers remain available without browser storage.
+            }
+          }
+        }
       } catch (cause) {
         if (active) {
           setError((cause as Error).message);
@@ -163,6 +223,13 @@ export function SubmissionForm({
     setBusy(true);
     setError("");
     requestToken.current ||= crypto.randomUUID();
+    if (!id && !editToken.current) {
+      editToken.current = Array.from(
+        crypto.getRandomValues(new Uint8Array(32)),
+        (b) => b.toString(16).padStart(2, "0"),
+      ).join("");
+      setPrivateToken(editToken.current);
+    }
     persist(form, true, "");
     setPending(true);
     try {
@@ -174,6 +241,7 @@ export function SubmissionForm({
           ...form,
           ...(makerMods ? { track: selectedTrack } : {}),
           requestId: requestToken.current,
+          ...(editToken.current ? { editToken: editToken.current } : {}),
           ...(id ? { id } : {}),
         }),
       });
@@ -190,6 +258,14 @@ export function SubmissionForm({
       setReceipt(data.id);
       setPending(false);
       persist(form, false, data.id);
+      if (editToken.current) {
+        try {
+          localStorage.setItem(
+            `${draftKey}:edit:${data.id}`,
+            editToken.current,
+          );
+        } catch {}
+      }
     } catch (cause) {
       const message = (cause as Error).message;
       setError(
@@ -253,6 +329,46 @@ export function SubmissionForm({
           <p>
             Team: {form.teamName} · Project: {form.projectName}
           </p>
+          {privateToken && (
+            <div>
+              <p>
+                Keep this private edit link to reopen your saved answers on any
+                device. Anyone with the link can edit until submissions close.
+              </p>
+              {id ? (
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => setReceipt("")}
+                >
+                  Edit submission
+                </button>
+              ) : (
+                <a
+                  className="primary-button"
+                  href={`/${slug}/submit?id=${encodeURIComponent(receipt)}#edit=${privateToken}`}
+                >
+                  Edit submission
+                </a>
+              )}
+              <label className="field" style={{ marginTop: 16 }}>
+                <span>Private edit link (copy and save)</span>
+                <input
+                  readOnly
+                  aria-label="Private edit link"
+                  value={
+                    typeof window === "undefined"
+                      ? ""
+                      : `${window.location.origin}/${slug}/submit?id=${encodeURIComponent(receipt)}#edit=${privateToken}`
+                  }
+                  onFocus={(e) => e.target.select()}
+                />
+              </label>
+            </div>
+          )}
+          {!privateToken && !id && (
+            <p>For changes to this earlier submission, contact an organizer.</p>
+          )}
           {id && (
             <a className="secondary-button" href={`/${slug}/projects`}>
               Back to projects
@@ -539,7 +655,10 @@ export function SubmissionForm({
               </small>
             </label>
             <label className="field">
-              <span>GitHub repository link{makerMods ? " *" : " (optional, preferred)"}</span>
+              <span>
+                GitHub repository link
+                {makerMods ? " *" : " (optional, preferred)"}
+              </span>
               <input
                 name="repositoryUrl"
                 type="url"
@@ -574,12 +693,9 @@ export function SubmissionForm({
                   ? "Save changes"
                   : "Submit project"}
           </button>
-          {!id && (
-            <p className="field-hint" role="status">
-              {draftMessage ||
-                "Your draft stays on this device until you submit."}
-            </p>
-          )}
+          <p className="field-hint" role="status">
+            {draftMessage || "Your draft stays on this device until you save."}
+          </p>
         </form>
       )}
     </main>
