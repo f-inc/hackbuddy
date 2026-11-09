@@ -77,10 +77,15 @@ export function AppShell({
   const router = useRouter();
   const navigation: AppNavigationItem[] = [
     ...(hackathon
-      ? eventNavigation.map((item) => ({
-          ...item,
-          href: `/${hackathon}${item.href}`,
-        }))
+      ? eventNavigation
+          .filter((item) =>
+            hackathon !== "makermods" ||
+            (item.href !== "/leaderboard" && item.href !== "/second-pass"),
+          )
+          .map((item) => ({
+            ...item,
+            href: `/${hackathon}${item.href}`,
+          }))
       : []),
     ...(hackathon
       ? settings.collections.filter((collection) =>
