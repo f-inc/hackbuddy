@@ -5,6 +5,7 @@ import { MAKERMODS_FORM } from "@/domain/submission-form";
 import { EMPTY_CREATIVE, creativeError, creativeTotal, type CreativeScores } from "@/domain/creative-rubric";
 import { CreativeScoreFields } from "./CreativeScoreFields";
 import { AppShell } from "@/components/AppShell";
+import { MakerModsProjectPicker } from "./MakerModsProjectPicker";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { ScoreControl } from "@/components/ScoreControl";
 import { SubmissionDetails } from "@/components/SubmissionDetails";
@@ -318,6 +319,38 @@ export function JudgingView({
     return () => window.clearInterval(interval);
   }, [apiBase, finalMode, name]);
 
+  async function chooseProject(id: string) {
+    if (submitting || skipping || id === submission?.id) return;
+    setSkipping(true);
+    setError("");
+    try {
+      await saveChain.current;
+      if (submission) {
+        const scores = { creative, notes };
+        try {
+          localStorage.setItem(draftKey(submission.id), JSON.stringify({ scores, updatedAt: new Date().toISOString() }));
+        } catch {}
+        const saved = await fetch(`${apiBase}/queue/draft`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: submission.id, scores }),
+        });
+        if (!saved.ok) throw new Error("Draft could not be synced. Your local draft is retained.");
+      }
+      const response = await fetch(`${apiBase}/queue/projects`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
+      });
+      const result = await response.json() as ClaimResponse;
+      if (!response.ok) throw new Error(result.error || "Could not select this project.");
+      setSubmission(result.submission);
+      setStats(result.stats);
+      setDemoMode(result.demoMode);
+      setSkippedIds(ids => ids.filter(value => value !== id));
+      restoreClaim(result);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not switch projects.");
+    } finally { setSkipping(false); }
+  }
+
   async function skipCurrentSubmission() {
     if (!submission || submitting || skipping) return;
     setSkipping(true);
@@ -568,6 +601,11 @@ export function JudgingView({
             </div>
           </div>
         </section>
+
+        {makerMods && !inspectionMode && !finalMode && (
+          <MakerModsProjectPicker apiBase={apiBase} currentId={submission?.id}
+            busy={submitting || skipping} onSelect={chooseProject} />
+        )}
 
         {error && <div className="error-banner page-error">{error}</div>}
 

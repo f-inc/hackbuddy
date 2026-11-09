@@ -178,3 +178,23 @@ export async function draftDatabaseReview(
     return (event.drafts[`${judge}:${sid}`] = { scores, updatedAt: new Date().toISOString() });
   });
 }
+
+// Switching is one transaction: validate the destination before releasing this
+// judge's other reservations. Other judges and all saved drafts are untouched.
+export async function selectMakerModsProject(sid: string, judge: string) {
+  const config = currentEventConfig();
+  if (config?.storage !== "database" || config.settings?.submissionForm !== "makermods-physical-ai")
+    throw new ConflictError("Project selection is only available for MakerMods.");
+  return changeEvent(config.id, event => {
+    mutable(event);
+    const target = find(event, sid);
+    if (isHillClimb(target))
+      throw new ConflictError("Hill Climb is judged in the Hill Climb section.");
+    if (hasReviewBy(target.reviews, judge))
+      throw new ConflictError("You already reviewed this project.");
+    for (const entry of event.submissions)
+      if (entry.id !== sid && !isHillClimb(entry)) releaseClaim(entry, judge);
+    target.judgeClaims = { ...claims(target), [judge]: new Date().toISOString() };
+    return project(event, target, judge);
+  });
+}
