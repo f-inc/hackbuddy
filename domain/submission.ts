@@ -68,6 +68,7 @@ export type SubmissionProject = {
 };
 
 export type SubmissionJudging = {
+  judgeClaims?: Record<string, string>;
   status: QueueStatus;
   claimedBy: string;
   claimedAt: string;

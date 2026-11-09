@@ -217,3 +217,34 @@ test("Supabase JSON key ordering cannot break identical review retries", () => {
  assert.equal(sameCreative(original, reordered), true);
  assert.equal(sameCreative(original, creative(4)), false);
 });
+
+test("six judges can reserve and submit one project concurrently without losing drafts", async () => {
+  const config = { id: randomUUID(), slug: "parallel-" + randomUUID(), storage: "database",
+    settings: { submissionForm: "makermods-physical-ai", requiredReviews: 6 } };
+  const sid = randomUUID();
+  await insertEvent({config, submissions: [{id: sid, track: "Creative Applications", createdAt: new Date().toISOString(),
+    reviews: [], claimedBy: "legacy", claimedAt: new Date().toISOString()}], drafts: {}, publication: null});
+  await withEventConfig(config, async () => {
+    const judges = ["legacy", "parallel1", "parallel2", "parallel3", "parallel4", "parallel5"];
+    const assigned = await Promise.all(judges.map(judge => api.claimNextSubmission(judge)));
+    assert.ok(assigned.every(s => s?.id === sid));
+    await Promise.all(judges.map((judge, i) => draftDatabaseReview(sid, judge, {
+      progress: 0, practicality: 0, complexity: 0, creative: creative(3), notes: "draft" + i
+    })));
+    for (let i = 0; i < judges.length; i++)
+      assert.equal((await draftDatabaseReview(sid, judges[i])).scores.notes, "draft" + i);
+    await api.skipSubmission(sid, "parallel1");
+    assert.equal((await api.claimNextSubmission("parallel1")).id, sid);
+    assert.equal((await api.claimNextSubmission("legacy")).id, sid);
+    await Promise.all(judges.map(judge => api.completeSubmission(sid, judge, {
+      progress: 0, practicality: 0, complexity: 0, creative: creative(4), notes: judge
+    })));
+    const saved = (await readEvent(config.id)).data;
+    assert.equal(saved.submissions[0].reviews.length, 6);
+    assert.equal(new Set(saved.submissions[0].reviews.map(r => r.judgeName)).size, 6);
+    assert.equal(Object.keys(saved.drafts).length, 0);
+    assert.equal(await api.claimNextSubmission("seventh"), null);
+    assert.equal((await api.getQueueStats()).completed, 1);
+    assert.equal((await api.getResultsReport()).results[0].totalScore, 80);
+  });
+});

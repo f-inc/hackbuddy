@@ -35,8 +35,8 @@ const repository: SubmissionRepositoryProvider = () => {
   return {
     ...source,
     findById: source.findById.bind(source),
-    async list() {
-      return (await source.list()).filter((submission) => !isHillClimb(submission));
+    async list(judgeName) {
+      return (await source.list(judgeName)).filter((submission) => !isHillClimb(submission));
     },
   };
 };
